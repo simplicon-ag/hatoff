@@ -31,7 +31,7 @@ export const FeaturedLook = ({ look }: Props) => {
     };
   }, [look]);
 
-  const heroImage = look.hero;
+  const heroImage = look.hero ?? products[0]?.node.images.edges[0]?.node.url ?? null;
   const total = products.reduce((sum, p) => {
     const v = p.node.variants.edges.find((e) => e.node.availableForSale)?.node;
     return v ? sum + parseFloat(v.price.amount) : sum;
@@ -69,12 +69,16 @@ export const FeaturedLook = ({ look }: Props) => {
     <article className="group flex flex-col">
       {/* Hero */}
       <Link to={`/looks/${look.slug}`} className="relative block aspect-[4/5] overflow-hidden bg-secondary">
-        <img
-          src={heroImage}
-          alt={look.title}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
-        />
+        {heroImage ? (
+          <img
+            src={heroImage}
+            alt={look.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
+          />
+        ) : (
+          <div className="h-full w-full animate-pulse bg-secondary" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/10 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-6 text-primary-foreground">
           <p className="text-[11px] uppercase tracking-[0.2em] opacity-80">Look</p>
