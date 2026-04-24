@@ -20,12 +20,12 @@ export const looks: CuratedLook[] = [
     welt: "business",
     anlaesse: ["buero", "besondere-anlaesse"],
     productHandles: [
-      "casamoda-hemd-modern-fit-weiss",
-      "meyer-chino-beige-slim-fit",
+      "venti-businesshemd-extra-langer-arm-72cm-weiss",
+      "casa-moda-chinohose-chris-dunkelblau",
     ],
     story:
-      "Ein weisses Hemd ist nie eine Notlösung — es ist eine Haltung. Kombiniert mit einer schmalen beigen Chino entsteht ein Look, der Büro, Termin und After-Work mühelos verbindet.",
-    hero: "/src/assets/welt-business.jpg",
+      "Ein weisses Hemd ist nie eine Notlösung — es ist eine Haltung. Mit der dunkelblauen CHRIS-Chino entsteht ein Look, der vom Termin bis zum After-Work funktioniert.",
+    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0315_i0.jpg?v=1777042433",
   },
   {
     slug: "smart-casual-cafe",
@@ -34,12 +34,12 @@ export const looks: CuratedLook[] = [
     welt: "smart-casual",
     anlaesse: ["alltag", "ausgang"],
     productHandles: [
-      "casamoda-oxford-hemd-hellblau",
-      "meyer-chino-beige-slim-fit",
+      "venti-businesshemd-extra-langer-arm-72cm-hellblau",
+      "casa-moda-chinohose-chris-beige",
     ],
     story:
-      "Hellblaues Oxford-Hemd, Ärmel umgeschlagen, beige Chino — der Klassiker für Tage, an denen alles passen soll. Vom Meeting bis zum Aperitif.",
-    hero: "/src/assets/welt-smart-casual.jpg",
+      "Hellblaues Hemd, Ärmel umgeschlagen, beige CHRIS-Chino — der Klassiker für Tage, an denen alles passen soll. Vom Meeting bis zum Aperitif.",
+    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0302_i0.jpg?v=1777042388",
   },
   {
     slug: "wochenende-warm",
@@ -48,12 +48,13 @@ export const looks: CuratedLook[] = [
     welt: "freizeit",
     anlaesse: ["alltag", "reisen"],
     productHandles: [
-      "fynch-hatton-merino-pullover-creme",
-      "milestone-ubergangsjacke-cognac",
+      "casa-moda-pullover-champagner-beige",
+      "casa-moda-jeans-steve-dunkelblau",
+      "casa-moda-blouson-olive",
     ],
     story:
-      "Cremefarbener Merino-Pullover unter einer cognacfarbenen Jacke — Wärme, die nach Stil aussieht. Für Spaziergänge, Märkte und lange Frühstücke.",
-    hero: "/src/assets/welt-freizeit.jpg",
+      "Champagner-Pullover, dunkelblaue STEVE-Jeans und ein olivfarbener Blouson — Wärme, die nach Stil aussieht. Für Spaziergänge, Märkte und lange Frühstücke.",
+    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0145_i0.jpg?v=1777041794",
   },
   {
     slug: "sommer-leicht",
@@ -62,40 +63,42 @@ export const looks: CuratedLook[] = [
     welt: "sommer",
     anlaesse: ["sommer", "reisen"],
     productHandles: [
-      "fynch-hatton-pikee-polo-navy",
-      "meyer-chino-beige-slim-fit",
+      "casa-moda-polo-shirt-dunkelblau",
+      "casa-moda-3-4-bermuda-ben-beige",
     ],
     story:
-      "Ein Navy-Polo bringt Frische ohne Anstrengung. Mit beiger Chino wird daraus die ehrlichste Form von Sommer-Stil.",
-    hero: "/src/assets/welt-sommer.jpg",
+      "Ein dunkelblaues Polo bringt Frische ohne Anstrengung. Mit der beigen BEN-Bermuda wird daraus die ehrlichste Form von Sommer-Stil.",
+    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0099_i0.jpg?v=1777041624",
   },
   {
-    slug: "ausgang-warm",
-    title: "Abendlicht & Cognac",
+    slug: "abend-cognac",
+    title: "Abendlicht & Beige",
     subtitle: "Ein Look, der die Stunde fühlt.",
     welt: "smart-casual",
     anlaesse: ["ausgang", "besondere-anlaesse"],
     productHandles: [
-      "venti-slim-fit-hemd-karo-hellblau",
-      "milestone-ubergangsjacke-cognac",
+      "venti-businesshemd-extra-langer-arm-72cm-hellblau",
+      "casa-moda-jeans-steve-dunkelblau",
+      "casa-moda-strickjacke-beige",
     ],
     story:
-      "Ein Karo-Hemd, das Persönlichkeit zeigt, getragen unter einer warmen cognacfarbenen Jacke — der Look für lange Abende.",
-    hero: "/src/assets/welt-jacken.jpg",
+      "Hellblaues Hemd, dunkle Jeans, beige Strickjacke — der Look für lange Abende, in denen Stil keine Anstrengung sein soll.",
+    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0302_i0.jpg?v=1777042388",
   },
   {
-    slug: "neuer-business-klassiker",
+    slug: "business-klassiker",
     title: "Neuer Business-Klassiker",
-    subtitle: "Streifen, Struktur, Statement.",
+    subtitle: "Anzug, neu gedacht.",
     welt: "business",
     anlaesse: ["buero"],
     productHandles: [
-      "venti-modern-fit-hemd-streifen",
-      "meyer-chino-beige-slim-fit",
+      "venti-businesshemd-extra-langer-arm-72cm-weiss",
+      "venti-anzughose-108-blau",
+      "casa-moda-steppweste-dunkelblau",
     ],
     story:
-      "Ein Streifenhemd bringt Rhythmus in ruhige Tage. Mit Chino und Lederschuh wird es zum verlässlichen Begleiter.",
-    hero: "/src/assets/welt-hemden.jpg",
+      "Weisses Hemd, blaue Anzughose und eine dunkelblaue Steppweste als moderne Schicht — präzise, ruhig, souverän.",
+    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0315_i0.jpg?v=1777042433",
   },
 ];
 
