@@ -159,7 +159,16 @@ export async function fetchProductsByHandles(handles: string[]): Promise<Shopify
     .map((node) => ({ node }) as ShopifyProduct);
 }
 
-export function formatPrice(amount: string | number, currencyCode = "CHF") {
+/**
+ * Formatiert einen Preis im HATOFF-Schema:
+ *  - Währung immer CHF (Shopify liefert teilweise andere Codes für Sandbox-Stores)
+ *  - Endet immer auf `.95` (psychologische Preisgestaltung)
+ *  - Ganzzahliger Frankenbetrag wird vom Shopify-Sales-Preis übernommen,
+ *    Rappen werden auf `.95` normalisiert (z.B. 89.00 → CHF 89.95, 120.50 → CHF 120.95)
+ */
+export function formatPrice(amount: string | number, _currencyCode = "CHF") {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return `${currencyCode} ${num.toFixed(2)}`;
+  if (!isFinite(num)) return "CHF –";
+  const francs = Math.floor(num);
+  return `CHF ${francs}.95`;
 }
