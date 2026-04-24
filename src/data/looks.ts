@@ -1,5 +1,11 @@
 // HATOFF — Curated Looks
 // Each look references real Shopify product handles created in the store.
+import heroBuero from "@/assets/look-modernes-buero.jpg";
+import heroCafe from "@/assets/look-smart-casual-cafe.jpg";
+import heroWochenende from "@/assets/look-wochenende-warm.jpg";
+import heroSommer from "@/assets/look-sommer-leicht.jpg";
+import heroAbend from "@/assets/look-abend-cognac.jpg";
+import heroBusiness from "@/assets/look-business-klassiker.jpg";
 
 export interface CuratedLook {
   slug: string;
@@ -25,7 +31,7 @@ export const looks: CuratedLook[] = [
     ],
     story:
       "Ein weisses Hemd ist nie eine Notlösung — es ist eine Haltung. Mit der dunkelblauen CHRIS-Chino entsteht ein Look, der vom Termin bis zum After-Work funktioniert.",
-    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0315_i0.jpg?v=1777042433",
+    hero: heroBuero,
   },
   {
     slug: "smart-casual-cafe",
@@ -39,7 +45,7 @@ export const looks: CuratedLook[] = [
     ],
     story:
       "Hellblaues Hemd, Ärmel umgeschlagen, beige CHRIS-Chino — der Klassiker für Tage, an denen alles passen soll. Vom Meeting bis zum Aperitif.",
-    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0302_i0.jpg?v=1777042388",
+    hero: heroCafe,
   },
   {
     slug: "wochenende-warm",
@@ -54,7 +60,7 @@ export const looks: CuratedLook[] = [
     ],
     story:
       "Champagner-Pullover, dunkelblaue STEVE-Jeans und ein olivfarbener Blouson — Wärme, die nach Stil aussieht. Für Spaziergänge, Märkte und lange Frühstücke.",
-    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0145_i0.jpg?v=1777041794",
+    hero: heroWochenende,
   },
   {
     slug: "sommer-leicht",
@@ -68,7 +74,7 @@ export const looks: CuratedLook[] = [
     ],
     story:
       "Ein dunkelblaues Polo bringt Frische ohne Anstrengung. Mit der beigen BEN-Bermuda wird daraus die ehrlichste Form von Sommer-Stil.",
-    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0099_i0.jpg?v=1777041624",
+    hero: heroSommer,
   },
   {
     slug: "abend-cognac",
@@ -83,7 +89,7 @@ export const looks: CuratedLook[] = [
     ],
     story:
       "Hellblaues Hemd, dunkle Jeans, beige Strickjacke — der Look für lange Abende, in denen Stil keine Anstrengung sein soll.",
-    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0302_i0.jpg?v=1777042388",
+    hero: heroAbend,
   },
   {
     slug: "business-klassiker",
@@ -98,7 +104,7 @@ export const looks: CuratedLook[] = [
     ],
     story:
       "Weisses Hemd, blaue Anzughose und eine dunkelblaue Steppweste als moderne Schicht — präzise, ruhig, souverän.",
-    hero: "https://cdn.shopify.com/s/files/1/0999/5006/8094/files/p0315_i0.jpg?v=1777042433",
+    hero: heroBusiness,
   },
 ];
 
