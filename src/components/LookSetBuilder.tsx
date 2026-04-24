@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, ShoppingBag, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPrice, type ShopifyProduct } from "@/lib/shopify";
+import { useLivePrices, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
 import { toast } from "sonner";
@@ -93,12 +94,16 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
   const allReady = resolved.every(
     (r) => r.variant && r.variant.availableForSale,
   );
-  const total = resolved.reduce(
-    (sum, r) => sum + (r.variant ? parseFloat(r.variant.price.amount) : 0),
-    0,
-  );
-  const currency =
-    products[0]?.node.priceRange.minVariantPrice.currencyCode ?? "CHF";
+
+  const handles = useMemo(() => products.map((p) => p.node.handle), [products]);
+  const { prices: livePrices } = useLivePrices(handles);
+
+  const total = resolved.reduce((sum, r) => {
+    const live = livePrices[r.product.node.handle];
+    if (live) return sum + live.display_price_chf;
+    return sum + (r.variant ? parseFloat(r.variant.price.amount) : 0);
+  }, 0);
+  const currency = "CHF";
 
   const handleAddSet = async () => {
     if (!allReady) {
@@ -138,7 +143,7 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
             Komplettes Set
           </p>
-          <p className="mt-1 font-display text-2xl">{products.length} Stücke · {formatPrice(total.toFixed(2), currency)}</p>
+          <p className="mt-1 font-display text-2xl">{products.length} Stücke · {`CHF ${total.toFixed(2)}`}</p>
         </div>
         <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary">
           Set sparen — alles aus einer Bestellung
@@ -177,9 +182,10 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
                     {cleanTitle}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {r.variant
-                      ? formatPrice(r.variant.price.amount, r.variant.price.currencyCode)
-                      : "—"}
+                    {formatLivePrice(livePrices[p.node.handle]) ??
+                      (r.variant
+                        ? formatPrice(r.variant.price.amount, r.variant.price.currencyCode)
+                        : "—")}
                   </p>
                 </div>
               </div>
@@ -241,7 +247,7 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Set-Total</p>
           <p className="font-display text-3xl">
-            {formatPrice(total.toFixed(2), currency)}
+            {`CHF ${total.toFixed(2)}`}
           </p>
         </div>
         <Button
