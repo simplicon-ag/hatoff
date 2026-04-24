@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,31 @@ const LookDetail = () => {
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Story</p>
           <p className="mt-4 leading-relaxed text-foreground/85">{look.story}</p>
+
+          {look.highlights && look.highlights.length > 0 && (
+            <ul className="mt-8 space-y-3 border-t border-border pt-6">
+              {look.highlights.map((h, i) => {
+                const [head, ...rest] = h.split(":");
+                const tail = rest.join(":").trim();
+                return (
+                  <li key={i} className="flex gap-3 text-sm leading-relaxed">
+                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                    <span>
+                      {tail ? (
+                        <>
+                          <span className="font-medium text-foreground">{head}.</span>{" "}
+                          <span className="text-muted-foreground">{tail}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">{h}</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
           <Button onClick={handleAddAll} disabled={loading || isLoading || products.length === 0} className="mt-8" size="lg">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kompletten Look in den Warenkorb"}
           </Button>
