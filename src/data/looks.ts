@@ -122,39 +122,18 @@ export const anlaesse = [
 
 export const marken = [
   {
-    slug: "casamoda",
-    name: "CASAMODA",
-    tagline: "Hemden mit Haltung — seit Generationen.",
+    slug: "casa-moda",
+    name: "CASA MODA",
+    tagline: "Hemden, Polos & Hosen mit Haltung.",
     story:
-      "CASAMODA steht für sorgfältig gefertigte Hemden mit präzisem Schnitt und langlebiger Qualität. Eine Marke für alle, die das Detail sehen.",
+      "CASA MODA steht für sorgfältig gefertigte Hemden, Polos und Hosen mit präzisem Schnitt und langlebiger Qualität. Eine Marke für alle, die das Detail sehen.",
   },
   {
     slug: "venti",
     name: "VENTI",
-    tagline: "Schmal geschnitten, klar gedacht.",
+    tagline: "Business-Hemden & Anzughosen, klar gedacht.",
     story:
-      "VENTI bringt moderne Silhouetten ins Hemd. Slim Fits, klare Muster, und Stoffe, die mitarbeiten — vom Büro bis ins Wochenende.",
-  },
-  {
-    slug: "meyer",
-    name: "MEYER",
-    tagline: "Hosen, die mitgehen.",
-    story:
-      "MEYER fertigt Hosen, die sich wie ein Lieblingsstück anfühlen — präzise verarbeitet, perfekt im Sitz.",
-  },
-  {
-    slug: "fynch-hatton",
-    name: "FYNCH-HATTON",
-    tagline: "Reise, Stil, Wärme.",
-    story:
-      "FYNCH-HATTON kombiniert reisetaugliche Stoffe mit zeitlosen Schnitten. Eine Marke, die in jedes Klima passt.",
-  },
-  {
-    slug: "milestone",
-    name: "MILESTONE",
-    tagline: "Jacken mit Charakter.",
-    story:
-      "MILESTONE macht Jacken zum Statement — warm, durchdacht, mit dem gewissen Etwas.",
+      "VENTI bringt moderne Silhouetten ins Hemd und in die Anzughose. Klare Muster und Stoffe, die mitarbeiten — vom Büro bis ins Wochenende.",
   },
 ];
 
