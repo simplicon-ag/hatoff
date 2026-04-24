@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
-import { LookCard } from "@/components/LookCard";
+import { FeaturedLook } from "@/components/FeaturedLook";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
 import { anlaesse, looks, magazinArtikel, marken, welten } from "@/data/looks";
@@ -85,12 +85,18 @@ const Index = () => {
 
       {/* Featured Looks */}
       <section className="container-editorial py-20 md:py-28">
-        <div className="mb-12">
-          <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Aktuelle Looks</p>
-          <h2 className="mt-2 font-display text-4xl md:text-5xl">Diese Woche im Spotlight.</h2>
+        <div className="mb-12 flex items-end justify-between gap-6">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Aktuelle Looks</p>
+            <h2 className="mt-2 font-display text-4xl md:text-5xl">Diese Woche im Spotlight.</h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              Echte Stücke aus dem Shop — klick aufs Bild zum Einzelteil oder hol dir den ganzen Look mit einem Tap.
+            </p>
+          </div>
+          <Link to="/looks" className="hidden text-sm text-primary hover:underline md:inline">Alle Looks →</Link>
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
-          {featuredLooks.map((l) => <LookCard key={l.slug} look={l} />)}
+        <div className="grid gap-x-8 gap-y-12 md:grid-cols-3">
+          {featuredLooks.map((l) => <FeaturedLook key={l.slug} look={l} />)}
         </div>
       </section>
 
