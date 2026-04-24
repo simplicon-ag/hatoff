@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, ShoppingBag, ArrowRight } from "lucide-react";
 import type { CuratedLook } from "@/data/looks";
-import { fetchProductsByHandles, formatPrice, type ShopifyProduct } from "@/lib/shopify";
+import { fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
+import { useLivePrices } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -32,11 +33,14 @@ export const FeaturedLook = ({ look }: Props) => {
   }, [look]);
 
   const heroImage = look.hero ?? products[0]?.node.images.edges[0]?.node.url ?? null;
+  const handles = useMemo(() => products.map((p) => p.node.handle), [products]);
+  const { prices: livePrices } = useLivePrices(handles);
   const total = products.reduce((sum, p) => {
+    const live = livePrices[p.node.handle];
+    if (live) return sum + live.display_price_chf;
     const v = p.node.variants.edges.find((e) => e.node.availableForSale)?.node;
     return v ? sum + parseFloat(v.price.amount) : sum;
   }, 0);
-  const currency = products[0]?.node.priceRange.minVariantPrice.currencyCode ?? "CHF";
 
   const handleAddAll = async () => {
     const items = products
@@ -120,7 +124,7 @@ export const FeaturedLook = ({ look }: Props) => {
             {products.length} Stücke
           </p>
           <p className="font-display text-lg">
-            {loading ? "—" : formatPrice(total.toFixed(2), currency)}
+            {loading ? "—" : `CHF ${total.toFixed(2)}`}
           </p>
         </div>
         <div className="flex gap-2">
