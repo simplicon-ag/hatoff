@@ -31,7 +31,7 @@ export const FeaturedLook = ({ look }: Props) => {
     };
   }, [look]);
 
-  const heroImage = look.hero;
+  const heroImage = look.hero ?? products[0]?.node.images.edges[0]?.node.url ?? null;
   const total = products.reduce((sum, p) => {
     const v = p.node.variants.edges.find((e) => e.node.availableForSale)?.node;
     return v ? sum + parseFloat(v.price.amount) : sum;
