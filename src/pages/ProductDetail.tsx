@@ -14,6 +14,7 @@ import {
   formatPrice,
   type ShopifyProduct,
 } from "@/lib/shopify";
+import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { looks } from "@/data/looks";
 import { toast } from "sonner";
@@ -172,7 +173,8 @@ const ProductDetail = () => {
           {selectedVariant && (
             <div className="mt-5 flex items-baseline gap-3">
               <p className="text-2xl font-medium">
-                {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                {formatLivePrice(livePrice) ??
+                  formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
               </p>
               <span className="text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</span>
             </div>
@@ -326,7 +328,8 @@ const ProductDetail = () => {
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{product.vendor}</p>
             {selectedVariant && (
               <p className="text-sm font-medium">
-                {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                {formatLivePrice(livePrice) ??
+                  formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
               </p>
             )}
           </div>
