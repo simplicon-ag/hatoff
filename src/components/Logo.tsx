@@ -14,7 +14,7 @@ export const Logo = ({ className = "" }: LogoProps) => (
     <img
       src={logoUrl}
       alt="HATOFF"
-      className="h-10 w-auto md:h-12 transition-opacity group-hover:opacity-80 dark:invert"
+      className="h-16 w-auto md:h-24 transition-opacity group-hover:opacity-80 dark:invert"
     />
   </Link>
 );

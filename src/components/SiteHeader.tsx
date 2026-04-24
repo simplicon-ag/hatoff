@@ -29,7 +29,7 @@ export const SiteHeader = () => {
         scrolled ? "bg-background/85 backdrop-blur-md border-border" : "bg-background border-transparent"
       }`}
     >
-      <div className="container-editorial flex h-16 items-center justify-between md:h-20">
+      <div className="container-editorial flex h-24 items-center justify-between md:h-32">
         <Logo />
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Hauptnavigation">
