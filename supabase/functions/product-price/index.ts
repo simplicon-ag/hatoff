@@ -258,8 +258,8 @@ Deno.serve(async (req) => {
 
       let result: PriceResult;
       try {
-        const found = await firecrawlSearch(term, site);
-        if (!found) {
+        const foundUrl = await firecrawlSearchUrl(term, site);
+        if (!foundUrl) {
           const display = fallbackPrice(shopifyPrices[handle]);
           result = {
             handle,
@@ -271,13 +271,15 @@ Deno.serve(async (req) => {
             fetched_at: new Date().toISOString(),
           };
         } else {
-          const eur = extractEurPrice(found.content);
+          // Eigene Anfrage zur vollen Produktseite — Snippets sind oft irreführend
+          const md = await firecrawlScrape(foundUrl);
+          const eur = md ? extractEurPrice(md) : null;
           if (eur === null) {
             const display = fallbackPrice(shopifyPrices[handle]);
             result = {
               handle,
               brand,
-              source_url: found.url,
+              source_url: foundUrl,
               raw_price_eur: null,
               display_price_chf: display,
               status: "fallback",
@@ -289,7 +291,7 @@ Deno.serve(async (req) => {
             result = {
               handle,
               brand,
-              source_url: found.url,
+              source_url: foundUrl,
               raw_price_eur: eur,
               display_price_chf: chf,
               status: "ok",
