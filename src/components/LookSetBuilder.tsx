@@ -3,6 +3,7 @@ import { Loader2, ShoppingBag, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPrice, type ShopifyProduct } from "@/lib/shopify";
 import { useCartStore } from "@/stores/cartStore";
+import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
 import { toast } from "sonner";
 
 interface Props {
