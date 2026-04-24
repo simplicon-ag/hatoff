@@ -50,10 +50,12 @@ function parseGuide(markdown: string, brand: string): SizeTable[] {
     const h2 = line.match(/^##\s+([^#].+)$/);
     if (h2) {
       const raw = h2[1]
-        .replace(/^_+|_+$/g, "")
-        .replace(/größentabellen[\s-]*/i, "")
+        .replace(/\\/g, "")           // strip escape backslashes from markdown
+        .replace(/größentabellen/gi, "")
+        .replace(/[_\-\s]+/g, " ")    // collapse underscores/dashes/whitespace
         .trim();
-      currentCategory = raw || defaultCategory;
+      // If nothing meaningful is left (e.g. CASA MODA's "_größentabellen"), use default
+      currentCategory = raw.length > 1 ? raw : defaultCategory;
       continue;
     }
 
