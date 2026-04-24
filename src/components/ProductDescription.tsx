@@ -2,32 +2,79 @@ interface Props {
   description: string;
 }
 
-// Splits Shopify's run-together description by known keywords into a definition list.
-const KEYS = ["Material", "Pflege", "Passform", "Farbe", "Grösse", "Größe", "Schnitt", "Verschluss", "Futter", "Eigenschaften"];
+// Keywords that mark structured product info inside Shopify's flowing description
+const KEYS = [
+  "Material",
+  "Pflege",
+  "Passform",
+  "Farbe",
+  "Grösse",
+  "Größe",
+  "Schnitt",
+  "Verschluss",
+  "Futter",
+  "Eigenschaften",
+] as const;
+
+interface Pair {
+  label: string;
+  values: string[]; // bullet points
+}
 
 interface Section {
   intro: string;
-  pairs: Array<{ label: string; value: string }>;
+  pairs: Pair[];
+}
+
+// Split a value string into bullet items.
+// Handles: comma lists, semicolons, percentages ("63 % Baumwolle, 36 % Leinen"),
+// and care instruction sentences ("Schonwaschgang 30 °C, nicht bleichen, ...").
+function splitToBullets(label: string, value: string): string[] {
+  const cleaned = value.replace(/\s+/g, " ").trim().replace(/[.,;]\s*$/, "");
+
+  // Material: split on comma — items typically "63 % Baumwolle"
+  if (label === "Material") {
+    return cleaned.split(/\s*,\s*/).filter(Boolean);
+  }
+
+  // Pflege: split on commas/semicolons — items are short imperatives
+  if (label === "Pflege") {
+    return cleaned.split(/\s*[,;]\s*/).filter(Boolean);
+  }
+
+  // Single-value attributes
+  return [cleaned];
 }
 
 function parseDescription(raw: string): Section {
   if (!raw) return { intro: "", pairs: [] };
-  // Insert a separator before any "Keyword:" that has no preceding whitespace
-  const pattern = new RegExp(`(?<!^)(?<!\\n)(?<!\\s)(${KEYS.join("|")}):`, "g");
-  const normalized = raw
-    .replace(pattern, "\n$1:")
-    .replace(/\.([A-ZÄÖÜ])/g, ". $1") // add space after sentences glued together
-    .replace(/\n{2,}/g, "\n")
+
+  // Normalise common Shopify quirks: glued sentences and missing newlines.
+  let text = raw
+    .replace(/\r\n/g, "\n")
+    .replace(/\.([A-ZÄÖÜ])/g, ". $1") // add space after sentence-ending periods
+    .replace(/\s+/g, " ")
     .trim();
 
-  const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
+  // Insert a marker before each known keyword (with or without colon),
+  // so we can split a single-line blob into intro + key/value pairs.
+  // We require either a colon OR the keyword followed by a capitalised word (e.g. "Material 63 %").
+  const keyAlt = KEYS.join("|");
+  const splitter = new RegExp(`\\s+(?=(?:${keyAlt})(?::|\\s+[0-9A-ZÄÖÜ%]))`, "g");
+  text = text.replace(splitter, "\n");
+
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const introParts: string[] = [];
-  const pairs: Array<{ label: string; value: string }> = [];
+  const pairs: Pair[] = [];
+
+  const lineRegex = new RegExp(`^(${keyAlt}):?\\s+(.+)$`);
 
   for (const line of lines) {
-    const match = line.match(/^([A-Za-zÄÖÜäöü]+):\s*(.+)$/);
-    if (match && KEYS.includes(match[1])) {
-      pairs.push({ label: match[1], value: match[2].trim() });
+    const match = line.match(lineRegex);
+    if (match) {
+      const label = match[1];
+      const value = match[2].trim();
+      pairs.push({ label, values: splitToBullets(label, value) });
     } else {
       introParts.push(line);
     }
@@ -44,23 +91,35 @@ export const ProductDescription = ({ description }: Props) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {intro && (
         <p className="whitespace-pre-line text-[15px] leading-[1.7] text-foreground/85">
           {intro}
         </p>
       )}
+
       {pairs.length > 0 && (
-        <dl className="grid gap-x-6 gap-y-3 border-t border-border pt-5 sm:grid-cols-[120px_1fr]">
+        <div className="space-y-5 border-t border-border pt-5">
           {pairs.map((p) => (
-            <div key={p.label} className="contents">
-              <dt className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            <div key={p.label} className="grid gap-2 sm:grid-cols-[120px_1fr] sm:gap-6">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 {p.label}
-              </dt>
-              <dd className="text-sm leading-relaxed text-foreground/85">{p.value}</dd>
+              </p>
+              {p.values.length > 1 ? (
+                <ul className="space-y-1.5 text-sm leading-relaxed text-foreground/85">
+                  {p.values.map((v, i) => (
+                    <li key={i} className="flex gap-2.5">
+                      <span aria-hidden className="mt-[0.55em] inline-block h-1 w-1 shrink-0 rounded-full bg-primary" />
+                      <span>{v}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm leading-relaxed text-foreground/85">{p.values[0]}</p>
+              )}
             </div>
           ))}
-        </dl>
+        </div>
       )}
     </div>
   );
