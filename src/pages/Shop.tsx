@@ -12,16 +12,36 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { SlidersHorizontal, X } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { SlidersHorizontal, X, Search } from "lucide-react";
 
-type SortKey = "featured" | "price-asc" | "price-desc" | "title-asc";
+type SortKey = "featured" | "price-asc" | "price-desc" | "title-asc" | "newest";
+
+const titleCase = (s: string) =>
+  s
+    .split(/[-_\s]+/)
+    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1) : w.toUpperCase()))
+    .join(" ");
+
+const tagValue = (tag: string, prefix: string) =>
+  tag.toLowerCase().startsWith(prefix.toLowerCase() + ":")
+    ? tag.slice(prefix.length + 1).trim()
+    : null;
 
 const Shop = () => {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortKey>("featured");
+  const [search, setSearch] = useState("");
   const [selectedVendors, setSelectedVendors] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedWelten, setSelectedWelten] = useState<Set<string>>(new Set());
+  const [selectedAnlaesse, setSelectedAnlaesse] = useState<Set<string>>(new Set());
+  const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
+  const [selectedSizes, setSelectedSizes] = useState<Set<string>>(new Set());
+  const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -31,23 +51,141 @@ const Shop = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const vendors = useMemo(() => {
-    const map = new Map<string, number>();
+  // Compute derived facets from product data
+  const facets = useMemo(() => {
+    const vendors = new Map<string, number>();
+    const categories = new Map<string, number>();
+    const welten = new Map<string, number>();
+    const anlaesse = new Map<string, number>();
+    const colors = new Map<string, number>();
+    const sizes = new Map<string, number>();
+    let priceMin = Infinity;
+    let priceMax = 0;
+
     products.forEach((p) => {
-      const v = p.node.vendor || "Sonstige";
-      map.set(v, (map.get(v) ?? 0) + 1);
+      const n = p.node;
+      const v = n.vendor || "Sonstige";
+      vendors.set(v, (vendors.get(v) ?? 0) + 1);
+
+      if (n.productType) {
+        categories.set(n.productType, (categories.get(n.productType) ?? 0) + 1);
+      }
+
+      n.tags.forEach((t) => {
+        const w = tagValue(t, "welt");
+        if (w) welten.set(w, (welten.get(w) ?? 0) + 1);
+        const a = tagValue(t, "anlass");
+        if (a) anlaesse.set(a, (anlaesse.get(a) ?? 0) + 1);
+        const c = tagValue(t, "farbe");
+        if (c) colors.set(c, (colors.get(c) ?? 0) + 1);
+      });
+
+      // Sizes from variant option "Grösse"/"Größe"/"Size"
+      n.variants.edges.forEach((vt) => {
+        vt.node.selectedOptions.forEach((o) => {
+          if (/gr(ö|oe|o)sse|size/i.test(o.name)) {
+            sizes.set(o.value, (sizes.get(o.value) ?? 0) + 1);
+          }
+        });
+      });
+
+      const price = parseFloat(n.priceRange.minVariantPrice.amount);
+      if (!Number.isNaN(price)) {
+        priceMin = Math.min(priceMin, price);
+        priceMax = Math.max(priceMax, price);
+      }
     });
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+
+    if (priceMin === Infinity) priceMin = 0;
+
+    const sortNum = (a: string, b: string) => {
+      const na = parseFloat(a);
+      const nb = parseFloat(b);
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+      return a.localeCompare(b);
+    };
+
+    return {
+      vendors: Array.from(vendors.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      categories: Array.from(categories.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      welten: Array.from(welten.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      anlaesse: Array.from(anlaesse.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      colors: Array.from(colors.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      sizes: Array.from(sizes.entries()).sort(([a], [b]) => sortNum(a, b)),
+      priceMin: Math.floor(priceMin),
+      priceMax: Math.ceil(priceMax),
+    };
   }, [products]);
+
+  // Initialise price range once after products loaded
+  useEffect(() => {
+    if (priceRange === null && products.length > 0 && facets.priceMax > 0) {
+      setPriceRange([facets.priceMin, facets.priceMax]);
+    }
+  }, [products, facets.priceMin, facets.priceMax, priceRange]);
 
   const filtered = useMemo(() => {
     let list = products;
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.node.title.toLowerCase().includes(q) ||
+          p.node.vendor?.toLowerCase().includes(q) ||
+          p.node.productType?.toLowerCase().includes(q),
+      );
+    }
+
     if (selectedVendors.size > 0) {
       list = list.filter((p) => selectedVendors.has(p.node.vendor || "Sonstige"));
+    }
+    if (selectedCategories.size > 0) {
+      list = list.filter((p) => selectedCategories.has(p.node.productType));
+    }
+    if (selectedWelten.size > 0) {
+      list = list.filter((p) =>
+        p.node.tags.some((t) => {
+          const v = tagValue(t, "welt");
+          return v ? selectedWelten.has(v) : false;
+        }),
+      );
+    }
+    if (selectedAnlaesse.size > 0) {
+      list = list.filter((p) =>
+        p.node.tags.some((t) => {
+          const v = tagValue(t, "anlass");
+          return v ? selectedAnlaesse.has(v) : false;
+        }),
+      );
+    }
+    if (selectedColors.size > 0) {
+      list = list.filter((p) =>
+        p.node.tags.some((t) => {
+          const v = tagValue(t, "farbe");
+          return v ? selectedColors.has(v) : false;
+        }),
+      );
+    }
+    if (selectedSizes.size > 0) {
+      list = list.filter((p) =>
+        p.node.variants.edges.some((vt) =>
+          vt.node.selectedOptions.some(
+            (o) => /gr(ö|oe|o)sse|size/i.test(o.name) && selectedSizes.has(o.value),
+          ),
+        ),
+      );
+    }
+    if (priceRange) {
+      list = list.filter((p) => {
+        const price = parseFloat(p.node.priceRange.minVariantPrice.amount);
+        return price >= priceRange[0] && price <= priceRange[1];
+      });
     }
     if (onlyAvailable) {
       list = list.filter((p) => p.node.variants.edges.some((v) => v.node.availableForSale));
     }
+
     const sorted = [...list];
     if (sort === "price-asc") {
       sorted.sort(
@@ -65,53 +203,180 @@ const Shop = () => {
       sorted.sort((a, b) => a.node.title.localeCompare(b.node.title));
     }
     return sorted;
-  }, [products, selectedVendors, onlyAvailable, sort]);
+  }, [
+    products,
+    search,
+    selectedVendors,
+    selectedCategories,
+    selectedWelten,
+    selectedAnlaesse,
+    selectedColors,
+    selectedSizes,
+    priceRange,
+    onlyAvailable,
+    sort,
+  ]);
 
-  const toggleVendor = (v: string) => {
-    setSelectedVendors((prev) => {
-      const next = new Set(prev);
-      next.has(v) ? next.delete(v) : next.add(v);
-      return next;
-    });
+  const toggle = (set: Set<string>, setter: (s: Set<string>) => void) => (value: string) => {
+    const next = new Set(set);
+    next.has(value) ? next.delete(value) : next.add(value);
+    setter(next);
   };
 
   const clearFilters = () => {
     setSelectedVendors(new Set());
+    setSelectedCategories(new Set());
+    setSelectedWelten(new Set());
+    setSelectedAnlaesse(new Set());
+    setSelectedColors(new Set());
+    setSelectedSizes(new Set());
+    setPriceRange([facets.priceMin, facets.priceMax]);
     setOnlyAvailable(false);
+    setSearch("");
   };
 
-  const activeCount = selectedVendors.size + (onlyAvailable ? 1 : 0);
+  const activeCount =
+    selectedVendors.size +
+    selectedCategories.size +
+    selectedWelten.size +
+    selectedAnlaesse.size +
+    selectedColors.size +
+    selectedSizes.size +
+    (onlyAvailable ? 1 : 0) +
+    (priceRange &&
+    (priceRange[0] !== facets.priceMin || priceRange[1] !== facets.priceMax)
+      ? 1
+      : 0) +
+    (search.trim() ? 1 : 0);
 
-  const FilterPanel = () => (
-    <div className="space-y-8">
-      <div>
-        <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Verfügbarkeit</p>
-        <label className="flex cursor-pointer items-center gap-3 text-sm">
-          <Checkbox checked={onlyAvailable} onCheckedChange={(c) => setOnlyAvailable(!!c)} />
-          Nur verfügbare Artikel
-        </label>
-      </div>
-
-      <div>
-        <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Marke</p>
-        <ScrollArea className="h-72 pr-3">
-          <div className="space-y-2">
-            {vendors.map(([v, count]) => (
+  const FacetGroup = ({
+    title,
+    items,
+    selected,
+    onToggle,
+    capitalize = false,
+    columns = 1,
+  }: {
+    title: string;
+    items: Array<[string, number]>;
+    selected: Set<string>;
+    onToggle: (v: string) => void;
+    capitalize?: boolean;
+    columns?: 1 | 2;
+  }) => {
+    if (items.length === 0) return null;
+    return (
+      <AccordionItem value={title} className="border-border">
+        <AccordionTrigger className="text-xs font-medium uppercase tracking-[0.2em] text-foreground hover:no-underline">
+          {title}
+          {Array.from(selected).length > 0 && (
+            <span className="ml-auto mr-2 rounded-full bg-foreground px-2 text-[10px] text-background">
+              {selected.size}
+            </span>
+          )}
+        </AccordionTrigger>
+        <AccordionContent>
+          <div className={columns === 2 ? "grid grid-cols-2 gap-y-2" : "space-y-2"}>
+            {items.map(([v, count]) => (
               <label key={v} className="flex cursor-pointer items-center justify-between gap-3 text-sm">
-                <span className="flex items-center gap-3">
-                  <Checkbox checked={selectedVendors.has(v)} onCheckedChange={() => toggleVendor(v)} />
-                  {v}
+                <span className="flex items-center gap-2">
+                  <Checkbox checked={selected.has(v)} onCheckedChange={() => onToggle(v)} />
+                  <span>{capitalize ? titleCase(v) : v}</span>
                 </span>
                 <span className="text-xs text-muted-foreground">{count}</span>
               </label>
             ))}
           </div>
-        </ScrollArea>
+        </AccordionContent>
+      </AccordionItem>
+    );
+  };
+
+  const FilterPanel = () => (
+    <div className="space-y-6">
+      <div>
+        <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Verfügbarkeit
+        </p>
+        <label className="flex cursor-pointer items-center gap-3 text-sm">
+          <Checkbox
+            checked={onlyAvailable}
+            onCheckedChange={(c) => setOnlyAvailable(!!c)}
+          />
+          Nur verfügbare Artikel
+        </label>
       </div>
+
+      {priceRange && facets.priceMax > facets.priceMin && (
+        <div>
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Preis
+          </p>
+          <Slider
+            min={facets.priceMin}
+            max={facets.priceMax}
+            step={5}
+            value={priceRange}
+            onValueChange={(v) => setPriceRange([v[0], v[1]] as [number, number])}
+            className="mt-3"
+          />
+          <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+            <span>CHF {priceRange[0]}</span>
+            <span>CHF {priceRange[1]}</span>
+          </div>
+        </div>
+      )}
+
+      <Accordion
+        type="multiple"
+        defaultValue={["Marke", "Kategorie", "Welt"]}
+        className="w-full"
+      >
+        <FacetGroup
+          title="Marke"
+          items={facets.vendors}
+          selected={selectedVendors}
+          onToggle={toggle(selectedVendors, setSelectedVendors)}
+        />
+        <FacetGroup
+          title="Kategorie"
+          items={facets.categories}
+          selected={selectedCategories}
+          onToggle={toggle(selectedCategories, setSelectedCategories)}
+        />
+        <FacetGroup
+          title="Welt"
+          items={facets.welten}
+          selected={selectedWelten}
+          onToggle={toggle(selectedWelten, setSelectedWelten)}
+          capitalize
+        />
+        <FacetGroup
+          title="Anlass"
+          items={facets.anlaesse}
+          selected={selectedAnlaesse}
+          onToggle={toggle(selectedAnlaesse, setSelectedAnlaesse)}
+          capitalize
+        />
+        <FacetGroup
+          title="Farbe"
+          items={facets.colors}
+          selected={selectedColors}
+          onToggle={toggle(selectedColors, setSelectedColors)}
+          capitalize
+        />
+        <FacetGroup
+          title="Grösse"
+          items={facets.sizes}
+          selected={selectedSizes}
+          onToggle={toggle(selectedSizes, setSelectedSizes)}
+          columns={2}
+        />
+      </Accordion>
 
       {activeCount > 0 && (
         <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
-          <X className="h-3.5 w-3.5" /> Filter zurücksetzen
+          <X className="h-3.5 w-3.5" /> Alle Filter zurücksetzen
         </Button>
       )}
     </div>
@@ -121,22 +386,29 @@ const Shop = () => {
     <SiteLayout>
       <section className="container-editorial pt-16 md:pt-24">
         <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Shop</p>
-        <h1 className="mt-2 max-w-2xl font-display text-5xl leading-[1.05] md:text-6xl">Einzelne Stücke.</h1>
+        <h1 className="mt-2 max-w-2xl font-display text-5xl leading-[1.05] md:text-6xl">
+          Einzelne Stücke.
+        </h1>
       </section>
 
       <section className="container-editorial py-12">
         {/* Toolbar */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-3 border-y border-border py-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-1 items-center gap-3">
             {/* Mobile filter trigger */}
             <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="sm" className="lg:hidden">
                   <SlidersHorizontal className="h-3.5 w-3.5" />
-                  Filter {activeCount > 0 && <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{activeCount}</span>}
+                  Filter{" "}
+                  {activeCount > 0 && (
+                    <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
+                      {activeCount}
+                    </span>
+                  )}
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80">
+              <SheetContent side="left" className="w-80 overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle>Filter</SheetTitle>
                 </SheetHeader>
@@ -146,13 +418,25 @@ const Shop = () => {
               </SheetContent>
             </Sheet>
 
-            <p className="text-xs text-muted-foreground">
+            <div className="relative max-w-xs flex-1">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Suche…"
+                className="h-9 pl-9 text-sm"
+              />
+            </div>
+
+            <p className="hidden text-xs text-muted-foreground sm:block">
               {loading ? "—" : `${filtered.length} ${filtered.length === 1 ? "Artikel" : "Artikel"}`}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="hidden text-xs uppercase tracking-[0.18em] text-muted-foreground sm:inline">Sortieren</span>
+            <span className="hidden text-xs uppercase tracking-[0.18em] text-muted-foreground sm:inline">
+              Sortieren
+            </span>
             <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
               <SelectTrigger className="h-9 w-44">
                 <SelectValue />
@@ -167,7 +451,7 @@ const Shop = () => {
           </div>
         </div>
 
-        <div className="grid gap-10 lg:grid-cols-[220px_1fr]">
+        <div className="grid gap-10 lg:grid-cols-[260px_1fr]">
           {/* Desktop filters */}
           <aside className="hidden lg:block">
             <FilterPanel />
@@ -187,7 +471,9 @@ const Shop = () => {
               </div>
             ) : (
               <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-                {filtered.map((p, i) => <ProductCard key={p.node.id} product={p} priority={i < 6} />)}
+                {filtered.map((p, i) => (
+                  <ProductCard key={p.node.id} product={p} priority={i < 6} />
+                ))}
               </div>
             )}
           </div>
