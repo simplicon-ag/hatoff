@@ -94,10 +94,10 @@ function fallbackPrice(shopifyPrice?: number): number {
   return roundDownTo95(estimated);
 }
 
-async function firecrawlSearch(
+async function firecrawlSearchUrl(
   query: string,
   site: string,
-): Promise<{ url: string; content: string } | null> {
+): Promise<string | null> {
   const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
   if (!apiKey) throw new Error("FIRECRAWL_API_KEY not configured");
 
@@ -109,8 +109,8 @@ async function firecrawlSearch(
     },
     body: JSON.stringify({
       query: `${query} site:${site}`,
-      limit: 3,
-      scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
+      limit: 5,
+      // Kein scrapeOptions — wir wollen nur die URL, nicht den Snippet-Inhalt
     }),
   });
 
@@ -121,18 +121,42 @@ async function firecrawlSearch(
     );
   }
 
-  // Response shape kann variieren — robust auslesen
   const results =
     data?.data?.web ?? data?.web ?? data?.data ?? data?.results ?? [];
+  // Bevorzuge URLs, die nach Produktseite aussehen (enthalten Bindestriche und Ziffern)
   for (const r of results) {
     const url = r?.url ?? r?.link;
-    const md = r?.markdown ?? r?.content ?? r?.snippet ?? "";
-    if (url && md && md.length > 50) {
-      return { url, content: md };
-    }
+    if (!url) continue;
+    // Filter offensichtliche Nicht-Produktseiten weg
+    if (/groessentabellen|wishlist|cart|warenkorb|kategorie/i.test(url)) continue;
+    return url;
   }
-  return null;
+  // Fallback: erste URL
+  return results[0]?.url ?? results[0]?.link ?? null;
 }
+
+async function firecrawlScrape(url: string): Promise<string | null> {
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!apiKey) throw new Error("FIRECRAWL_API_KEY not configured");
+
+  const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["markdown"],
+      onlyMainContent: true,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) return null;
+  return data?.data?.markdown ?? data?.markdown ?? null;
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
