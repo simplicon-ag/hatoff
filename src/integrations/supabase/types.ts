@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      product_price_cache: {
+        Row: {
+          brand: string
+          created_at: string
+          display_price_chf: number
+          fetched_at: string
+          handle: string
+          id: string
+          raw_price_eur: number | null
+          source_url: string | null
+          status: string
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          display_price_chf: number
+          fetched_at?: string
+          handle: string
+          id?: string
+          raw_price_eur?: number | null
+          source_url?: string | null
+          status?: string
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          display_price_chf?: number
+          fetched_at?: string
+          handle?: string
+          id?: string
+          raw_price_eur?: number | null
+          source_url?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       size_guide_cache: {
         Row: {
           brand: string
