@@ -50,26 +50,30 @@ function brandSite(brand: Brand): string {
 }
 
 /**
- * Parsed einen EUR-Preis aus Markdown/Text.
- * Akzeptiert Formate: "89,99 €", "€ 89,99", "89.99€", "ab 89,99 €"
- * Gibt den NIEDRIGSTEN gefundenen Preis zurück (typisch der Sale/aktuelle Preis).
+ * Parsed einen EUR-Preis aus Markdown/Text der Produktseite.
+ * Strategie: Auf Webshop-Produktseiten erscheint der aktuelle Preis sehr oft (Variantentabelle).
+ * Wir nehmen daher den HÄUFIGSTEN Preis (Modus), nicht den niedrigsten.
+ * Bei Gleichstand gewinnt der höhere (UVP > Sale-Banner Snippet).
  */
 function extractEurPrice(text: string): number | null {
-  // Regex deckt Komma- und Punkttrenner ab
-  const re = /(?:€\s*)?(\d{1,4})[.,](\d{2})\s*€?/g;
-  const prices: number[] = [];
+  const re = /(?:€\s*)?(\d{1,4})[.,](\d{2})\s*€/g;
+  const counts = new Map<number, number>();
   let m;
   while ((m = re.exec(text)) !== null) {
     const whole = parseInt(m[1], 10);
     const decimals = parseInt(m[2], 10);
     if (whole >= 5 && whole < 2000) {
-      // realistisch: 5–2000 EUR
-      prices.push(whole + decimals / 100);
+      const price = whole + decimals / 100;
+      counts.set(price, (counts.get(price) ?? 0) + 1);
     }
   }
-  if (prices.length === 0) return null;
-  // niedrigster Preis = i.d.R. aktueller Sale-Preis
-  return Math.min(...prices);
+  if (counts.size === 0) return null;
+  // Sortiere nach Häufigkeit DESC, bei Gleichstand höherer Preis zuerst
+  const sorted = Array.from(counts.entries()).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return b[0] - a[0];
+  });
+  return sorted[0][0];
 }
 
 /** Rundet ABWÄRTS auf nächste .95-Grenze (89.99 → 89.95, 90.10 → 89.95). */
