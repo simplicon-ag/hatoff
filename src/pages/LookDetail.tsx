@@ -58,7 +58,9 @@ const LookDetail = () => {
   return (
     <SiteLayout>
       <section className="relative h-[60vh] min-h-[420px] w-full overflow-hidden">
-        <img src={look.hero} alt={look.title} className="absolute inset-0 h-full w-full object-cover" />
+        {(look.hero ?? products[0]?.node.images.edges[0]?.node.url) && (
+          <img src={look.hero ?? products[0]?.node.images.edges[0]?.node.url} alt={look.title} className="absolute inset-0 h-full w-full object-cover" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-foreground/10 to-foreground/70" />
         <div className="container-editorial relative flex h-full flex-col justify-end pb-12 text-primary-foreground">
           <p className="text-[11px] uppercase tracking-[0.3em] opacity-90">Look</p>
