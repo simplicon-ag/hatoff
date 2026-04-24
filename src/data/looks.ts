@@ -711,6 +711,22 @@ export const looks: CuratedLook[] = [
   },
 ];
 
+// Auto-attach generated lifestyle hero images for looks that don't already have one.
+const generatedHeroes = import.meta.glob<{ default: string }>(
+  "../assets/looks-generated/*.jpg",
+  { eager: true },
+);
+const heroBySlug: Record<string, string> = {};
+for (const [path, mod] of Object.entries(generatedHeroes)) {
+  const slug = path.split("/").pop()!.replace(/\.jpg$/, "");
+  heroBySlug[slug] = mod.default;
+}
+for (const look of looks) {
+  if (!look.hero && heroBySlug[look.slug]) {
+    look.hero = heroBySlug[look.slug];
+  }
+}
+
 export const welten = [
   { id: "business", title: "Business", description: "Souverän auftreten.", image: "/src/assets/welt-business.jpg" },
   { id: "smart-casual", title: "Smart Casual", description: "Locker mit Haltung.", image: "/src/assets/welt-smart-casual.jpg" },
