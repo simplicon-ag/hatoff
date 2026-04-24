@@ -34,9 +34,10 @@ export interface ShopifyProduct {
 }
 
 export const PRODUCTS_QUERY = `
-  query GetProducts($first: Int!, $query: String) {
-    products(first: $first, query: $query) {
+  query GetProducts($first: Int!, $query: String, $after: String) {
+    products(first: $first, query: $query, after: $after) {
       edges {
+        cursor
         node {
           id
           title
@@ -61,6 +62,7 @@ export const PRODUCTS_QUERY = `
           options { name values }
         }
       }
+      pageInfo { hasNextPage endCursor }
     }
   }
 `;
