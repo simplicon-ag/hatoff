@@ -182,9 +182,10 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
                     {cleanTitle}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {r.variant
-                      ? formatPrice(r.variant.price.amount, r.variant.price.currencyCode)
-                      : "—"}
+                    {formatLivePrice(livePrices[p.node.handle]) ??
+                      (r.variant
+                        ? formatPrice(r.variant.price.amount, r.variant.price.currencyCode)
+                        : "—")}
                   </p>
                 </div>
               </div>
