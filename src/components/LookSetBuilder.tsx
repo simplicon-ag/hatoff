@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, ShoppingBag, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPrice, type ShopifyProduct } from "@/lib/shopify";
+import { useLivePrices, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
 import { toast } from "sonner";
@@ -93,12 +94,16 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
   const allReady = resolved.every(
     (r) => r.variant && r.variant.availableForSale,
   );
-  const total = resolved.reduce(
-    (sum, r) => sum + (r.variant ? parseFloat(r.variant.price.amount) : 0),
-    0,
-  );
-  const currency =
-    products[0]?.node.priceRange.minVariantPrice.currencyCode ?? "CHF";
+
+  const handles = useMemo(() => products.map((p) => p.node.handle), [products]);
+  const { prices: livePrices } = useLivePrices(handles);
+
+  const total = resolved.reduce((sum, r) => {
+    const live = livePrices[r.product.node.handle];
+    if (live) return sum + live.display_price_chf;
+    return sum + (r.variant ? parseFloat(r.variant.price.amount) : 0);
+  }, 0);
+  const currency = "CHF";
 
   const handleAddSet = async () => {
     if (!allReady) {
