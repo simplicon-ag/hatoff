@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
-import { fetchProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchAllProducts, type ShopifyProduct } from "@/lib/shopify";
 import {
   Select,
   SelectContent,
