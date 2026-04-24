@@ -1,20 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, ArrowRight } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
-import { Button } from "@/components/ui/button";
+import { LookSetBuilder } from "@/components/LookSetBuilder";
 import { looks } from "@/data/looks";
 import { fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
-import { useCartStore } from "@/stores/cartStore";
 
 const LookDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const look = looks.find((l) => l.slug === slug);
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const addItems = useCartStore((s) => s.addItems);
-  const isLoading = useCartStore((s) => s.isLoading);
 
   useEffect(() => {
     if (!look) return;
@@ -29,37 +26,26 @@ const LookDetail = () => {
       <SiteLayout>
         <div className="container-editorial py-32 text-center">
           <h1 className="font-display text-4xl">Look nicht gefunden</h1>
-          <Link to="/looks" className="mt-4 inline-block text-primary hover:underline">Zurück zu allen Looks</Link>
+          <Link to="/looks" className="mt-4 inline-block text-primary hover:underline">
+            Zurück zu allen Looks
+          </Link>
         </div>
       </SiteLayout>
     );
   }
 
-  const handleAddAll = async () => {
-    const items = products
-      .map((p) => {
-        const v = p.node.variants.edges[0]?.node;
-        if (!v) return null;
-        return {
-          productHandle: p.node.handle,
-          productTitle: p.node.title,
-          productImage: p.node.images.edges[0]?.node.url ?? null,
-          variantId: v.id,
-          variantTitle: v.title,
-          price: v.price,
-          quantity: 1,
-          selectedOptions: v.selectedOptions ?? [],
-        };
-      })
-      .filter(Boolean) as Parameters<typeof addItems>[0];
-    await addItems(items);
-  };
+  const heroImage = look.hero ?? products[0]?.node.images.edges[0]?.node.url;
 
   return (
     <SiteLayout>
+      {/* Hero */}
       <section className="relative h-[60vh] min-h-[420px] w-full overflow-hidden">
-        {(look.hero ?? products[0]?.node.images.edges[0]?.node.url) && (
-          <img src={look.hero ?? products[0]?.node.images.edges[0]?.node.url} alt={look.title} className="absolute inset-0 h-full w-full object-cover" />
+        {heroImage && (
+          <img
+            src={heroImage}
+            alt={look.title}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-foreground/10 to-foreground/70" />
         <div className="container-editorial relative flex h-full flex-col justify-end pb-12 text-primary-foreground">
@@ -69,8 +55,10 @@ const LookDetail = () => {
         </div>
       </section>
 
-      <section className="container-editorial grid gap-12 py-16 md:grid-cols-[1fr_2fr]">
-        <div>
+      {/* Hauptbereich: Set-Builder rechts (gross), Story links */}
+      <section className="container-editorial grid gap-12 py-16 md:grid-cols-[1fr_1.6fr]">
+        {/* Story + Highlights — sekundär */}
+        <aside className="md:sticky md:top-24 md:self-start">
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Story</p>
           <p className="mt-4 leading-relaxed text-foreground/85">{look.story}</p>
 
@@ -97,23 +85,57 @@ const LookDetail = () => {
               })}
             </ul>
           )}
+        </aside>
 
-          <Button onClick={handleAddAll} disabled={loading || isLoading || products.length === 0} className="mt-8" size="lg">
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kompletten Look in den Warenkorb"}
-          </Button>
-        </div>
-
+        {/* Set-Builder — primärer CTA-Block */}
         <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Stücke im Look</p>
           {loading ? (
-            <p className="py-12 text-center text-muted-foreground">Lade Produkte …</p>
-          ) : (
-            <div className="mt-6 grid gap-x-6 gap-y-10 sm:grid-cols-2">
-              {products.map((p) => <ProductCard key={p.node.id} product={p} />)}
+            <div className="flex h-72 items-center justify-center rounded-lg border border-border bg-card">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
+          ) : products.length === 0 ? (
+            <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
+              Produkte konnten nicht geladen werden.
+            </div>
+          ) : (
+            <LookSetBuilder products={products} lookTitle={look.title} />
           )}
         </div>
       </section>
+
+      {/* Einzelteile — bewusst zurückhaltend, ganz unten */}
+      {!loading && products.length > 0 && (
+        <section className="border-t border-border bg-secondary/30">
+          <div className="container-editorial py-16">
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+                  Lieber einzeln?
+                </p>
+                <h2 className="mt-2 font-display text-2xl md:text-3xl">
+                  Auch einzeln bestellbar
+                </h2>
+                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                  Du willst nur ein Stück aus dem Look? Kein Problem — jedes Teil
+                  öffnet seine eigene Detailseite.
+                </p>
+              </div>
+              <Link
+                to="/looks"
+                className="text-sm text-primary hover:underline"
+              >
+                Weitere Looks ansehen <ArrowRight className="ml-1 inline h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+              {products.map((p) => (
+                <ProductCard key={p.node.id} product={p} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </SiteLayout>
   );
 };
