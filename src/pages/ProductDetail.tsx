@@ -182,7 +182,7 @@ const ProductDetail = () => {
             <span
               className={cn(
                 "inline-block h-2 w-2 rounded-full",
-                available ? "bg-emerald-600" : "bg-destructive",
+                available ? "bg-success" : "bg-destructive",
               )}
             />
             <span className={available ? "text-foreground/80" : "text-destructive"}>
