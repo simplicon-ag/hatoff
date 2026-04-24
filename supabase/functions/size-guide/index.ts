@@ -33,11 +33,14 @@ interface ParsedGuide {
  * Parse the markdown blob into structured tables.
  * The page layout is: ## <Category>\n### <Fit>\n| Größe | ... |\n| --- | ... |\n| ...rows |
  */
-function parseGuide(markdown: string): SizeTable[] {
+function parseGuide(markdown: string, brand: string): SizeTable[] {
   const tables: SizeTable[] = [];
   const lines = markdown.split("\n");
 
-  let currentCategory = "";
+  // CASA MODA's größentabellen page is shirts-only (says so on the page).
+  // Their only H2 is "_größentabellen" which we'd otherwise discard.
+  const defaultCategory = brand === "casa-moda" ? "Hemden" : "Allgemein";
+  let currentCategory = defaultCategory;
   let currentFit = "";
 
   for (let i = 0; i < lines.length; i++) {
@@ -46,11 +49,11 @@ function parseGuide(markdown: string): SizeTable[] {
     // ## Category — capture words like "Hemden", "Anzughosen", "Sakkos", "Anzugwesten"
     const h2 = line.match(/^##\s+([^#].+)$/);
     if (h2) {
-      currentCategory = h2[1]
+      const raw = h2[1]
         .replace(/^_+|_+$/g, "")
         .replace(/größentabellen[\s-]*/i, "")
         .trim();
-      if (!currentCategory) currentCategory = "Allgemein";
+      currentCategory = raw || defaultCategory;
       continue;
     }
 
@@ -89,7 +92,7 @@ function parseGuide(markdown: string): SizeTable[] {
         j++;
       }
 
-      if (rows.length > 0 && currentCategory) {
+      if (rows.length > 0) {
         tables.push({
           fit: currentFit || "Standard",
           category: currentCategory,
@@ -192,7 +195,7 @@ Deno.serve(async (req) => {
           );
       }
 
-      const tables = parseGuide(content);
+      const tables = parseGuide(content, brand);
       guides.push({
         brand,
         source_url: sourceUrl,
