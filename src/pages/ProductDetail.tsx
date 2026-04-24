@@ -50,6 +50,7 @@ const ProductDetail = () => {
   const [related, setRelated] = useState<ShopifyProduct[]>([]);
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
+  const { price: livePrice } = useLivePrice(handle);
 
   useEffect(() => {
     if (!handle) return;
