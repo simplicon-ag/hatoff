@@ -14,7 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      size_guide_cache: {
+        Row: {
+          brand: string
+          content: string
+          created_at: string
+          fetched_at: string
+          id: string
+          source_url: string
+        }
+        Insert: {
+          brand: string
+          content: string
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          source_url: string
+        }
+        Update: {
+          brand?: string
+          content?: string
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          source_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
