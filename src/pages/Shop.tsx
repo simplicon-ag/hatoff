@@ -26,7 +26,7 @@ const Shop = () => {
   const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
-    fetchProducts(100)
+    fetchAllProducts()
       .then(setProducts)
       .finally(() => setLoading(false));
   }, []);
