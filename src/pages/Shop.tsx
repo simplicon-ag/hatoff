@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
-import { fetchProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchAllProducts, type ShopifyProduct } from "@/lib/shopify";
 import {
   Select,
   SelectContent,
@@ -26,7 +26,7 @@ const Shop = () => {
   const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
-    fetchProducts(100)
+    fetchAllProducts()
       .then(setProducts)
       .finally(() => setLoading(false));
   }, []);

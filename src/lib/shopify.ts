@@ -34,9 +34,10 @@ export interface ShopifyProduct {
 }
 
 export const PRODUCTS_QUERY = `
-  query GetProducts($first: Int!, $query: String) {
-    products(first: $first, query: $query) {
+  query GetProducts($first: Int!, $query: String, $after: String) {
+    products(first: $first, query: $query, after: $after) {
       edges {
+        cursor
         node {
           id
           title
@@ -61,6 +62,7 @@ export const PRODUCTS_QUERY = `
           options { name values }
         }
       }
+      pageInfo { hasNextPage endCursor }
     }
   }
 `;
@@ -118,8 +120,31 @@ export async function storefrontApiRequest(query: string, variables: Record<stri
 }
 
 export async function fetchProducts(first = 50, query?: string): Promise<ShopifyProduct[]> {
-  const data = await storefrontApiRequest(PRODUCTS_QUERY, { first, query: query ?? null });
+  const data = await storefrontApiRequest(PRODUCTS_QUERY, { first, query: query ?? null, after: null });
   return data?.data?.products?.edges ?? [];
+}
+
+/**
+ * Fetch ALL products from Shopify, paginating through the Storefront API.
+ * Storefront API caps `first` at 250 per request, so we loop until hasNextPage is false.
+ */
+export async function fetchAllProducts(query?: string, pageSize = 250): Promise<ShopifyProduct[]> {
+  const all: ShopifyProduct[] = [];
+  let after: string | null = null;
+  // Hard safety cap to prevent runaway loops
+  for (let i = 0; i < 50; i++) {
+    const data = await storefrontApiRequest(PRODUCTS_QUERY, {
+      first: pageSize,
+      query: query ?? null,
+      after,
+    });
+    const products = data?.data?.products;
+    if (!products) break;
+    all.push(...(products.edges ?? []));
+    if (!products.pageInfo?.hasNextPage) break;
+    after = products.pageInfo.endCursor;
+  }
+  return all;
 }
 
 export async function fetchProductByHandle(handle: string) {
