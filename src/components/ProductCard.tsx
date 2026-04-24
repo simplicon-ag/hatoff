@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Loader2, ShoppingBag } from "lucide-react";
 import type { ShopifyProduct } from "@/lib/shopify";
 import { formatPrice } from "@/lib/shopify";
+import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,8 @@ export const ProductCard = ({ product, priority }: Props) => {
   const primary = images[0]?.node;
   const secondary = images[1]?.node;
   const price = p.priceRange.minVariantPrice;
+  const { price: livePrice } = useLivePrice(p.handle);
+  const displayPrice = formatLivePrice(livePrice) ?? formatPrice(price.amount, price.currencyCode);
 
   const firstAvailable = p.variants.edges.find((e) => e.node.availableForSale)?.node;
   const soldOut = !firstAvailable;
@@ -104,7 +107,7 @@ export const ProductCard = ({ product, priority }: Props) => {
       <div className="mt-4 space-y-1">
         <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
         <h3 className="font-display text-lg leading-tight">{p.title}</h3>
-        <p className="text-sm text-foreground/80">{formatPrice(price.amount, price.currencyCode)}</p>
+        <p className="text-sm text-foreground/80">{displayPrice}</p>
       </div>
     </Link>
   );
