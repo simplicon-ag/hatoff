@@ -107,10 +107,13 @@ function extractUrls(text: string, pattern: RegExp): string[] {
 }
 
 function urlToHandle(url: string): string {
-  // https://www.casamoda.com/de/de/some-product-name-12345-67 → some-product-name
-  // We strip the trailing "-NNNNN-NN" article number.
+  // Keep the article-color suffix so each variant gets a unique handle:
+  // https://www.casamoda.com/de/de/freizeithemd-kurzarm-blau-14909-154
+  //   → freizeithemd-kurzarm-blau-14909-154
+  // Without this suffix, multiple distinct products would collide on the same
+  // handle (e.g. 6 different "freizeithemd-kurzarm-blau" articles).
   const path = url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "");
-  return path.replace(/-\d+-\d+\/?$/, "");
+  return path.replace(/\/$/, "").toLowerCase();
 }
 
 async function discoverBrandUrls(
