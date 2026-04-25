@@ -344,9 +344,16 @@ const ProductDetail = () => {
           <div className="flex-1">
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{product.vendor}</p>
             {selectedVariant && (
-              <p className="text-sm font-medium">
-                {formatLivePrice(livePrice) ??
-                  formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+              <p className="flex items-baseline gap-2 text-sm font-medium">
+                <span className={livePrice?.on_sale ? "text-destructive" : ""}>
+                  {formatLivePrice(livePrice) ??
+                    formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                </span>
+                {livePrice?.on_sale && formatOriginalPrice(livePrice) && (
+                  <span className="text-xs text-foreground/50 line-through">
+                    {formatOriginalPrice(livePrice)}
+                  </span>
+                )}
               </p>
             )}
           </div>
