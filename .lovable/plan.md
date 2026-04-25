@@ -1,42 +1,59 @@
 ## Problem
-Der Worker bekommt von Shopify durchgehend `401: Invalid API key or access token`. Das Secret `SHOPIFY_ADMIN_API_TOKEN` ist abgelaufen, widerrufen oder gehört zu einem anderen Store. Im Trockenlauf merkst du das nicht (da läuft nur Firecrawl + DB), aber sobald der echte Import Produkte in Shopify anlegen will, scheitert jeder einzelne Aufruf — daher die vielen Errors.
 
-## Schritt 1 — Token in Shopify generieren (manuell durch dich)
+Aktuell laufen **20 von 51 verarbeiteten Produkten in 429-Rate-Limit-Errors**. Shopify erlaubt nur **2 API-Calls/Sekunde**, der Worker schickt aber 10–20 parallel:
 
-1. Öffne den Shopify-Admin: `https://admin.shopify.com/store/style-compass-6nrqi`
-2. Gehe zu **Settings → Apps and sales channels → Develop apps**
-3. Falls noch keine Custom-App existiert: Klick **"Create an app"**, nenne sie z.B. *"Lovable Product Importer"*
-4. Klick auf die App → Tab **"Configuration"** → bei *Admin API integration* auf **"Configure"**
-5. Folgende Scopes freigeben:
-   - `write_products`
-   - `read_products`
-   - `write_product_listings`
-6. **Save** klicken
-7. Tab **"API credentials"** → **"Install app"** klicken
-8. Den **Admin API access token** kopieren (beginnt mit `shpat_...`) — wird nur EINMAL angezeigt!
+- 6 Produkte parallel pro Worker-Tick
+- Pro Produkt: 1× Create + bis zu 5× Bild-Upload = 6+ Calls
+- Frontend triggert alle 8s einen neuen Tick, auch wenn der vorherige noch läuft → Worker überlappen
 
-## Schritt 2 — Token via `add_secret` aktualisieren
+Zusätzlich: 1 Eintrag mit 422 `handle has already been taken` (Duplikat), 3 Einträge hängen in `creating` (Worker abgebrochen mitten drin).
 
-Nach Plan-Genehmigung rufe ich `add_secret` auf und du fügst den Token im sicheren Eingabefeld für **`SHOPIFY_ADMIN_API_TOKEN`** ein. Der alte Wert wird überschrieben, alle Edge-Functions sehen den neuen Token sofort.
+## Lösung
 
-## Schritt 3 — Worker absichern (Code-Änderung)
+### 1. `supabase/functions/product-import-run/index.ts` — Rate-Limit-konforme Verarbeitung
 
-In `supabase/functions/product-import-run/index.ts`:
-- **Fail-fast Auth-Check**: Vor dem ersten Produkt einen Test-Request gegen `/admin/api/2025-07/shop.json` machen. Bei 401 sofort den Job auf `error` setzen mit Klartext-Meldung "Shopify-Token ungültig — bitte SHOPIFY_ADMIN_API_TOKEN aktualisieren". Verhindert dass 1006 Produkte als `error` geflaggt werden, nur weil der Token kaputt ist.
-- **Token-Quelle loggen**: Beim Start loggen welches Secret gewählt wurde (`SHOPIFY_ADMIN_API_TOKEN` vs Fallback) — Debug-Hilfe für künftige Auth-Probleme.
+**a) Sequenziell statt parallel**
+- Batch-Size auf **2 Produkte pro Tick** reduzieren (statt 6)
+- Produkte **nacheinander** verarbeiten (kein `Promise.all`)
+- Zwischen jedem Shopify-Call **600ms warten** (= ~1.5 Calls/sec, sicher unter Limit von 2/sec)
 
-## Schritt 4 — Stuck-Errors zurücksetzen & echten Import starten
+**b) Automatischer Retry bei 429**
+- Wrapper-Funktion `shopifyFetch()` einbauen die:
+  - Bei 429-Response den `Retry-After` Header liest (oder fallback 2s)
+  - Bis zu **3× automatisch retryt** mit exponentieller Pause (2s → 4s → 8s)
+  - Erst danach den Eintrag als `error` markiert
+- Bilder einzeln nacheinander hochladen (nicht parallel), je 600ms Pause
 
-Nach Token-Update führe ich automatisch aus:
-- Reset aller `error`-Logs zurück auf `pending`
-- Job-State auf `idle`
+**c) Duplikat-Handling (422 `handle has already been taken`)**
+- Bei diesem Fehler: Status auf `skipped` setzen statt `error` (Produkt existiert schon in Shopify, ist also OK)
+- Optional: per `GET /products.json?handle=xyz` die existierende Product-ID holen und im Log speichern
 
-Du gehst dann auf `/admin/import`, schaltest **Trockenlauf AUS**, klickst **Start** — diesmal werden Produkte tatsächlich in Shopify angelegt.
+**d) Lock gegen überlappende Worker**
+- Vor Verarbeitung im `product_import_job`-Singleton-Row prüfen ob `state='running'` UND letzter `updated_at` < 30s alt → wenn ja: dieser Tick exitet sofort (ein anderer Worker arbeitet schon)
+- Eigenes `updated_at` regelmässig aktualisieren als „Heartbeat"
 
-## Was du jetzt tun musst
-1. Token in Shopify generieren (Schritt 1 oben)
-2. Plan genehmigen → ich frage den Token via `add_secret` ab und mache Schritte 3 + 4
+### 2. `src/pages/AdminImport.tsx` — Tick-Intervall anpassen
 
-<lov-actions>
-<lov-link url="https://admin.shopify.com/store/style-compass-6nrqi">Shopify-Admin öffnen</lov-link>
-</lov-actions>
+- Auto-Tick von **8s → 20s** erhöhen (passt zur sequenziellen Verarbeitung: 2 Produkte × ~5s = 10s, plus Puffer)
+- Batch-Size im Frontend von 6 auf 2 ändern
+
+### 3. Cleanup-Migration — hängende Einträge & alte Errors zurücksetzen
+
+Eine SQL-Migration die:
+- 3 Einträge in `creating` zurück auf `pending` setzt
+- Die 20 `error`-Einträge mit 429-Fehler zurück auf `pending` setzt (waren keine echten Datenfehler)
+- Job-Counters (`error_count`, `processed`) entsprechend dekrementiert
+
+## Erwartetes Ergebnis
+
+- Keine 429-Errors mehr
+- Stabile Verarbeitung mit ~2 Produkten/20s = ~360 Produkte/Stunde
+- 951 pending + 23 zurückgesetzte = **974 Produkte** werden in ~3 Stunden sauber importiert
+- Duplikate werden korrekt als `skipped` markiert statt als Error gezählt
+
+## Was NICHT angefasst wird
+
+- Auth-Logik (`resolveAdminToken`) — funktioniert bereits korrekt
+- Scraping-Logik (Firecrawl) — keine Probleme
+- Discover-Funktion — keine Änderung nötig
+- Die 31 bereits erfolgreich erstellten Shopify-Produkte bleiben unberührt

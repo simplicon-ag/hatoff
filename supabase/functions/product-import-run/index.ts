@@ -248,24 +248,61 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   };
 }
 
+// ---------- Rate-limited Shopify fetch helper ----------
+// Shopify Admin REST API: 2 calls/sec sustained, bucket of 40.
+// We pace at ~1.5/sec (650ms gap) and retry 429 with Retry-After.
+const SHOPIFY_MIN_GAP_MS = 650;
+let lastShopifyCallAt = 0;
+
+async function shopifyFetch(
+  url: string,
+  init: RequestInit & { adminToken: string },
+  attempt = 1,
+): Promise<Response> {
+  // Pace requests
+  const since = Date.now() - lastShopifyCallAt;
+  if (since < SHOPIFY_MIN_GAP_MS) {
+    await new Promise((r) => setTimeout(r, SHOPIFY_MIN_GAP_MS - since));
+  }
+  lastShopifyCallAt = Date.now();
+
+  const { adminToken, headers, ...rest } = init;
+  const res = await fetch(url, {
+    ...rest,
+    headers: {
+      ...(headers ?? {}),
+      "X-Shopify-Access-Token": adminToken,
+    },
+  });
+
+  if (res.status === 429 && attempt <= 4) {
+    const retryAfter = parseFloat(res.headers.get("Retry-After") ?? "2");
+    const waitMs = Math.max(retryAfter * 1000, 2000 * attempt);
+    console.warn(
+      `[worker] 429 rate-limit, retry ${attempt}/4 after ${waitMs}ms`,
+    );
+    // Drain body to free the connection
+    await res.text().catch(() => "");
+    await new Promise((r) => setTimeout(r, waitMs));
+    return shopifyFetch(url, init, attempt + 1);
+  }
+
+  return res;
+}
+
 async function uploadImageToShopify(
   productId: string,
   imageUrl: string,
   adminToken: string,
 ): Promise<boolean> {
-  // Shopify accepts an external src — we don't need to download/re-upload.
-  // The "robust" mode: Shopify fetches the image from the source URL once
-  // and stores it in their CDN forever.
   try {
-    const res = await fetch(
+    const res = await shopifyFetch(
       `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}/images.json`,
       {
         method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": adminToken,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: { src: imageUrl } }),
+        adminToken,
       },
     );
     if (!res.ok) {
@@ -279,11 +316,33 @@ async function uploadImageToShopify(
   }
 }
 
+/** Look up an existing product by handle. Returns its Shopify ID or null. */
+async function findShopifyProductByHandle(
+  handle: string,
+  adminToken: string,
+): Promise<string | null> {
+  try {
+    const res = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?handle=${encodeURIComponent(handle)}&fields=id,handle&limit=1`,
+      { method: "GET", adminToken },
+    );
+    if (!res.ok) {
+      await res.text().catch(() => "");
+      return null;
+    }
+    const json = await res.json();
+    const p = json?.products?.[0];
+    return p?.id ? String(p.id) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function createShopifyProduct(
   data: ScrapedProduct,
   handle: string,
   adminToken: string,
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; duplicate?: boolean } | null> {
   const priceChf = data.price_eur ? (data.price_eur * EUR_TO_CHF).toFixed(2) : "0.00";
   const compareAt = data.compare_at_price_eur
     ? (data.compare_at_price_eur * EUR_TO_CHF).toFixed(2)
@@ -311,20 +370,23 @@ async function createShopifyProduct(
     },
   };
 
-  const res = await fetch(
+  const res = await shopifyFetch(
     `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json`,
     {
       method: "POST",
-      headers: {
-        "X-Shopify-Access-Token": adminToken,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      adminToken,
     },
   );
   if (!res.ok) {
     const errText = await res.text();
     console.error(`[worker] create product ${res.status}: ${errText}`);
+    // Duplicate handle (422) → look up existing product, return its ID with duplicate flag
+    if (res.status === 422 && /handle/i.test(errText) && /taken/i.test(errText)) {
+      const existing = await findShopifyProductByHandle(handle, adminToken);
+      if (existing) return { id: existing, duplicate: true };
+    }
     throw new Error(`Shopify ${res.status}: ${errText.slice(0, 300)}`);
   }
   const json = await res.json();
@@ -343,7 +405,8 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const batchSize = Math.min(Number(body.batch_size ?? 8), 15);
+    // Sequential processing with rate limit → keep batches small
+    const batchSize = Math.min(Math.max(Number(body.batch_size ?? 2), 1), 4);
 
     // Check job state
     const { data: job } = await supabase
@@ -373,6 +436,26 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    // Worker lock: if another worker updated the job in the last 25s, skip this tick
+    // to prevent overlapping workers hammering the Shopify rate limit.
+    if (job.state === "running" && job.updated_at) {
+      const ageMs = Date.now() - new Date(job.updated_at).getTime();
+      if (ageMs < 25_000) {
+        console.log(`[worker] skip tick — another worker active ${ageMs}ms ago`);
+        return new Response(
+          JSON.stringify({ success: true, state: "running", processed: 0, skipped: "lock" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    // Heartbeat — claim the lock now so overlapping ticks bail out
+    await supabase
+      .from("product_import_job")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", "singleton");
+
 
     const dryRun = Boolean(job.dry_run);
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
@@ -558,11 +641,30 @@ Deno.serve(async (req) => {
         );
         if (!created) throw new Error("create returned null");
 
-        // Attach images sequentially (Shopify rate-limits to ~2/sec)
+        // If product already existed in Shopify, mark as skipped (not error, not new)
+        if (created.duplicate) {
+          await supabase
+            .from("product_import_log")
+            .update({
+              status: "skipped",
+              shopify_product_id: created.id,
+              error_message: "Bereits in Shopify vorhanden",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", item.id);
+          continue;
+        }
+
+        // Attach images sequentially via shopifyFetch (handles 429 retry + pacing)
         for (const imgUrl of scraped.image_urls) {
           await uploadImageToShopify(created.id, imgUrl, adminToken);
-          await new Promise((r) => setTimeout(r, 600));
         }
+
+        // Heartbeat after each product to keep the lock fresh
+        await supabase
+          .from("product_import_job")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", "singleton");
 
         await supabase
           .from("product_import_log")
