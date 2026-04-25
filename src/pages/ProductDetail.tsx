@@ -8,6 +8,7 @@ import { ProductGallery } from "@/components/ProductGallery";
 import { ProductDescription } from "@/components/ProductDescription";
 import { TrustBadges } from "@/components/TrustBadges";
 import { ProductCard } from "@/components/ProductCard";
+import { AiStyleGenerator } from "@/components/AiStyleGenerator";
 import {
   fetchProductByHandle,
   fetchProducts,
