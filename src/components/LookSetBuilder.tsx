@@ -197,9 +197,21 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Pro
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Stück {idx + 1}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Stück {idx + 1}
+                    </p>
+                    {allowRemove && visibleProducts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(p.node.id)}
+                        aria-label={`${cleanTitle} aus Set entfernen`}
+                        className="-mr-1 -mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:hidden"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                   <p className="text-sm font-medium leading-tight">
                     {cleanTitle}
                   </p>
@@ -210,6 +222,16 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Pro
                         : "—")}
                   </p>
                 </div>
+                {allowRemove && visibleProducts.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeItem(p.node.id)}
+                    aria-label={`${cleanTitle} aus Set entfernen`}
+                    className="hidden h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:inline-flex"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
               <div className="flex flex-1 flex-wrap gap-3">
