@@ -100,14 +100,14 @@ export default function AdminImport() {
     const tick = async () => {
       try {
         await supabase.functions.invoke("product-import-run", {
-          body: { batch_size: 6 },
+          body: { batch_size: 2 },
         });
       } catch (err) {
         console.error("[admin-import] worker tick failed", err);
       }
     };
     tick();
-    tickRef.current = window.setInterval(tick, 8000);
+    tickRef.current = window.setInterval(tick, 20000);
     return () => {
       if (tickRef.current) window.clearInterval(tickRef.current);
       tickRef.current = null;
