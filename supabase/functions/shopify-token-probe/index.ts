@@ -29,15 +29,32 @@ Deno.serve(async (req) => {
       results.push({ name: c.name, status: "missing" });
       continue;
     }
+    // Try to extract token from JSON wrapper if present
+    let token = c.value;
+    let parsedFrom = "raw";
+    if (c.value.trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(c.value);
+        token =
+          parsed.access_token ??
+          parsed.accessToken ??
+          parsed.token ??
+          c.value;
+        parsedFrom = "json:" + Object.keys(parsed).join(",");
+      } catch {
+        parsedFrom = "json-parse-failed";
+      }
+    }
     try {
       const r = await fetch(
         `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/shop.json`,
-        { headers: { "X-Shopify-Access-Token": c.value } },
+        { headers: { "X-Shopify-Access-Token": token } },
       );
       results.push({
         name: c.name,
-        prefix: c.value.slice(0, 6),
-        length: c.value.length,
+        parsedFrom,
+        prefix: token.slice(0, 6),
+        length: token.length,
         status: r.status,
       });
     } catch (e) {
