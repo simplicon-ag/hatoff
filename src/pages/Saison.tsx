@@ -168,6 +168,13 @@ const Saison = () => {
                 ? "Wird geladen …"
                 : `${filtered.length} ${filtered.length === 1 ? "Stück" : "Stücke"} für ${saison.shortLabel}`}
             </h2>
+            {!loading && brandMatched.length > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {brandMatched.length} davon direkt von der Marke als{" "}
+                {saison.shortLabel} ausgewiesen, {heuristic.length} ergänzt nach
+                Stoff & Farbe.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden text-xs uppercase tracking-[0.18em] text-muted-foreground sm:inline">
