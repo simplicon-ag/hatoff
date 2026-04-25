@@ -264,7 +264,7 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
                         handle: { type: "string", description: "Produkt-Handle aus dem Katalog." },
                         role: {
                           type: "string",
-                          description: "Rolle im Outfit, z.B. Hose, Sakko, Schuhe, Accessoire.",
+                          description: "Rolle im Outfit, z.B. Hose, Sakko, Schuhe, Pullover. KEINE Accessoires (Gürtel, Schal, Krawatte, Mütze, Socken).",
                         },
                       },
                       required: ["handle", "role"],
