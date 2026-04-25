@@ -127,12 +127,14 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Shop preview */}
+      {/* Neu eingetroffen */}
       <section className="container-editorial py-20 md:py-28">
         <div className="mb-12 flex items-end justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Shop</p>
-            <h2 className="mt-2 font-display text-4xl md:text-5xl">Einzelne Stücke.</h2>
+            <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+              <Sparkles className="h-3 w-3" /> Neu eingetroffen
+            </p>
+            <h2 className="mt-2 font-display text-4xl md:text-5xl">Frisch im Sortiment.</h2>
           </div>
           <Link to="/shop" className="hidden text-sm text-primary hover:underline md:inline">Alle Produkte →</Link>
         </div>
@@ -144,6 +146,36 @@ const Index = () => {
           </div>
         )}
       </section>
+
+      {/* Sale-Highlights */}
+      {saleProducts.length > 0 && (
+        <section className="border-y border-destructive/20 bg-destructive/5">
+          <div className="container-editorial py-20 md:py-28">
+            <div className="mb-12 flex items-end justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-destructive">
+                  <Flame className="h-3 w-3" /> Aktuelle Deals
+                </p>
+                <h2 className="mt-2 font-display text-4xl md:text-5xl">Sale-Highlights.</h2>
+                <p className="mt-3 max-w-xl text-muted-foreground">
+                  Die grössten Ersparnisse aus den aktuellen Aktionen unserer Marken.
+                </p>
+              </div>
+              <Link to="/sale" className="hidden text-sm font-medium text-destructive hover:underline md:inline">
+                Alle Sale-Stücke →
+              </Link>
+            </div>
+            <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+              {saleProducts.map((p) => <ProductCard key={p.node.id} product={p} />)}
+            </div>
+            <div className="mt-10 text-center md:hidden">
+              <Link to="/sale" className="text-sm font-medium text-destructive hover:underline">
+                Alle Sale-Stücke →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Magazin Teaser */}
       <section className="container-editorial py-20 md:py-28">
