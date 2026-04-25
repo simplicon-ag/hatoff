@@ -120,10 +120,13 @@ function extractHandles(links: string[], pattern: RegExp): string[] {
   return Array.from(set);
 }
 
+// deno-lint-ignore no-explicit-any
+type SupabaseLike = any;
+
 async function syncSeason(
   season: Season,
   firecrawlKey: string,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseLike,
 ): Promise<{ season: Season; brand: string; count: number; error?: string }[]> {
   const results: {
     season: Season;
