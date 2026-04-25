@@ -281,23 +281,15 @@ Deno.serve(async (req) => {
       `[discover] ${groups.size} grouped products (from ${cmUrls.length + vtUrls.length} URLs)`,
     );
 
-    // Wipe previous pending/error rows and re-insert fresh discovery.
-    // Keep created/skipped rows so we have a permanent log.
+    // Fresh discovery is source-of-truth for the next import run.
+    // Shopify was purged manually, so old `created` rows are stale and must not
+    // block Casa Moda handles from being queued again.
     await supabase
       .from("product_import_log")
       .delete()
-      .in("status", ["pending", "error", "scraping", "scraped", "creating"]);
-
-    // Filter out handles that are already logged as created/skipped
-    const { data: alreadyLogged } = await supabase
-      .from("product_import_log")
-      .select("handle");
-    const loggedSet = new Set(
-      (alreadyLogged ?? []).map((r) => String(r.handle ?? "")),
-    );
+      .not("id", "is", null);
 
     const toInsert = Array.from(groups.values())
-      .filter((g) => !loggedSet.has(g.handle))
       .map((g) => ({
         brand: g.brand,
         source_url: g.color_urls[0].url,
