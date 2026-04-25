@@ -628,10 +628,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Pull a batch of pending items
+    // Pull a batch of pending items (need scraped_data for color_urls)
     const { data: items, error: fetchErr } = await supabase
       .from("product_import_log")
-      .select("id, brand, source_url, handle")
+      .select("id, brand, source_url, handle, scraped_data")
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(batchSize);
@@ -639,7 +639,6 @@ Deno.serve(async (req) => {
     if (fetchErr) throw fetchErr;
 
     if (!items || items.length === 0) {
-      // Done!
       await supabase
         .from("product_import_job")
         .update({
@@ -662,7 +661,15 @@ Deno.serve(async (req) => {
       processed++;
 
       try {
-        // Mark as scraping
+        // Resolve list of colour URLs. Fallback: just the source_url as a
+        // single colour group (handles legacy entries without scraped_data).
+        const sd = (item.scraped_data ?? {}) as {
+          color_urls?: Array<{ url: string; colorId: string }>;
+        };
+        const colorUrls = sd.color_urls && sd.color_urls.length > 0
+          ? sd.color_urls
+          : [{ url: item.source_url, colorId: "0" }];
+
         await supabase
           .from("product_import_log")
           .update({
@@ -672,13 +679,30 @@ Deno.serve(async (req) => {
           })
           .eq("id", item.id);
 
-        const html = await firecrawlScrape(item.source_url, firecrawlKey);
-        if (!html) {
+        // Scrape every colour sequentially.
+        const colors: ColorData[] = [];
+        for (const cu of colorUrls) {
+          const html = await firecrawlScrape(cu.url, firecrawlKey);
+          if (!html) {
+            console.warn(`[worker] firecrawl failed for ${cu.url} — skipping colour`);
+            continue;
+          }
+          const sc = extractFromHtml(html, item.brand, cu.url);
+          if (!sc.title || sc.price_eur === null) {
+            console.warn(`[worker] incomplete data for ${cu.url} — skipping colour`);
+            continue;
+          }
+          // Derive colour name from the title (or fall back to colorId)
+          const colorName = extractColorFromTitle(sc.title) || `Farbe ${cu.colorId}`;
+          colors.push({ colorName, colorId: cu.colorId, scraped: sc });
+        }
+
+        if (colors.length === 0) {
           await supabase
             .from("product_import_log")
             .update({
               status: "error",
-              error_message: "Firecrawl returned no HTML",
+              error_message: `Keine Farb-Variante konnte gescraped werden (${colorUrls.length} URLs)`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", item.id);
@@ -686,27 +710,35 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const scraped = extractFromHtml(html, item.brand, item.source_url);
-        if (!scraped.title || scraped.price_eur === null) {
-          await supabase
-            .from("product_import_log")
-            .update({
-              status: "error",
-              error_message: `Konnte Titel/Preis nicht extrahieren (title="${scraped.title}", price=${scraped.price_eur})`,
-              scraped_data: scraped,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", item.id);
-          errorCount++;
-          continue;
-        }
+        // Build colour-neutral base data from the first successful colour scrape.
+        const first = colors[0].scraped;
+        const baseTitle = stripColorFromTitle(first.title) || first.title;
+        const base: ScrapedProduct = {
+          ...first,
+          title: baseTitle,
+          // Aggregate every colour's images so we can attach them per-variant
+          image_urls: [],
+        };
+
+        const aggregatedScrape = {
+          base_title: baseTitle,
+          colors: colors.map((c) => ({
+            colorName: c.colorName,
+            colorId: c.colorId,
+            price_eur: c.scraped.price_eur,
+            image_urls: c.scraped.image_urls,
+          })),
+          sizes: base.sizes,
+          description: base.description,
+          color_urls: colorUrls,
+        };
 
         if (dryRun) {
           await supabase
             .from("product_import_log")
             .update({
               status: "scraped",
-              scraped_data: scraped,
+              scraped_data: aggregatedScrape,
               updated_at: new Date().toISOString(),
             })
             .eq("id", item.id);
@@ -714,24 +746,24 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Real run: create product, then attach images
+        // Real run — create the multi-colour product
         await supabase
           .from("product_import_log")
           .update({
             status: "creating",
-            scraped_data: scraped,
+            scraped_data: aggregatedScrape,
             updated_at: new Date().toISOString(),
           })
           .eq("id", item.id);
 
-        const created = await createShopifyProduct(
-          scraped,
+        const created = await createMultiColorProduct(
+          base,
+          colors,
           item.handle,
           adminToken,
         );
         if (!created) throw new Error("create returned null");
 
-        // If product already existed in Shopify, mark as skipped (not error, not new)
         if (created.duplicate) {
           await supabase
             .from("product_import_log")
@@ -745,22 +777,49 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Attach images sequentially via shopifyFetch (handles 429 retry + pacing)
-        for (const imgUrl of scraped.image_urls) {
-          await uploadImageToShopify(created.id, imgUrl, adminToken);
+        // Fetch back the created product to get variant IDs grouped by colour.
+        const variantsByColor = new Map<string, string[]>();
+        try {
+          const vRes = await shopifyFetch(
+            `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${created.id}.json?fields=variants`,
+            { method: "GET", adminToken },
+          );
+          if (vRes.ok) {
+            const vJson = await vRes.json();
+            for (const v of vJson?.product?.variants ?? []) {
+              const cn = String(v.option2 ?? "");
+              if (!variantsByColor.has(cn)) variantsByColor.set(cn, []);
+              variantsByColor.get(cn)!.push(String(v.id));
+            }
+          }
+        } catch (e) {
+          console.warn("[worker] could not fetch variants for image mapping", e);
         }
 
-        // Heartbeat after each product to keep the lock fresh
+        // Upload all images per colour and link them to that colour's variants
+        for (const c of colors) {
+          const variantIds = variantsByColor.get(c.colorName) ?? [];
+          for (const imgUrl of c.scraped.image_urls) {
+            await uploadColorImage(created.id, imgUrl, variantIds, adminToken);
+          }
+        }
+
+        // Heartbeat
         await supabase
           .from("product_import_job")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", "singleton");
 
+        // Persist a colour→variantIds map for the look-detail UI
+        const variants_summary = Object.fromEntries(
+          Array.from(variantsByColor.entries()),
+        );
         await supabase
           .from("product_import_log")
           .update({
             status: "created",
             shopify_product_id: created.id,
+            scraped_data: { ...aggregatedScrape, variants_summary },
             updated_at: new Date().toISOString(),
           })
           .eq("id", item.id);
