@@ -13,11 +13,12 @@ import {
 } from "@/components/ui/select";
 import { fetchAllProducts, type ShopifyProduct } from "@/lib/shopify";
 import {
-  filterProductsForSaison,
+  filterProductsForSaisonWithBrandData,
   saisons,
   saisonList,
   type SaisonSlug,
 } from "@/data/saisons";
+import { supabase } from "@/integrations/supabase/client";
 
 type SortKey = "relevance" | "price-asc" | "price-desc" | "title-asc";
 
@@ -31,6 +32,7 @@ const Saison = () => {
   const cross = saisons[saison.cross];
 
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
+  const [brandHandles, setBrandHandles] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortKey>("relevance");
 
@@ -40,27 +42,61 @@ const Saison = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = useMemo(() => {
-    const list = filterProductsForSaison(products, saison);
-    if (sort === "price-asc") {
-      return [...list].sort(
-        (a, b) =>
-          parseFloat(a.node.priceRange.minVariantPrice.amount) -
-          parseFloat(b.node.priceRange.minVariantPrice.amount),
-      );
-    }
-    if (sort === "price-desc") {
-      return [...list].sort(
-        (a, b) =>
-          parseFloat(b.node.priceRange.minVariantPrice.amount) -
-          parseFloat(a.node.priceRange.minVariantPrice.amount),
-      );
-    }
-    if (sort === "title-asc") {
-      return [...list].sort((a, b) => a.node.title.localeCompare(b.node.title));
-    }
-    return list;
-  }, [products, saison, sort]);
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from("brand_season_products")
+      .select("handle")
+      .eq("season", validSlug)
+      .then(({ data }) => {
+        if (!active) return;
+        const set = new Set<string>(
+          (data ?? []).map((r) => String(r.handle).toLowerCase()),
+        );
+        setBrandHandles(set);
+      });
+    return () => {
+      active = false;
+    };
+  }, [validSlug]);
+
+  const { brandMatched, heuristic, filtered } = useMemo(() => {
+    const { brandMatched, heuristic } = filterProductsForSaisonWithBrandData(
+      products,
+      saison,
+      brandHandles,
+    );
+    const list = [...brandMatched, ...heuristic];
+
+    const sortList = (arr: ShopifyProduct[]) => {
+      if (sort === "price-asc") {
+        return [...arr].sort(
+          (a, b) =>
+            parseFloat(a.node.priceRange.minVariantPrice.amount) -
+            parseFloat(b.node.priceRange.minVariantPrice.amount),
+        );
+      }
+      if (sort === "price-desc") {
+        return [...arr].sort(
+          (a, b) =>
+            parseFloat(b.node.priceRange.minVariantPrice.amount) -
+            parseFloat(a.node.priceRange.minVariantPrice.amount),
+        );
+      }
+      if (sort === "title-asc") {
+        return [...arr].sort((a, b) =>
+          a.node.title.localeCompare(b.node.title),
+        );
+      }
+      return arr;
+    };
+
+    return {
+      brandMatched,
+      heuristic,
+      filtered: sortList(list),
+    };
+  }, [products, saison, sort, brandHandles]);
 
   if (!isSaisonSlug(slug)) {
     return <Navigate to="/saison/fs-2026" replace />;
