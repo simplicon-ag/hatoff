@@ -47,7 +47,7 @@ async function firecrawlScrape(
         url,
         formats: ["html"],
         onlyMainContent: false,
-        waitFor: 3000,
+        waitFor: 5000,
       }),
     });
     if (!res.ok) {
