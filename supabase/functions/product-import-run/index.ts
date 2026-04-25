@@ -376,14 +376,35 @@ Deno.serve(async (req) => {
 
     const dryRun = Boolean(job.dry_run);
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
-    const adminTokenPrimary = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
-    const adminTokenFallback = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-    const adminToken = adminTokenPrimary ?? adminTokenFallback ?? "";
-    const tokenSource = adminTokenPrimary
-      ? "SHOPIFY_ADMIN_API_TOKEN"
-      : adminTokenFallback
-        ? "SHOPIFY_ACCESS_TOKEN (fallback)"
-        : "none";
+
+    // Resolve a working Shopify Admin token. Order of preference:
+    //   1) SHOPIFY_ADMIN_API_TOKEN (manual custom-app token)
+    //   2) SHOPIFY_ACCESS_TOKEN    (legacy Lovable token)
+    //   3) SHOPIFY_ONLINE_ACCESS_TOKEN:user:* (current Lovable connection — JSON wrapped)
+    function resolveAdminToken(): { token: string; source: string } {
+      const direct =
+        Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ??
+        Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+      if (direct && direct.startsWith("shpat_")) {
+        return { token: direct, source: "SHOPIFY_ADMIN_API_TOKEN/ACCESS_TOKEN" };
+      }
+      // Look for SHOPIFY_ONLINE_ACCESS_TOKEN:user:* (JSON-wrapped)
+      for (const [k, v] of Object.entries(Deno.env.toObject())) {
+        if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v?.trim().startsWith("{")) {
+          try {
+            const parsed = JSON.parse(v);
+            const t = parsed.access_token ?? parsed.accessToken ?? parsed.token;
+            if (typeof t === "string" && t.startsWith("shpat_")) {
+              return { token: t, source: `${k} (Lovable Verbindung)` };
+            }
+          } catch { /* ignore */ }
+        }
+      }
+      // Last resort: return whatever direct value we had (even if not shpat_)
+      return { token: direct ?? "", source: "fallback" };
+    }
+
+    const { token: adminToken, source: tokenSource } = resolveAdminToken();
 
     if (!dryRun) {
       if (!adminToken) {
