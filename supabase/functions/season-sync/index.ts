@@ -103,7 +103,7 @@ async function firecrawlScrapeLinks(
       url,
       formats: ["links", "html"],
       onlyMainContent: false,
-      waitFor: 2500,
+      waitFor: 5000,
     }),
   });
   if (!res.ok) {
