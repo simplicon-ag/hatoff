@@ -58,40 +58,69 @@ function brandSite(brand: Brand): string {
  *  - `current`: aktueller (ggf. reduzierter) Preis = HÄUFIGSTER Preis
  *  - `original`: UVP wenn Sale erkannt, sonst null
  *
- * Sale-Heuristik: tauchen mind. 2 verschiedene Preise mit ähnlicher Häufigkeit auf
- * UND ist der zweithäufigste >5% höher als der häufigste, gilt der höhere als UVP.
+ * Sale-Heuristik:
+ *  1) Markdown nach explizitem Sale-Muster scannen: "statt X €", "UVP X €",
+ *     durchgestrichene Preise (`~~X €~~`), oder zwei Preise direkt nebeneinander.
+ *  2) Sonst: häufigster Preis = current. Falls ein deutlich höherer Preis
+ *     (>10%) ebenfalls vorkommt, gilt er als UVP.
  */
 function extractEurPrices(
   text: string,
 ): { current: number; original: number | null } | null {
-  const re = /(?:€\s*)?(\d{1,4})[.,](\d{2})\s*€/g;
+  const priceRe = /(\d{1,4})[.,](\d{2})\s*€/g;
+  const all: number[] = [];
   const counts = new Map<number, number>();
   let m;
-  while ((m = re.exec(text)) !== null) {
+  while ((m = priceRe.exec(text)) !== null) {
     const whole = parseInt(m[1], 10);
     const decimals = parseInt(m[2], 10);
     if (whole >= 5 && whole < 2000) {
       const price = whole + decimals / 100;
+      all.push(price);
       counts.set(price, (counts.get(price) ?? 0) + 1);
     }
   }
   if (counts.size === 0) return null;
 
-  // Nach Häufigkeit DESC, bei Gleichstand niedrigerer Preis zuerst (Aktionspreis)
+  // 1) Explizite Sale-Marker suchen (UVP / statt / durchgestrichen)
+  let explicitOriginal: number | null = null;
+  let explicitCurrent: number | null = null;
+
+  // Pattern: "~~129,99 €~~ 54,99 €" (durchgestrichen + neuer Preis)
+  const struckRe = /~~\s*(\d{1,4})[.,](\d{2})\s*€\s*~~[^\d]{0,40}(\d{1,4})[.,](\d{2})\s*€/g;
+  const sm = struckRe.exec(text);
+  if (sm) {
+    const orig = parseInt(sm[1], 10) + parseInt(sm[2], 10) / 100;
+    const curr = parseInt(sm[3], 10) + parseInt(sm[4], 10) / 100;
+    if (orig > curr) {
+      explicitOriginal = orig;
+      explicitCurrent = curr;
+    }
+  }
+
+  // Pattern: "statt 129,99 €" oder "UVP 129,99 €"
+  if (explicitOriginal === null) {
+    const stattRe = /(?:statt|UVP|ehemals)\s*(\d{1,4})[.,](\d{2})\s*€/gi;
+    const st = stattRe.exec(text);
+    if (st) {
+      explicitOriginal = parseInt(st[1], 10) + parseInt(st[2], 10) / 100;
+    }
+  }
+
+  // Häufigster Preis (Modus) für aktuellen Preis
   const sorted = Array.from(counts.entries()).sort((a, b) => {
     if (b[1] !== a[1]) return b[1] - a[1];
     return a[0] - b[0];
   });
+  const current = explicitCurrent ?? sorted[0][0];
 
-  const current = sorted[0][0];
-
-  // Sale-Erkennung: Suche unter den anderen Preisen einen, der höher ist
-  // und mind. 2x vorkommt (UVP-Hinweis), Diff > 5%
-  let original: number | null = null;
-  for (let i = 1; i < sorted.length; i++) {
-    const [p, c] = sorted[i];
-    if (p > current * 1.05 && c >= 2) {
-      if (original === null || p > original) original = p;
+  // Original-Preis bestimmen
+  let original: number | null = explicitOriginal;
+  if (original === null) {
+    // Fallback: höchster Preis im Dokument, falls deutlich >10% über aktuellem
+    const maxPrice = Math.max(...all);
+    if (maxPrice > current * 1.1) {
+      original = maxPrice;
     }
   }
 
