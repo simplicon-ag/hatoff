@@ -502,7 +502,7 @@ async function createMultiColorProduct(
   const body = {
     product: {
       title: base.title || handle,
-      body_html: base.description,
+      body_html: base.description_html || base.description || "",
       vendor: base.vendor,
       product_type: base.product_type ?? "Bekleidung",
       tags: base.tags.join(","),
@@ -822,6 +822,10 @@ Deno.serve(async (req) => {
           })),
           sizes: base.sizes,
           description: base.description,
+          description_html: base.description_html,
+          material: base.material,
+          article_number: base.article_number,
+          care_labels: base.care_labels,
           color_urls: colorUrls,
         };
 
