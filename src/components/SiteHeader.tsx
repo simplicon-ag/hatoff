@@ -7,6 +7,7 @@ import { CartDrawer } from "./CartDrawer";
 const navItems = [
   { to: "/looks", label: "Looks" },
   { to: "/shop", label: "Shop" },
+  { to: "/sale", label: "Sale", highlight: true },
   { to: "/anlass/buero", label: "Anlässe" },
   { to: "/marken", label: "Marken" },
   { to: "/magazin", label: "Magazin" },
