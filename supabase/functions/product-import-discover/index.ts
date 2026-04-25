@@ -242,21 +242,44 @@ Deno.serve(async (req) => {
     const existing = await fetchAllShopifyHandles();
     console.log(`[discover] Shopify already has ${existing.size} handles`);
 
-    const candidates: { brand: string; source_url: string; handle: string }[] =
-      [];
+    // ---- Group every URL by base handle (brand + slug + articleId) ----
+    // Each group becomes ONE Shopify product with multiple colour variants.
+    type Group = {
+      brand: string;
+      handle: string;
+      slugBase: string;
+      articleId: string;
+      color_urls: Array<{ url: string; colorId: string }>;
+    };
+    const groups = new Map<string, Group>();
 
-    for (const url of cmUrls) {
-      const handle = urlToHandle(url);
-      if (existing.has(handle)) continue;
-      candidates.push({ brand: "casa-moda", source_url: url, handle });
-    }
-    for (const url of vtUrls) {
-      const handle = urlToHandle(url);
-      if (existing.has(handle)) continue;
-      candidates.push({ brand: "venti", source_url: url, handle });
+    function addUrl(brand: string, url: string) {
+      const parsed = parseProductUrl(url);
+      if (!parsed) return;
+      const handle = buildBaseHandle(brand, parsed.slugBase, parsed.articleId);
+      if (existing.has(handle)) return;
+      let g = groups.get(handle);
+      if (!g) {
+        g = {
+          brand,
+          handle,
+          slugBase: parsed.slugBase,
+          articleId: parsed.articleId,
+          color_urls: [],
+        };
+        groups.set(handle, g);
+      }
+      if (!g.color_urls.find((c) => c.colorId === parsed.colorId)) {
+        g.color_urls.push({ url, colorId: parsed.colorId });
+      }
     }
 
-    console.log(`[discover] ${candidates.length} new product candidates`);
+    for (const url of cmUrls) addUrl("casa-moda", url);
+    for (const url of vtUrls) addUrl("venti", url);
+
+    console.log(
+      `[discover] ${groups.size} grouped products (from ${cmUrls.length + vtUrls.length} URLs)`,
+    );
 
     // Wipe previous pending/error rows and re-insert fresh discovery.
     // Keep created/skipped rows so we have a permanent log.
@@ -265,19 +288,28 @@ Deno.serve(async (req) => {
       .delete()
       .in("status", ["pending", "error", "scraping", "scraped", "creating"]);
 
-    // Filter out URLs that are already logged (e.g. previously created)
+    // Filter out handles that are already logged as created/skipped
     const { data: alreadyLogged } = await supabase
       .from("product_import_log")
-      .select("source_url");
+      .select("handle");
     const loggedSet = new Set(
-      (alreadyLogged ?? []).map((r) => String(r.source_url)),
+      (alreadyLogged ?? []).map((r) => String(r.handle ?? "")),
     );
 
-    const toInsert = candidates
-      .filter((c) => !loggedSet.has(c.source_url))
-      .map((c) => ({ ...c, status: "pending" as const }));
+    const toInsert = Array.from(groups.values())
+      .filter((g) => !loggedSet.has(g.handle))
+      .map((g) => ({
+        brand: g.brand,
+        source_url: g.color_urls[0].url,
+        handle: g.handle,
+        status: "pending" as const,
+        scraped_data: {
+          color_urls: g.color_urls,
+          article_id: g.articleId,
+          slug_base: g.slugBase,
+        },
+      }));
 
-    // Insert in chunks
     let inserted = 0;
     for (let i = 0; i < toInsert.length; i += 200) {
       const chunk = toInsert.slice(i, i + 200);
