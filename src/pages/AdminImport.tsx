@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search } from "lucide-react";
+import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2 } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 
 type JobRow = {
@@ -54,6 +54,8 @@ export default function AdminImport() {
   const [dryRun, setDryRun] = useState(true);
   const [busy, setBusy] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeProgress, setPurgeProgress] = useState<string>("");
   const tickRef = useRef<number | null>(null);
 
   const fetchAll = async () => {
@@ -171,6 +173,49 @@ export default function AdminImport() {
     }
   };
 
+  const runPurgeShopify = async () => {
+    const confirmText = prompt(
+      "⚠️ Achtung: Löscht ALLE Produkte der Marken CASA MODA und VENTI direkt aus Shopify.\n\nTippe LÖSCHEN um zu bestätigen:",
+    );
+    if (confirmText !== "LÖSCHEN") {
+      toast.info("Abgebrochen");
+      return;
+    }
+
+    setPurging(true);
+    setPurgeProgress("Starte…");
+    let totalDeleted = 0;
+    let totalFailed = 0;
+    try {
+      for (let round = 1; round <= 20; round++) {
+        setPurgeProgress(`Runde ${round} läuft (bisher gelöscht: ${totalDeleted})…`);
+        const { data, error } = await supabase.functions.invoke("product-import-cleanup", {
+          body: { confirm: true, vendors: ["CASA MODA", "VENTI"], max: 200 },
+        });
+        if (error) throw error;
+        const deleted = (data?.deleted as number) ?? 0;
+        const failed = (data?.failed as number) ?? 0;
+        const remaining = (data?.remaining_estimate as number) ?? 0;
+        totalDeleted += deleted;
+        totalFailed += failed;
+        setPurgeProgress(
+          `Runde ${round}: ${deleted} gelöscht (Total: ${totalDeleted}). Geschätzt verbleibend: ${remaining}`,
+        );
+        if (deleted === 0 && remaining === 0) break;
+        if (deleted === 0 && failed === 0) break;
+      }
+      toast.success(
+        `Purge fertig: ${totalDeleted} Produkte gelöscht${totalFailed > 0 ? `, ${totalFailed} Fehler` : ""}`,
+      );
+      setPurgeProgress(`Fertig: ${totalDeleted} gelöscht`);
+    } catch (err) {
+      toast.error(`Purge-Fehler: ${(err as Error).message}`);
+      setPurgeProgress(`Fehler: ${(err as Error).message}`);
+    } finally {
+      setPurging(false);
+    }
+  };
+
   const isRunning = job?.state === "running";
   const isStopping = job?.state === "stopping";
   const progress = job && job.total > 0 ? (job.processed / job.total) * 100 : 0;
@@ -194,6 +239,36 @@ export default function AdminImport() {
             <strong>Workflow:</strong> 1️⃣ <em>Entdecken</em> findet alle fehlenden Produkte. 2️⃣ <em>Trockenlauf</em> scrapt &amp; prüft die Daten ohne in Shopify zu schreiben. 3️⃣ Echter Import nur, wenn der Trockenlauf sauber aussieht.
           </AlertDescription>
         </Alert>
+
+        {/* Shopify purge card — destructive operation */}
+        <Card className="p-6 space-y-3 border-destructive/40 bg-destructive/5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="space-y-1">
+              <h2 className="font-medium flex items-center gap-2">
+                <Trash2 className="h-4 w-4 text-destructive" />
+                Shopify komplett purgen
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Löscht ALLE CASA MODA + VENTI Produkte direkt aus Shopify (per Vendor-Suche, paginiert).
+                Nutze dies vor einem sauberen Re-Import um Duplikate zu vermeiden.
+              </p>
+              {purgeProgress && (
+                <p className="text-xs font-mono text-muted-foreground border-l-2 border-destructive/50 pl-2 mt-2">
+                  {purgeProgress}
+                </p>
+              )}
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={runPurgeShopify}
+              disabled={purging || isRunning}
+            >
+              {purging ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Alle löschen
+            </Button>
+          </div>
+        </Card>
 
         {/* Job state card */}
         <Card className="p-6 space-y-4">
