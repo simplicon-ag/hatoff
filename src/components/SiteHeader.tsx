@@ -8,6 +8,8 @@ const navItems = [
   { to: "/looks", label: "Looks" },
   { to: "/shop", label: "Shop" },
   { to: "/sale", label: "Sale", highlight: true },
+  { to: "/saison/fs-2026", label: "F/S 2026" },
+  { to: "/saison/hw-2026", label: "H/W 2026" },
   { to: "/anlass/buero", label: "Anlässe" },
   { to: "/marken", label: "Marken" },
   { to: "/magazin", label: "Magazin" },
