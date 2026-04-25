@@ -31,6 +31,7 @@ const PRODUCTS_LIST = `
           id title handle vendor productType tags
           priceRange { minVariantPrice { amount currencyCode } }
           images(first: 1) { edges { node { url } } }
+          options { name values }
           variants(first: 1) { edges { node { availableForSale } } }
         }
       }
@@ -49,6 +50,7 @@ interface ShopifyNode {
   description?: string;
   priceRange?: { minVariantPrice: { amount: string; currencyCode: string } };
   images?: { edges: Array<{ node: { url: string } }> };
+  options?: Array<{ name: string; values: string[] }>;
   variants?: { edges: Array<{ node: { availableForSale: boolean } }> };
 }
 
