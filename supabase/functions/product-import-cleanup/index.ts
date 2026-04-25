@@ -1,10 +1,13 @@
-// One-shot cleanup: deletes all Shopify products that were created by the
-// product-import worker (identified via product_import_log.shopify_product_id).
-// Uses the same rate-limited shopifyFetch logic as the worker.
+// One-shot cleanup: deletes ALL Shopify products from the configured vendors
+// (CASA MODA + VENTI) by paginating through the Admin GraphQL API.
 //
-// Body: { confirm: true }  — required to actually delete.
-// Returns: { deleted, failed, total }
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// Body:
+//   { confirm: true, vendors?: string[], max?: number }
+//   - confirm: required to actually delete
+//   - vendors: optional, defaults to ["CASA MODA", "VENTI"]
+//   - max:     optional safety cap per invocation (default 200 — call repeatedly)
+//
+// Returns: { success, scanned, deleted, failed, remaining_estimate, failures }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,7 +17,7 @@ const corsHeaders = {
 
 const SHOPIFY_DOMAIN = "style-compass-6nrqi.myshopify.com";
 const SHOPIFY_ADMIN_VERSION = "2025-07";
-const SHOPIFY_MIN_GAP_MS = 650;
+const SHOPIFY_MIN_GAP_MS = 600;
 let lastShopifyCallAt = 0;
 
 async function shopifyFetch(
@@ -31,10 +34,14 @@ async function shopifyFetch(
   const { adminToken, headers, ...rest } = init;
   const res = await fetch(url, {
     ...rest,
-    headers: { ...(headers ?? {}), "X-Shopify-Access-Token": adminToken },
+    headers: {
+      ...(headers ?? {}),
+      "X-Shopify-Access-Token": adminToken,
+      "Content-Type": "application/json",
+    },
   });
 
-  if (res.status === 429 && attempt <= 4) {
+  if (res.status === 429 && attempt <= 5) {
     const retryAfter = parseFloat(res.headers.get("Retry-After") ?? "2");
     const waitMs = Math.max(retryAfter * 1000, 2000 * attempt);
     await res.text().catch(() => "");
@@ -61,15 +68,62 @@ function resolveAdminToken(): string {
   return direct ?? "";
 }
 
+async function gqlSearch(
+  adminToken: string,
+  query: string,
+  cursor: string | null,
+): Promise<{
+  ids: string[];
+  cursor: string | null;
+  hasNext: boolean;
+}> {
+  const body = {
+    query: `
+      query ($q: String!, $cursor: String) {
+        products(first: 50, query: $q, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          edges { node { id } }
+        }
+      }
+    `,
+    variables: { q: query, cursor },
+  };
+  const res = await shopifyFetch(
+    `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/graphql.json`,
+    { method: "POST", body: JSON.stringify(body), adminToken },
+  );
+  const json = await res.json();
+  if (json.errors) throw new Error(JSON.stringify(json.errors));
+  const products = json.data?.products;
+  return {
+    ids: (products?.edges ?? []).map((e: { node: { id: string } }) =>
+      e.node.id.replace("gid://shopify/Product/", "")
+    ),
+    cursor: products?.pageInfo?.endCursor ?? null,
+    hasNext: products?.pageInfo?.hasNextPage ?? false,
+  };
+}
+
+async function deleteProduct(
+  adminToken: string,
+  productId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await shopifyFetch(
+    `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}.json`,
+    { method: "DELETE", adminToken },
+  );
+  if (res.ok || res.status === 404) {
+    await res.text().catch(() => "");
+    return { ok: true };
+  }
+  const txt = await res.text().catch(() => "");
+  return { ok: false, error: `${res.status} ${txt.slice(0, 120)}` };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -91,49 +145,75 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Pull all log rows that have a Shopify product ID
-    const { data: rows, error } = await supabase
-      .from("product_import_log")
-      .select("id, shopify_product_id, handle")
-      .not("shopify_product_id", "is", null);
+    const vendors: string[] = Array.isArray(body.vendors) && body.vendors.length > 0
+      ? body.vendors
+      : ["CASA MODA", "VENTI"];
+    const maxPerRun: number = typeof body.max === "number" ? body.max : 200;
 
-    if (error) throw error;
-
+    let scanned = 0;
     let deleted = 0;
     let failed = 0;
     const failures: string[] = [];
+    let stoppedEarly = false;
 
-    // Dedupe — multiple log rows can point to the same Shopify product
-    const ids = Array.from(
-      new Set((rows ?? []).map((r) => r.shopify_product_id).filter(Boolean)),
-    );
-    const total = ids.length;
+    for (const vendor of vendors) {
+      const query = `vendor:"${vendor}"`;
+      let cursor: string | null = null;
 
-    for (const productId of ids) {
-      try {
-        const res = await shopifyFetch(
-          `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}.json`,
-          { method: "DELETE", adminToken },
-        );
-        if (res.ok || res.status === 404) {
-          deleted++;
-        } else {
-          failed++;
-          const txt = await res.text().catch(() => "");
-          failures.push(`${productId}: ${res.status} ${txt.slice(0, 100)}`);
+      // Loop pages until exhausted or budget hit
+      // We always re-query from the start (no cursor) after deletes,
+      // because deleted products vanish from the result set.
+      while (true) {
+        const page = await gqlSearch(adminToken, query, cursor);
+        scanned += page.ids.length;
+        if (page.ids.length === 0) break;
+
+        for (const id of page.ids) {
+          if (deleted + failed >= maxPerRun) {
+            stoppedEarly = true;
+            break;
+          }
+          const result = await deleteProduct(adminToken, id);
+          if (result.ok) deleted++;
+          else {
+            failed++;
+            failures.push(`${id}: ${result.error}`);
+          }
         }
-      } catch (err) {
-        failed++;
-        failures.push(`${productId}: ${(err as Error).message}`);
+
+        if (stoppedEarly) break;
+        // After deleting, restart pagination from the beginning so we don't
+        // skip products (cursor would point past now-deleted entries).
+        cursor = null;
+
+        // If page was full but nothing left, the next iteration's gqlSearch
+        // will return 0 and we exit. If a page came back smaller than 50,
+        // we're at the tail.
+        if (!page.hasNext) {
+          // Re-query once more to confirm empty (since we deleted)
+          const confirm = await gqlSearch(adminToken, query, null);
+          if (confirm.ids.length === 0) break;
+        }
       }
+      if (stoppedEarly) break;
+    }
+
+    // Estimate remaining across vendors
+    let remaining = 0;
+    for (const vendor of vendors) {
+      const probe = await gqlSearch(adminToken, `vendor:"${vendor}"`, null);
+      remaining += probe.ids.length + (probe.hasNext ? 50 : 0); // rough lower bound
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        total,
+        vendors,
+        scanned,
         deleted,
         failed,
+        stopped_early: stoppedEarly,
+        remaining_estimate: remaining,
         failures: failures.slice(0, 20),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
