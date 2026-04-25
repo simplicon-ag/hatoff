@@ -333,7 +333,7 @@ Deno.serve(async (req) => {
       .from("product_import_job")
       .update({
         total: pendingTotal ?? 0,
-        message: `Entdeckt: ${inserted} neue Produkte`,
+        message: `Entdeckt: ${inserted} gruppierte Produkte`,
         updated_at: new Date().toISOString(),
       })
       .eq("id", "singleton");
@@ -344,7 +344,7 @@ Deno.serve(async (req) => {
         casamoda_urls: cmUrls.length,
         venti_urls: vtUrls.length,
         shopify_existing: existing.size,
-        new_candidates: candidates.length,
+        groups: groups.size,
         inserted,
         pending_total: pendingTotal ?? 0,
       }),
