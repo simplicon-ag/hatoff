@@ -11,6 +11,8 @@ interface Props {
   lookTitle: string;
   /** When true, each item shows a remove button (used in AI-generated sets). */
   allowRemove?: boolean;
+  /** Per-handle list of AI-recommended colours; first available is auto-selected. */
+  recommendedColors?: Record<string, string[]>;
 }
 
 type Selections = Record<string, Record<string, string>>; // productId -> { optionName -> value }
