@@ -208,6 +208,11 @@ export const AiStyleGenerator = ({ productHandle, productTitle }: Props) => {
               products={setProducts}
               lookTitle={`${productTitle} · ${OCCASIONS.find((o) => o.id === occasion)?.label}`}
               allowRemove
+              recommendedColors={Object.fromEntries(
+                result.items
+                  .filter((i) => i.recommendedColors && i.recommendedColors.length > 0)
+                  .map((i) => [i.handle, i.recommendedColors as string[]]),
+              )}
             />
           </div>
         )}
