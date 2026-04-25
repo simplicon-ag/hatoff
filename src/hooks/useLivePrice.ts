@@ -7,6 +7,9 @@ export interface LivePrice {
   source_url: string | null;
   raw_price_eur: number | null;
   display_price_chf: number;
+  original_price_eur: number | null;
+  original_price_chf: number | null;
+  on_sale: boolean;
   status: "ok" | "fallback" | "not_found";
   fetched_at: string;
 }
