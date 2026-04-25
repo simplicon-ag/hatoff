@@ -75,7 +75,9 @@ export const SiteHeader = () => {
                 key={item.to}
                 to={item.to}
                 onClick={() => setOpen(false)}
-                className="rounded-sm px-2 py-3 text-base font-medium text-foreground/90 hover:bg-secondary"
+                className={`rounded-sm px-2 py-3 text-base font-medium hover:bg-secondary ${
+                  item.highlight ? "text-destructive" : "text-foreground/90"
+                }`}
               >
                 {item.label}
               </Link>
