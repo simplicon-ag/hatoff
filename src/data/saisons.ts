@@ -221,3 +221,37 @@ export function filterProductsForSaison(
     .sort((a, b) => b.s - a.s)
     .map((x) => x.p);
 }
+
+/**
+ * Filter products using brand-provided season handles (from brand_season_products),
+ * with the keyword heuristic as a fallback for handles not in the brand mapping.
+ *
+ * Products whose handle is in `brandHandles` are ranked first (in their original
+ * Shopify order). Remaining products are scored heuristically and only kept if
+ * they score > 0.
+ */
+export function filterProductsForSaisonWithBrandData(
+  products: ShopifyProduct[],
+  saison: SaisonConfig,
+  brandHandles: Set<string>,
+): { brandMatched: ShopifyProduct[]; heuristic: ShopifyProduct[] } {
+  const brandMatched: ShopifyProduct[] = [];
+  const remaining: ShopifyProduct[] = [];
+
+  for (const p of products) {
+    if (brandHandles.has(p.node.handle.toLowerCase())) {
+      brandMatched.push(p);
+    } else {
+      remaining.push(p);
+    }
+  }
+
+  const heuristic = remaining
+    .map((p) => ({ p, s: scoreProductForSaison(p, saison) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .map((x) => x.p);
+
+  return { brandMatched, heuristic };
+}
+
