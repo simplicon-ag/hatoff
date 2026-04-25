@@ -78,28 +78,28 @@ function categorize(p: { productType?: string; tags?: string[]; title?: string }
   if (/(jacke|mantel|parka|coat|weste)/.test(hay)) return "jacke";
   if (/(hose|chino|jeans|bermuda|short)/.test(hay)) return "hose";
   if (/(schuh|sneaker|loafer|boot|stiefel)/.test(hay)) return "schuhe";
-  if (/(g[üu]rtel|belt)/.test(hay)) return "guertel";
-  if (/(socke|sock)/.test(hay)) return "socken";
-  if (/(krawatte|fliege|tie|einstecktuch)/.test(hay)) return "accessoire";
-  if (/(m[üu]tze|cap|hut|schal|tuch)/.test(hay)) return "accessoire";
+  // Accessoires (Gürtel, Socken, Krawatten, Mützen, Schals, Tücher) explizit
+  // ausschliessen — sie werden nicht in generierte Looks aufgenommen.
+  if (/(g[üu]rtel|belt|socke|sock|krawatte|fliege|tie|einstecktuch|m[üu]tze|cap|hut|schal|tuch)/.test(hay)) return "accessoire";
   return "sonstige";
 }
 
-/** Which categories complement an anchor category for a complete outfit */
+/** Which categories complement an anchor category for a complete outfit.
+ *  "accessoire" wird bewusst nirgends zurückgegeben. */
 function complementaryCats(anchor: string): string[] {
   switch (anchor) {
     case "hemd":
     case "polo":
     case "tshirt":
-      return ["hose", "sakko", "jacke", "schuhe", "guertel", "accessoire"];
+      return ["hose", "sakko", "jacke", "schuhe"];
     case "pullover":
-      return ["hose", "hemd", "jacke", "schuhe", "accessoire"];
+      return ["hose", "hemd", "jacke", "schuhe"];
     case "sakko":
-      return ["hose", "hemd", "schuhe", "guertel", "accessoire"];
+      return ["hose", "hemd", "schuhe"];
     case "jacke":
       return ["hose", "hemd", "polo", "pullover", "schuhe"];
     case "hose":
-      return ["hemd", "polo", "pullover", "sakko", "jacke", "schuhe", "guertel"];
+      return ["hemd", "polo", "pullover", "sakko", "jacke", "schuhe"];
     case "schuhe":
       return ["hose", "hemd", "sakko", "jacke"];
     default:
