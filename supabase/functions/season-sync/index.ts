@@ -128,12 +128,19 @@ async function firecrawlScrapeLinks(
   return links;
 }
 
-function extractProductUrls(links: string[], pattern: RegExp): string[] {
+function extractProductUrls(
+  links: Array<string | { url?: string; href?: string }>,
+  pattern: RegExp,
+): string[] {
   const set = new Set<string>();
   for (const link of links) {
-    const m = link.match(pattern);
+    const raw =
+      typeof link === "string"
+        ? link
+        : (link?.url ?? link?.href ?? "");
+    if (!raw) continue;
+    const m = raw.match(pattern);
     if (m) {
-      // Strip query string + fragment, lowercase host
       const clean = m[0].split(/[?#]/)[0].toLowerCase();
       set.add(clean);
     }
