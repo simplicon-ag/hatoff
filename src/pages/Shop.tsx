@@ -38,7 +38,7 @@ const Shop = () => {
   const [selectedVendors, setSelectedVendors] = useState<Set<string>>(new Set());
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [selectedWelten, setSelectedWelten] = useState<Set<string>>(new Set());
-  const [selectedAnlaesse, setSelectedAnlaesse] = useState<Set<string>>(new Set());
+  
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
   const [selectedSizes, setSelectedSizes] = useState<Set<string>>(new Set());
   const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
@@ -56,7 +56,7 @@ const Shop = () => {
     const vendors = new Map<string, number>();
     const categories = new Map<string, number>();
     const welten = new Map<string, number>();
-    const anlaesse = new Map<string, number>();
+    
     const colors = new Map<string, number>();
     const sizes = new Map<string, number>();
     let priceMin = Infinity;
@@ -74,8 +74,6 @@ const Shop = () => {
       n.tags.forEach((t) => {
         const w = tagValue(t, "welt");
         if (w) welten.set(w, (welten.get(w) ?? 0) + 1);
-        const a = tagValue(t, "anlass");
-        if (a) anlaesse.set(a, (anlaesse.get(a) ?? 0) + 1);
         const c = tagValue(t, "farbe");
         if (c) colors.set(c, (colors.get(c) ?? 0) + 1);
       });
@@ -109,7 +107,7 @@ const Shop = () => {
       vendors: Array.from(vendors.entries()).sort(([a], [b]) => a.localeCompare(b)),
       categories: Array.from(categories.entries()).sort(([a], [b]) => a.localeCompare(b)),
       welten: Array.from(welten.entries()).sort(([a], [b]) => a.localeCompare(b)),
-      anlaesse: Array.from(anlaesse.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      
       colors: Array.from(colors.entries()).sort(([a], [b]) => a.localeCompare(b)),
       sizes: Array.from(sizes.entries()).sort(([a], [b]) => sortNum(a, b)),
       priceMin: Math.floor(priceMin),
@@ -148,14 +146,6 @@ const Shop = () => {
         p.node.tags.some((t) => {
           const v = tagValue(t, "welt");
           return v ? selectedWelten.has(v) : false;
-        }),
-      );
-    }
-    if (selectedAnlaesse.size > 0) {
-      list = list.filter((p) =>
-        p.node.tags.some((t) => {
-          const v = tagValue(t, "anlass");
-          return v ? selectedAnlaesse.has(v) : false;
         }),
       );
     }
@@ -209,7 +199,7 @@ const Shop = () => {
     selectedVendors,
     selectedCategories,
     selectedWelten,
-    selectedAnlaesse,
+    
     selectedColors,
     selectedSizes,
     priceRange,
@@ -227,7 +217,7 @@ const Shop = () => {
     setSelectedVendors(new Set());
     setSelectedCategories(new Set());
     setSelectedWelten(new Set());
-    setSelectedAnlaesse(new Set());
+    
     setSelectedColors(new Set());
     setSelectedSizes(new Set());
     setPriceRange([facets.priceMin, facets.priceMax]);
@@ -239,7 +229,7 @@ const Shop = () => {
     selectedVendors.size +
     selectedCategories.size +
     selectedWelten.size +
-    selectedAnlaesse.size +
+    
     selectedColors.size +
     selectedSizes.size +
     (onlyAvailable ? 1 : 0) +
@@ -349,13 +339,6 @@ const Shop = () => {
           items={facets.welten}
           selected={selectedWelten}
           onToggle={toggle(selectedWelten, setSelectedWelten)}
-          capitalize
-        />
-        <FacetGroup
-          title="Anlass"
-          items={facets.anlaesse}
-          selected={selectedAnlaesse}
-          onToggle={toggle(selectedAnlaesse, setSelectedAnlaesse)}
           capitalize
         />
         <FacetGroup

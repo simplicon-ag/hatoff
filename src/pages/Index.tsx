@@ -5,7 +5,7 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { FeaturedLook } from "@/components/FeaturedLook";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
-import { anlaesse, looks, magazinArtikel, marken, welten } from "@/data/looks";
+import { looks, magazinArtikel, marken, welten } from "@/data/looks";
 import { fetchProducts, type ShopifyProduct } from "@/lib/shopify";
 import heroImg from "@/assets/hero.jpg";
 
@@ -66,18 +66,6 @@ const Index = () => {
                 <h3 className="font-display text-2xl">{w.title}</h3>
                 <p className="text-xs opacity-90">{w.description}</p>
               </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Anlässe Strip */}
-      <section className="border-y border-border bg-secondary/40">
-        <div className="container-editorial flex flex-wrap items-center justify-center gap-3 py-8 md:gap-6">
-          <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Anlässe</span>
-          {anlaesse.map((a) => (
-            <Link key={a.slug} to={`/anlass/${a.slug}`} className="rounded-full border border-border bg-background px-4 py-2 text-sm hover:border-primary hover:text-primary">
-              {a.title}
             </Link>
           ))}
         </div>

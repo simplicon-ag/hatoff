@@ -44,9 +44,6 @@ export const SiteFooter = () => {
           <h4 className="font-display text-base">Service</h4>
           <ul className="space-y-2 text-muted-foreground">
             <li><Link to="/groessentabellen" className="hover:text-primary">Grössentabellen</Link></li>
-            <li><Link to="/anlass/buero" className="hover:text-primary">Büro</Link></li>
-            <li><Link to="/anlass/alltag" className="hover:text-primary">Alltag</Link></li>
-            <li><Link to="/anlass/ausgang" className="hover:text-primary">Ausgang</Link></li>
           </ul>
         </div>
       </div>
