@@ -511,7 +511,13 @@ async function createMultiColorProduct(
       body_html: base.description_html || base.description || "",
       vendor: base.vendor,
       product_type: base.product_type ?? "Bekleidung",
-      tags: base.tags.join(","),
+      tags: [
+        ...base.tags,
+        ...colors
+          .map((c) => c.scraped.article_number)
+          .filter((n): n is string => !!n)
+          .map((n) => `art:${n}`),
+      ].join(","),
       handle,
       status: "active",
       options: [
