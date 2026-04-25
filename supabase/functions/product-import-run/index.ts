@@ -89,11 +89,31 @@ function parseProductIds(url: string): { articleId: string; colorId: string } | 
  *  Venti format:     "Businesshemd Hellblau - Modern Fit 001480 - VENTI" */
 function cleanTitle(rawTitle: string, brand: string): string {
   let t = decode(rawTitle).trim();
-  // Strip brand suffix
   t = t.replace(/\s*-\s*(CASAMODA|VENTI)\s*$/i, "");
-  // Strip trailing 6+ digit article codes
   t = t.replace(/\s+\d{6,}\s*$/g, "");
   return t.trim();
+}
+
+/** Strip a colour token from the end of a title so we get the colour-neutral
+ *  base title (e.g. "Businesshemd Hellblau" → "Businesshemd"). */
+const COLOR_WORDS_RE =
+  /\s+(hell|dunkel|mittel|tief|graues?|altes?)?\s*(blau|hellblau|mittelblau|dunkelblau|marine|navy|rot|mittelrot|dunkelrot|weinrot|weiss|weiß|ecru|creme|champagner|champagner[- ]beige|schwarz|tiefschwarz|anthrazit|grau|hellgrau|dunkelgrau|silber|beige|sand|khaki|camel|braun|mittelbraun|dunkelbraun|cognac|gr(?:ue|ü)n|mittelgr(?:ue|ü)n|dunkelgr(?:ue|ü)n|oliv|olive|mint|gelb|senf|ocker|orange|rost|rosa|pink|altrosa|lila|violett|t(?:ue|ü)rkis|petrol)\s*$/i;
+function stripColorFromTitle(title: string): string {
+  let t = title;
+  for (let i = 0; i < 3; i++) {
+    const m = t.match(COLOR_WORDS_RE);
+    if (!m) break;
+    t = t.slice(0, t.length - m[0].length).trim();
+  }
+  return t.replace(/[\s,–-]+$/g, "").trim();
+}
+
+/** Pull the colour name from a (Casa Moda / Venti) product title. */
+function extractColorFromTitle(title: string): string | null {
+  const m = title.match(COLOR_WORDS_RE);
+  if (!m) return null;
+  // Re-build the matched colour phrase preserving case but trimmed
+  return m[0].trim().replace(/\s+/g, " ");
 }
 
 const BRAND_DEFAULT_SIZES: Record<string, string[]> = {
