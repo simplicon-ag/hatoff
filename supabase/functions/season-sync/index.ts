@@ -205,13 +205,19 @@ async function syncSeason(
 
         if (cacheErr) throw cacheErr;
 
-        const productUrlSet = new Set(productUrls);
+        // Normalize: strip protocol + leading "www." + query/hash so both sides match.
+        const normalize = (u: string) =>
+          u
+            .replace(/^https?:\/\//i, "")
+            .replace(/^www\./i, "")
+            .split(/[?#]/)[0]
+            .toLowerCase();
+
+        const productUrlSet = new Set(productUrls.map(normalize));
         const seen = new Set<string>();
         for (const row of cacheRows ?? []) {
           if (!row.source_url) continue;
-          const cleaned = String(row.source_url)
-            .split(/[?#]/)[0]
-            .toLowerCase();
+          const cleaned = normalize(String(row.source_url));
           if (productUrlSet.has(cleaned)) {
             const handle = String(row.handle).toLowerCase();
             if (!seen.has(handle)) {
@@ -220,6 +226,9 @@ async function syncSeason(
             }
           }
         }
+        console.log(
+          `[season-sync] ${season}/${source.brand}: matched ${matchedHandles.length} handles from ${cacheRows?.length ?? 0} cache rows`,
+        );
 
         // 3) Replace previous mapping for this brand+season
         await supabase
