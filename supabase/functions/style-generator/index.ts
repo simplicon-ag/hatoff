@@ -215,6 +215,7 @@ Anlass-Vorgabe: ${guidance}
 
 Regeln:
 - Wähle keine Stücke aus derselben Hauptkategorie wie der Anker (z.B. nicht zwei Hemden, nicht zwei Hosen).
+- KEINE Accessoires (Gürtel, Krawatte, Schal, Mütze, Cap, Socken, Einstecktuch) — fokussiere auf Hauptkleidungsstücke.
 - Achte auf Farbharmonie: vermeide harte Farbkonflikte; nutze klassische Kombinationen (Marine + Beige, Grau + Weiss, Khaki + Ecru, etc.).
 - Vermeide es, dass mehrere Stücke alle in EINER Marke sind, ausser es passt klar besser.
 - Bevorzuge gut bewertete, vielseitige Klassiker.
