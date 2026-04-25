@@ -49,10 +49,23 @@ function isOptionAvailable(
   });
 }
 
-export const LookSetBuilder = ({ products, lookTitle }: Props) => {
+export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Props) => {
   const addItems = useCartStore((s) => s.addItems);
   const isLoading = useCartStore((s) => s.isLoading);
   const [adding, setAdding] = useState(false);
+
+  // Items the user hid from the set (only relevant when allowRemove)
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+
+  // Reset removed set if the products list changes (e.g. new AI generation)
+  useEffect(() => {
+    setRemovedIds(new Set());
+  }, [products]);
+
+  const visibleProducts = useMemo(
+    () => products.filter((p) => !removedIds.has(p.node.id)),
+    [products, removedIds],
+  );
 
   // Initialize: pre-select first available variant's options per product
   const [selections, setSelections] = useState<Selections>({});
@@ -81,15 +94,23 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
     }));
   };
 
-  // Compute selected variant + availability per product
+  const removeItem = (productId: string) => {
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(productId);
+      return next;
+    });
+  };
+
+  // Compute selected variant + availability per product (only visible ones count)
   const resolved = useMemo(
     () =>
-      products.map((p) => {
+      visibleProducts.map((p) => {
         const chosen = selections[p.node.id] ?? {};
         const variant = findVariant(p, chosen);
         return { product: p, chosen, variant };
       }),
-    [products, selections],
+    [visibleProducts, selections],
   );
 
   const allReady = resolved.every(
