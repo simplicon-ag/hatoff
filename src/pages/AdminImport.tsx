@@ -171,7 +171,8 @@ export default function AdminImport() {
     }
   };
 
-  const isRunning = job?.state === "running" || job?.state === "stopping";
+  const isRunning = job?.state === "running";
+  const isStopping = job?.state === "stopping";
   const progress = job && job.total > 0 ? (job.processed / job.total) * 100 : 0;
 
   return (

@@ -25,10 +25,10 @@ Deno.serve(async (req) => {
 
     if (action === "start") {
       // Mark job as running. Reset progress counters.
-      const { data: pending } = await supabase
+      const { count: total } = await supabase
         .from("product_import_log")
         .select("id", { count: "exact", head: true })
-        .in("status", ["pending", "error"]);
+        .in("status", ["pending", "error", "scraped"]);
 
       await supabase
         .from("product_import_job")
@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
           state: "running",
           dry_run: dryRun,
           processed: 0,
+          total: total ?? 0,
           created_count: 0,
           error_count: 0,
           message: dryRun ? "Trockenlauf gestartet" : "Echter Import gestartet",
