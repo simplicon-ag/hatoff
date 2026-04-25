@@ -1,50 +1,41 @@
-# Preise wirklich korrigieren
+## Ziel
+Beide Scraper laufen automatisch **täglich**, damit Preise und Saison-Listen immer frisch sind — ohne manuelles Anstossen.
 
-## Aktueller Stand (verifiziert)
+## Was läuft heute?
+- **`product-price`**: Holt Live-Preise von casamoda.com / venti.com (Cache 7 Tage). Wird heute nur **on-demand** beim Seitenaufruf getriggert.
+- **`season-sync`**: Aggregiert pro Saison die Produktlisten der Marken-Kategorieseiten. Wird heute **manuell** aufgerufen.
+- **Extensions `pg_cron` / `pg_net`**: aktuell **nicht aktiviert** (Check ergab leeres Resultat).
 
-Cache-Status Casa Moda: 26 `ok`, 64 `fallback`, **147 `mismatch`**, 1 `not_found`.
+## Plan
 
-**Du bist gerade auf `/product/casa-moda-polo-shirt-ivory`.** DB-Eintrag:
-- `status = 'mismatch'` ✅ (durch Audit korrekt markiert)
-- `on_sale = true, display = 39.95, original = 79.95` ❌ (falscher Preis steht aber noch im Cache)
+### 1. Extensions aktivieren (Migration)
+- `create extension if not exists pg_cron;`
+- `create extension if not exists pg_net;`
 
-→ Die UI zeigt trotzdem den falschen Sale, weil die Edge-Function den `mismatch`-Status beim Lesen nicht filtert.
+### 2. Drei tägliche Cron-Jobs einrichten (SQL via DB-Insert, kein Migration-File — enthält Anon-Key)
 
-## Zwei offene Bugs
+| Job | Zeit (UTC) | Funktion | Body |
+|---|---|---|---|
+| `season-sync-fs` | 02:00 | `season-sync` | `{"season":"fs-2026"}` |
+| `season-sync-hw` | 02:15 | `season-sync` | `{"season":"hw-2026"}` |
+| `product-price-refresh` | 03:00 | neuer Endpoint `product-price-refresh` | (kein Body) |
 
-**Bug 1:** `supabase/functions/product-price/index.ts` Zeile 258–280 — der Cache-Read gibt jeden Eintrag innerhalb der TTL zurück, egal ob `status='ok'`, `'fallback'` oder `'mismatch'`. Die Audit-Markierung wird ignoriert.
+Zeiten gestaffelt, damit Firecrawl-Quota nicht in einem Burst aufgebraucht wird.
 
-**Bug 2:** Beim Re-Scrapen (TTL abgelaufen oder force) gibt es keinen Bild-Vergleich → derselbe falsche URL wird wieder gecached.
+### 3. Neuer Edge-Endpoint `product-price-refresh`
+Da `product-price` aktuell **Handles als Input** erwartet, bauche ich eine neue kleine Funktion, die:
+- alle Handles aus `product_price_cache` lädt, deren `fetched_at` älter als **24 h** ist **und** Status nicht `mismatch` ist (Mismatches bleiben gesperrt — wie vom letzten Schritt vereinbart),
+- diese Handles in Batches (z.B. 20er) an die bestehende `product-price`-Funktion mit `force=1` weiterreicht,
+- pro Batch eine kurze Pause einlegt (Rate-Limit-Schutz für Firecrawl),
+- ein kurzes Resultat-JSON loggt (verarbeitet/erfolgreich/Fehler).
 
-## Schritt 1 — Mismatch-Filter (löst sofort das UI-Problem)
+Vorteil: bestehende Logik in `product-price` bleibt unverändert, neue Funktion ist nur ein Orchestrator.
 
-In `product-price/index.ts`:
-- Cache-Lese-Schleife: wenn `c.status === 'mismatch'` → Eintrag ignorieren.
-- Stattdessen direkt Shopify-Fallback zurückgeben (`status='fallback'`, `on_sale=false`) **ohne** `upsert` (sonst geht die Mismatch-Markierung verloren).
+### 4. Verifikation
+- Nach Setup: `select * from cron.job;` — die 3 Jobs müssen erscheinen.
+- Optional: Einen Job manuell triggern (`select cron.schedule(...)` → `select net.http_post(...)`) um Erfolg zu prüfen, ohne 24 h zu warten.
 
-Effekt: Polo Shirt Ivory + die 146 anderen Mismatches zeigen sofort den Shopify-Standardpreis ohne falsches Sale-Badge.
+## Offene Detail-Frage
+**Sind 24 h Refresh-Intervall OK** oder soll ich auf z.B. **48 h / 7 Tage** gehen? Firecrawl hat Credits-Limits — bei ~170 Casa-Moda-Produkten + Venti-Produkten täglich kann das ins Geld gehen.
 
-## Schritt 2 — Bild-Match-Schutz vor neuem Cache-Eintrag
-
-In `product-price/index.ts`:
-- `firecrawlScrape` zusätzlich Produktbild aus dem Casa-Moda-Markdown extrahieren (erstes `images.casamoda.com`-Bild).
-- Body-Payload erweitern um `shopifyImages: Record<handle, imageUrl>`.
-- Vor `upsert`: dHash-Vergleich (9×8 Graustufen, 64-Bit-Hash via `imagescript` aus deno.land/x). Hamming-Distanz ≤ 12 = Match.
-- Kein Match → `status='mismatch'` speichern statt `'ok'`.
-
-## Schritt 3 — Hook + Aufrufer Shopify-Bild mitschicken
-
-`src/hooks/useLivePrice.ts`: Signatur `useLivePrice(handle, shopifyImage?)` und `useLivePrices(handles, shopifyImages?)`. Body-Payload um `shopifyImages` ergänzen.
-
-Aufrufer aktualisieren: `ProductCard.tsx`, `ProductDetail.tsx`, `LookSetBuilder.tsx`, `AiStyleGenerator.tsx` → `primary?.url` mitgeben.
-
-## Schritt 4 — Verifikation
-
-- Polo Shirt Ivory neu laden → erwartet: kein Sale-Badge, Shopify-Standardpreis.
-- Stichprobe 3 weitere Mismatch-Handles aus dem Cache.
-- Ein sauberer `ok`-Handle muss weiterhin korrekten Sale zeigen.
-
-## Nicht geändert
-- Keine DB-Migrationen.
-- 26 `ok` + 64 `fallback`-Einträge bleiben.
-- Venti unberührt.
+Falls du knausrig sein willst: Variante "nur **Sale-Produkte täglich**, Rest wöchentlich" wäre auch sauber umsetzbar — sag Bescheid.
