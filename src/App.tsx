@@ -54,6 +54,7 @@ const App = () => (
               <Route path="/marken/:slug" element={<MarkenDetail />} />
               <Route path="/magazin" element={<MagazinIndex />} />
               <Route path="/magazin/:slug" element={<MagazinDetail />} />
+              <Route path="/groessentabellen" element={<Groessen />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </SizeAdvisorProvider>
