@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      brand_season_products: {
+        Row: {
+          brand: string
+          created_at: string
+          fetched_at: string
+          handle: string
+          id: string
+          season: string
+          source_url: string | null
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          fetched_at?: string
+          handle: string
+          id?: string
+          season: string
+          source_url?: string | null
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          fetched_at?: string
+          handle?: string
+          id?: string
+          season?: string
+          source_url?: string | null
+        }
+        Relationships: []
+      }
       product_price_cache: {
         Row: {
           brand: string
