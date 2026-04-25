@@ -99,10 +99,8 @@ const SOURCES: Record<Season, BrandSeasonSource[]> = {
       brandKey: "casa-moda",
       categories: [
         cm("hemden"),
-        cm("pullover"),
-        cm("sakkos"),
-        cm("jacken-mantel"),
         cm("jacken"),
+        cm("westen"),
         cm("hosen"),
       ],
     },
