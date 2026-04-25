@@ -1,1 +1,4 @@
 project_id = "xccffclxvdmwfgydebqx"
+
+[functions.product-price-refresh]
+verify_jwt = false
