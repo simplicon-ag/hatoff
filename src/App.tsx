@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound.tsx";
 import LooksPage from "./pages/Looks.tsx";
 import LookDetail from "./pages/LookDetail.tsx";
 import Shop from "./pages/Shop.tsx";
+import Sale from "./pages/Sale.tsx";
 import ProductDetail from "./pages/ProductDetail.tsx";
 import AnlassPage from "./pages/Anlass.tsx";
 import { MarkenDetail, MarkenIndex } from "./pages/Marken.tsx";
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/looks" element={<LooksPage />} />
               <Route path="/looks/:slug" element={<LookDetail />} />
               <Route path="/shop" element={<Shop />} />
+              <Route path="/sale" element={<Sale />} />
               <Route path="/product/:handle" element={<ProductDetail />} />
               <Route path="/anlass/:slug" element={<AnlassPage />} />
               <Route path="/marken" element={<MarkenIndex />} />

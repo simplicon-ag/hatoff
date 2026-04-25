@@ -7,6 +7,7 @@ import { CartDrawer } from "./CartDrawer";
 const navItems = [
   { to: "/looks", label: "Looks" },
   { to: "/shop", label: "Shop" },
+  { to: "/sale", label: "Sale", highlight: true },
   { to: "/anlass/buero", label: "Anlässe" },
   { to: "/marken", label: "Marken" },
   { to: "/magazin", label: "Magazin" },
@@ -39,7 +40,13 @@ export const SiteHeader = () => {
               to={item.to}
               className={({ isActive }) =>
                 `text-sm font-medium tracking-wide transition-colors ${
-                  isActive ? "text-primary" : "text-foreground/80 hover:text-primary"
+                  item.highlight
+                    ? isActive
+                      ? "text-destructive"
+                      : "text-destructive/90 hover:text-destructive"
+                    : isActive
+                      ? "text-primary"
+                      : "text-foreground/80 hover:text-primary"
                 }`
               }
             >
@@ -68,7 +75,9 @@ export const SiteHeader = () => {
                 key={item.to}
                 to={item.to}
                 onClick={() => setOpen(false)}
-                className="rounded-sm px-2 py-3 text-base font-medium text-foreground/90 hover:bg-secondary"
+                className={`rounded-sm px-2 py-3 text-base font-medium hover:bg-secondary ${
+                  item.highlight ? "text-destructive" : "text-foreground/90"
+                }`}
               >
                 {item.label}
               </Link>
