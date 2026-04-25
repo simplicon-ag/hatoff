@@ -239,6 +239,10 @@ Deno.serve(async (req) => {
             source_url: c.source_url,
             raw_price_eur: c.raw_price_eur,
             display_price_chf: Number(c.display_price_chf),
+            original_price_eur: c.original_price_eur ?? null,
+            original_price_chf:
+              c.original_price_chf != null ? Number(c.original_price_chf) : null,
+            on_sale: !!c.on_sale,
             status: c.status,
             fetched_at: c.fetched_at,
           });
@@ -255,6 +259,9 @@ Deno.serve(async (req) => {
           source_url: null,
           raw_price_eur: null,
           display_price_chf: display,
+          original_price_eur: null,
+          original_price_chf: null,
+          on_sale: false,
           status: "fallback",
           fetched_at: new Date().toISOString(),
         };
@@ -266,6 +273,9 @@ Deno.serve(async (req) => {
             source_url: result.source_url,
             raw_price_eur: result.raw_price_eur,
             display_price_chf: result.display_price_chf,
+            original_price_eur: result.original_price_eur,
+            original_price_chf: result.original_price_chf,
+            on_sale: result.on_sale,
             status: result.status,
             fetched_at: result.fetched_at,
           },
@@ -288,14 +298,17 @@ Deno.serve(async (req) => {
             source_url: null,
             raw_price_eur: null,
             display_price_chf: display,
+            original_price_eur: null,
+            original_price_chf: null,
+            on_sale: false,
             status: "not_found",
             fetched_at: new Date().toISOString(),
           };
         } else {
           // Eigene Anfrage zur vollen Produktseite — Snippets sind oft irreführend
           const md = await firecrawlScrape(foundUrl);
-          const eur = md ? extractEurPrice(md) : null;
-          if (eur === null) {
+          const parsed = md ? extractEurPrices(md) : null;
+          if (!parsed) {
             const display = fallbackPrice(shopifyPrices[handle]);
             result = {
               handle,
@@ -303,18 +316,27 @@ Deno.serve(async (req) => {
               source_url: foundUrl,
               raw_price_eur: null,
               display_price_chf: display,
+              original_price_eur: null,
+              original_price_chf: null,
+              on_sale: false,
               status: "fallback",
               fetched_at: new Date().toISOString(),
             };
           } else {
             // EUR → CHF 1:1 → auf .95 abrunden
-            const chf = roundDownTo95(eur);
+            const chf = roundDownTo95(parsed.current);
+            const origChf =
+              parsed.original !== null ? roundDownTo95(parsed.original) : null;
+            const onSale = origChf !== null && origChf > chf;
             result = {
               handle,
               brand,
               source_url: foundUrl,
-              raw_price_eur: eur,
+              raw_price_eur: parsed.current,
               display_price_chf: chf,
+              original_price_eur: parsed.original,
+              original_price_chf: origChf,
+              on_sale: onSale,
               status: "ok",
               fetched_at: new Date().toISOString(),
             };
@@ -329,6 +351,9 @@ Deno.serve(async (req) => {
           source_url: null,
           raw_price_eur: null,
           display_price_chf: display,
+          original_price_eur: null,
+          original_price_chf: null,
+          on_sale: false,
           status: "fallback",
           fetched_at: new Date().toISOString(),
         };
@@ -342,6 +367,9 @@ Deno.serve(async (req) => {
           source_url: result.source_url,
           raw_price_eur: result.raw_price_eur,
           display_price_chf: result.display_price_chf,
+          original_price_eur: result.original_price_eur,
+          original_price_chf: result.original_price_chf,
+          on_sale: result.on_sale,
           status: result.status,
           fetched_at: result.fetched_at,
         },
