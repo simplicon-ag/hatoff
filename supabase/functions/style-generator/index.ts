@@ -198,6 +198,7 @@ Deno.serve(async (req) => {
       vendor: p.vendor,
       category: p.cat,
       tags: (p.tags ?? []).slice(0, 6),
+      colors: (p.options ?? []).find((o) => /farbe|color/i.test(o.name))?.values ?? [],
     }));
 
     const anchorForPrompt = {
