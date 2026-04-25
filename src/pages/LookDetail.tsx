@@ -62,6 +62,20 @@ const LookDetail = () => {
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Story</p>
           <p className="mt-4 leading-relaxed text-foreground/85">{look.story}</p>
 
+          {heroImage && (
+            <figure className="mt-6 overflow-hidden rounded-lg border border-border bg-secondary">
+              <img
+                src={heroImage}
+                alt={`${look.title} — Stilreferenz`}
+                loading="lazy"
+                className="h-auto w-full object-cover"
+              />
+              <figcaption className="px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                Stilreferenz
+              </figcaption>
+            </figure>
+          )}
+
           {look.highlights && look.highlights.length > 0 && (
             <ul className="mt-8 space-y-3 border-t border-border pt-6">
               {look.highlights.map((h, i) => {
