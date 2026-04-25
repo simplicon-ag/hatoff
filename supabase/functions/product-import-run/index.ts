@@ -47,7 +47,15 @@ async function firecrawlScrape(
         url,
         formats: ["html"],
         onlyMainContent: false,
-        waitFor: 5000,
+        // Casa Moda / Venti are SPAs — material, care, description and SKU
+        // are only injected after JS hydration. We need ~12s + a scroll to
+        // ensure the product-detail accordion is rendered into the DOM.
+        waitFor: 12000,
+        actions: [
+          { type: "wait", milliseconds: 4000 },
+          { type: "scroll", direction: "down" },
+          { type: "wait", milliseconds: 3000 },
+        ],
       }),
     });
     if (!res.ok) {
@@ -65,6 +73,7 @@ async function firecrawlScrape(
     return null;
   }
 }
+
 
 function decode(s: string): string {
   return s
