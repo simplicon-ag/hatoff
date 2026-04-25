@@ -134,10 +134,16 @@ function extractProductUrls(
 ): string[] {
   const set = new Set<string>();
   for (const link of links) {
-    const raw =
-      typeof link === "string"
-        ? link
-        : (link?.url ?? link?.href ?? "");
+    let raw = "";
+    if (typeof link === "string") {
+      raw = link;
+    } else if (link && typeof link === "object") {
+      const obj = link as Record<string, unknown>;
+      raw =
+        (typeof obj.url === "string" && obj.url) ||
+        (typeof obj.href === "string" && obj.href) ||
+        "";
+    }
     if (!raw) continue;
     const m = raw.match(pattern);
     if (m) {
