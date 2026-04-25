@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ShoppingBag, Check, AlertCircle } from "lucide-react";
+import { Loader2, ShoppingBag, Check, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPrice, type ShopifyProduct } from "@/lib/shopify";
 import { useLivePrices, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
-import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
 import { toast } from "sonner";
 
 interface Props {
   products: ShopifyProduct[];
   lookTitle: string;
+  /** When true, each item shows a remove button (used in AI-generated sets). */
+  allowRemove?: boolean;
 }
 
 type Selections = Record<string, Record<string, string>>; // productId -> { optionName -> value }
