@@ -313,10 +313,12 @@ async function syncSeason(
           const cleaned = normalize(String(row.source_url));
           if (productUrlSet.has(cleaned)) {
             const handle = String(row.handle).toLowerCase();
-            if (!seen.has(handle)) {
-              seen.add(handle);
-              matchedHandles.push(handle);
-            }
+            if (seen.has(handle)) continue;
+            // Saison-spezifische Hard-Excludes (z.B. Bermudas raus aus H/W,
+            // auch wenn die Marke sie auf der Hosen-Seite listet)
+            if (isExcludedForSeason(handle, season)) continue;
+            seen.add(handle);
+            matchedHandles.push(handle);
           }
         }
         console.log(
