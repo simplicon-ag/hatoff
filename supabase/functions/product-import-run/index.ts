@@ -641,11 +641,30 @@ Deno.serve(async (req) => {
         );
         if (!created) throw new Error("create returned null");
 
-        // Attach images sequentially (Shopify rate-limits to ~2/sec)
+        // If product already existed in Shopify, mark as skipped (not error, not new)
+        if (created.duplicate) {
+          await supabase
+            .from("product_import_log")
+            .update({
+              status: "skipped",
+              shopify_product_id: created.id,
+              error_message: "Bereits in Shopify vorhanden",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", item.id);
+          continue;
+        }
+
+        // Attach images sequentially via shopifyFetch (handles 429 retry + pacing)
         for (const imgUrl of scraped.image_urls) {
           await uploadImageToShopify(created.id, imgUrl, adminToken);
-          await new Promise((r) => setTimeout(r, 600));
         }
+
+        // Heartbeat after each product to keep the lock fresh
+        await supabase
+          .from("product_import_job")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", "singleton");
 
         await supabase
           .from("product_import_log")
