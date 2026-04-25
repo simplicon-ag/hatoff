@@ -53,12 +53,17 @@ function brandSite(brand: Brand): string {
 }
 
 /**
- * Parsed einen EUR-Preis aus Markdown/Text der Produktseite.
- * Strategie: Auf Webshop-Produktseiten erscheint der aktuelle Preis sehr oft (Variantentabelle).
- * Wir nehmen daher den HÄUFIGSTEN Preis (Modus), nicht den niedrigsten.
- * Bei Gleichstand gewinnt der höhere (UVP > Sale-Banner Snippet).
+ * Parsed EUR-Preise aus Markdown/Text der Produktseite und erkennt Sale.
+ * Gibt { current, original } zurück:
+ *  - `current`: aktueller (ggf. reduzierter) Preis = HÄUFIGSTER Preis
+ *  - `original`: UVP wenn Sale erkannt, sonst null
+ *
+ * Sale-Heuristik: tauchen mind. 2 verschiedene Preise mit ähnlicher Häufigkeit auf
+ * UND ist der zweithäufigste >5% höher als der häufigste, gilt der höhere als UVP.
  */
-function extractEurPrice(text: string): number | null {
+function extractEurPrices(
+  text: string,
+): { current: number; original: number | null } | null {
   const re = /(?:€\s*)?(\d{1,4})[.,](\d{2})\s*€/g;
   const counts = new Map<number, number>();
   let m;
@@ -71,18 +76,31 @@ function extractEurPrice(text: string): number | null {
     }
   }
   if (counts.size === 0) return null;
-  // Sortiere nach Häufigkeit DESC, bei Gleichstand höherer Preis zuerst
+
+  // Nach Häufigkeit DESC, bei Gleichstand niedrigerer Preis zuerst (Aktionspreis)
   const sorted = Array.from(counts.entries()).sort((a, b) => {
     if (b[1] !== a[1]) return b[1] - a[1];
-    return b[0] - a[0];
+    return a[0] - b[0];
   });
-  return sorted[0][0];
+
+  const current = sorted[0][0];
+
+  // Sale-Erkennung: Suche unter den anderen Preisen einen, der höher ist
+  // und mind. 2x vorkommt (UVP-Hinweis), Diff > 5%
+  let original: number | null = null;
+  for (let i = 1; i < sorted.length; i++) {
+    const [p, c] = sorted[i];
+    if (p > current * 1.05 && c >= 2) {
+      if (original === null || p > original) original = p;
+    }
+  }
+
+  return { current, original };
 }
 
 /** Rundet ABWÄRTS auf nächste .95-Grenze (89.99 → 89.95, 90.10 → 89.95). */
 function roundDownTo95(amount: number): number {
   const floor = Math.floor(amount);
-  // wenn die Nachkommastelle unter .95 liegt, nimm den vorherigen Franken + .95
   if (amount - floor < 0.95) {
     return Math.max(0, floor - 1) + 0.95;
   }
