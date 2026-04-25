@@ -199,7 +199,7 @@ const Shop = () => {
     selectedVendors,
     selectedCategories,
     selectedWelten,
-    selectedAnlaesse,
+    
     selectedColors,
     selectedSizes,
     priceRange,
