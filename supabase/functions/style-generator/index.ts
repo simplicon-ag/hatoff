@@ -326,7 +326,7 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
     }
     const args = JSON.parse(toolCall.function.arguments) as {
       rationale: string;
-      items: Array<{ handle: string; role: string }>;
+      items: Array<{ handle: string; role: string; recommended_colors?: string[] }>;
     };
 
     // 5. Validate handles against catalog
@@ -342,6 +342,12 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
     // 6. Return enriched product info for the UI to render directly
     const enriched = validItems.map((it) => {
       const p = compactCatalog.find((c) => c.handle === it.handle)!;
+      const availableColors =
+        (p.options ?? []).find((o) => /farbe|color/i.test(o.name))?.values ?? [];
+      // Keep only colours that actually exist on the product
+      const recColors = (it.recommended_colors ?? []).filter((c) =>
+        availableColors.some((a) => a.toLowerCase() === c.toLowerCase()),
+      );
       return {
         handle: p.handle,
         title: p.title,
@@ -350,6 +356,8 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
         image: p.images?.edges?.[0]?.node.url ?? null,
         priceAmount: p.priceRange?.minVariantPrice.amount ?? null,
         currency: p.priceRange?.minVariantPrice.currencyCode ?? "CHF",
+        availableColors,
+        recommendedColors: recColors,
       };
     });
 
