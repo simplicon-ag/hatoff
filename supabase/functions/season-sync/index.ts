@@ -180,14 +180,18 @@ async function syncSeason(
 
   for (const source of SOURCES[season]) {
     try {
-      // 1) Get brand-side product URLs from the season page
-      let links = await firecrawlMap(source.url, firecrawlKey);
-      let productUrls = extractProductUrls(links, source.productUrlPattern);
+      // 1) Get brand-side product URLs from the season page (always scrape — /map
+      //    only returns sitemap-listed URLs, which omits dynamic listing pages).
+      const links = await firecrawlScrapeLinks(source.url, firecrawlKey);
+      const productUrls = extractProductUrls(links, source.productUrlPattern);
 
-      if (productUrls.length === 0) {
-        // Map endpoint returned nothing useful → fall back to scrape
-        links = await firecrawlScrapeLinks(source.url, firecrawlKey);
-        productUrls = extractProductUrls(links, source.productUrlPattern);
+      console.log(
+        `[season-sync] ${season}/${source.brand}: scrape returned ${links.length} links, ${productUrls.length} matched product pattern`,
+      );
+      if (productUrls.length > 0) {
+        console.log(
+          `[season-sync] sample urls: ${productUrls.slice(0, 3).join(", ")}`,
+        );
       }
 
       let matchedHandles: string[] = [];
