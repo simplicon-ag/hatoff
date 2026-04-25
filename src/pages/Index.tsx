@@ -1,19 +1,47 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Flame, Sparkles } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { FeaturedLook } from "@/components/FeaturedLook";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
 import { looks, magazinArtikel, marken, welten } from "@/data/looks";
-import { fetchProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchProducts, fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
+import { supabase } from "@/integrations/supabase/client";
 import heroImg from "@/assets/hero.jpg";
 
 const Index = () => {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
+  const [saleProducts, setSaleProducts] = useState<ShopifyProduct[]>([]);
 
   useEffect(() => {
+    // Shop-Vorschau / "Neu eingetroffen" — neueste 8 Produkte (Shopify default-sortiert)
     fetchProducts(8).then(setProducts).catch((e) => console.error(e));
+
+    // Sale-Highlights — Top 4 mit grösster Ersparnis aus DB-Cache
+    (async () => {
+      const { data } = await supabase
+        .from("product_price_cache")
+        .select("handle, display_price_chf, original_price_chf")
+        .eq("on_sale", true)
+        .neq("status", "mismatch")
+        .not("original_price_chf", "is", null);
+      if (!data || data.length === 0) return;
+      const ranked = data
+        .map((r) => ({
+          handle: r.handle,
+          discount:
+            r.original_price_chf && Number(r.original_price_chf) > 0
+              ? (Number(r.original_price_chf) - Number(r.display_price_chf)) /
+                Number(r.original_price_chf)
+              : 0,
+        }))
+        .sort((a, b) => b.discount - a.discount)
+        .slice(0, 8)
+        .map((r) => r.handle);
+      const items = await fetchProductsByHandles(ranked);
+      setSaleProducts(items.slice(0, 4));
+    })().catch((e) => console.error("sale highlights", e));
   }, []);
 
   const featuredLooks = looks.slice(0, 3);
