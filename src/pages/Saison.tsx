@@ -25,6 +25,7 @@ const isSaisonSlug = (s: string | undefined): s is SaisonSlug =>
   s === "fs-2026" || s === "hw-2026";
 
 const Saison = () => {
+  const { slug } = useParams<{ slug: string }>();
   const validSlug: SaisonSlug = isSaisonSlug(slug) ? slug : "fs-2026";
   const saison = saisons[validSlug];
   const cross = saisons[saison.cross];
