@@ -74,8 +74,6 @@ const Shop = () => {
       n.tags.forEach((t) => {
         const w = tagValue(t, "welt");
         if (w) welten.set(w, (welten.get(w) ?? 0) + 1);
-        const a = tagValue(t, "anlass");
-        if (a) anlaesse.set(a, (anlaesse.get(a) ?? 0) + 1);
         const c = tagValue(t, "farbe");
         if (c) colors.set(c, (colors.get(c) ?? 0) + 1);
       });
@@ -151,14 +149,6 @@ const Shop = () => {
         }),
       );
     }
-    if (selectedAnlaesse.size > 0) {
-      list = list.filter((p) =>
-        p.node.tags.some((t) => {
-          const v = tagValue(t, "anlass");
-          return v ? selectedAnlaesse.has(v) : false;
-        }),
-      );
-    }
     if (selectedColors.size > 0) {
       list = list.filter((p) =>
         p.node.tags.some((t) => {
@@ -227,7 +217,7 @@ const Shop = () => {
     setSelectedVendors(new Set());
     setSelectedCategories(new Set());
     setSelectedWelten(new Set());
-    setSelectedAnlaesse(new Set());
+    
     setSelectedColors(new Set());
     setSelectedSizes(new Set());
     setPriceRange([facets.priceMin, facets.priceMax]);
@@ -239,7 +229,7 @@ const Shop = () => {
     selectedVendors.size +
     selectedCategories.size +
     selectedWelten.size +
-    selectedAnlaesse.size +
+    
     selectedColors.size +
     selectedSizes.size +
     (onlyAvailable ? 1 : 0) +
@@ -349,13 +339,6 @@ const Shop = () => {
           items={facets.welten}
           selected={selectedWelten}
           onToggle={toggle(selectedWelten, setSelectedWelten)}
-          capitalize
-        />
-        <FacetGroup
-          title="Anlass"
-          items={facets.anlaesse}
-          selected={selectedAnlaesse}
-          onToggle={toggle(selectedAnlaesse, setSelectedAnlaesse)}
           capitalize
         />
         <FacetGroup
