@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Loader2, ShoppingBag } from "lucide-react";
 import type { ShopifyProduct } from "@/lib/shopify";
 import { formatPrice } from "@/lib/shopify";
-import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
+import { useLivePrice, formatLivePrice, formatOriginalPrice, discountPercent } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
