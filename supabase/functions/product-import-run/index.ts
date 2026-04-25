@@ -376,13 +376,58 @@ Deno.serve(async (req) => {
 
     const dryRun = Boolean(job.dry_run);
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
-    const adminToken =
-      Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ??
-      Deno.env.get("SHOPIFY_ACCESS_TOKEN") ??
-      "";
+    const adminTokenPrimary = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
+    const adminTokenFallback = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+    const adminToken = adminTokenPrimary ?? adminTokenFallback ?? "";
+    const tokenSource = adminTokenPrimary
+      ? "SHOPIFY_ADMIN_API_TOKEN"
+      : adminTokenFallback
+        ? "SHOPIFY_ACCESS_TOKEN (fallback)"
+        : "none";
 
-    if (!dryRun && !adminToken) {
-      throw new Error("SHOPIFY_ADMIN_API_TOKEN nicht konfiguriert");
+    if (!dryRun) {
+      if (!adminToken) {
+        await supabase
+          .from("product_import_job")
+          .update({
+            state: "error",
+            message:
+              "SHOPIFY_ADMIN_API_TOKEN nicht konfiguriert — bitte Secret setzen.",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", "singleton");
+        return new Response(
+          JSON.stringify({ success: false, error: "no admin token" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // Fail-fast auth probe — verify token works before processing batch
+      console.log(`[worker] using token from ${tokenSource}`);
+      const probe = await fetch(
+        `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/shop.json`,
+        { headers: { "X-Shopify-Access-Token": adminToken } },
+      );
+      if (probe.status === 401 || probe.status === 403) {
+        const body = await probe.text().catch(() => "");
+        console.error(`[worker] auth probe failed ${probe.status}: ${body}`);
+        await supabase
+          .from("product_import_job")
+          .update({
+            state: "error",
+            message: `Shopify-Token ungültig (${probe.status}) — bitte SHOPIFY_ADMIN_API_TOKEN aktualisieren. Quelle: ${tokenSource}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", "singleton");
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `shopify auth ${probe.status}`,
+            token_source: tokenSource,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     // Pull a batch of pending items
