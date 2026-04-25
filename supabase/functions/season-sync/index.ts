@@ -1,17 +1,18 @@
-// Edge function: crawls brand collection / new arrivals pages via Firecrawl,
-// extracts product page URLs, and matches them against `product_price_cache.source_url`
-// to derive Shopify product handles for each season.
+// Edge function: aggregates brand season product URLs from many category pages,
+// matches them against `product_price_cache.source_url`, and stores Shopify
+// handles per (brand, season) in `brand_season_products`.
 //
 // Trigger via:
-//   POST /season-sync   { "season": "fs-2026" }   -> syncs a single season
-//   POST /season-sync   { "season": "hw-2026" }
-//   POST /season-sync   { "season": "all" }       -> syncs both seasons
+//   POST /season-sync   { "season": "fs-2026" | "hw-2026" | "all" }
 //
-// Why this approach:
-// - The Lovable Shopify shop has its own product handles (e.g. "casa-moda-hemd-...").
-// - product_price_cache.source_url stores the real brand URL per Shopify handle
-//   (set by the price-scraping function).
-// - So: brand season URLs -> intersect with source_url -> Shopify handles.
+// Strategy per brand:
+// - Casa Moda exposes a JSON product-list endpoint per category:
+//     /de/de/article_collection/<category>.json?page=1&size=500
+//   We fetch directly (no Firecrawl needed) and extract product URLs from the
+//   embedded HTML in `product_list`.
+// - Venti renders product cards server-side on category pages — we fetch the
+//   HTML directly and grep product URLs out.
+// - Both fall back to Firecrawl if the direct fetch fails (anti-bot / 403).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -23,189 +24,256 @@ const corsHeaders = {
 
 type Season = "fs-2026" | "hw-2026";
 
-interface BrandSource {
-  brand: string;
-  // Brand identifier as stored in product_price_cache.brand
-  brandKey: string;
-  // The listing page that represents the season for this brand.
+interface BrandCategory {
+  // Identifier for logging
+  label: string;
+  // Full URL to fetch
   url: string;
-  // Optional: a regex matching valid product page paths on this brand's site.
-  // Anything that matches is considered a product URL candidate.
+  // 'casamoda-json' = parse JSON.product_list ; 'html' = scan raw HTML
+  fetchMode: "casamoda-json" | "html";
+  // Pattern to extract product URLs (must capture full URL in match)
   productUrlPattern: RegExp;
 }
 
-const SOURCES: Record<Season, BrandSource[]> = {
+interface BrandSeasonSource {
+  brand: string; // for logging
+  brandKey: string; // matches product_price_cache.brand
+  categories: BrandCategory[];
+}
+
+const CASAMODA_PRODUCT_RE = /https:\/\/www\.casamoda\.com\/de\/de\/[a-z0-9-]+-\d+-\d+/gi;
+const VENTI_PRODUCT_RE = /https:\/\/www\.venti\.com\/de\/de\/[a-z0-9-]+-\d+-\d+/gi;
+
+const cm = (slug: string): BrandCategory => ({
+  label: `cm/${slug}`,
+  url: `https://www.casamoda.com/de/de/article_collection/${slug}.json?page=1&size=500`,
+  fetchMode: "casamoda-json",
+  productUrlPattern: CASAMODA_PRODUCT_RE,
+});
+
+const vt = (slug: string): BrandCategory => ({
+  label: `vt/${slug}`,
+  url: `https://www.venti.com/de/de/${slug}`,
+  fetchMode: "html",
+  productUrlPattern: VENTI_PRODUCT_RE,
+});
+
+const SOURCES: Record<Season, BrandSeasonSource[]> = {
   "fs-2026": [
     {
       brand: "casamoda",
       brandKey: "casa-moda",
-      url: "https://www.casamoda.com/de/de/neuheiten",
-      // e.g. /de/de/t-shirt-blau-14900-154 or /de/de/businesshemd-weiss-11745-2
-      productUrlPattern: /casamoda\.com\/de\/de\/[a-z0-9-]+-\d+-\d+/i,
+      categories: [
+        cm("neuheiten"),
+        cm("hemden"),
+        cm("polos"),
+        cm("t-shirts"),
+        cm("hosen"),
+      ],
     },
     {
       brand: "venti",
       brandKey: "venti",
-      url: "https://www.venti.com/de/de/neuheiten",
-      productUrlPattern: /venti\.com\/de\/de\/[a-z0-9-]+-\d+-\d+/i,
+      categories: [
+        vt("neuheiten"),
+        vt("neue-styles"),
+        vt("monatshemd"),
+        vt("modern-fit-hemden-neu"),
+        vt("body-fit-hemden-neu"),
+        vt("comfort-fit-hemden-neu"),
+        vt("hemden-modern-fit"),
+        vt("hemde-body-fit"),
+        vt("hemden-buegelfrei"),
+        vt("hemden-extra-lang"),
+        vt("hemdjacke"),
+        vt("neu-hemdjacke"),
+        vt("t-shirts"),
+        vt("shirts"),
+        vt("tanktops"),
+      ],
     },
   ],
   "hw-2026": [
     {
       brand: "casamoda",
       brandKey: "casa-moda",
-      url: "https://www.casamoda.com/de/de/herren/jacken-mantel",
-      productUrlPattern: /casamoda\.com\/de\/de\/[a-z0-9-]+-\d+-\d+/i,
+      categories: [
+        cm("hemden"),
+        cm("jacken"),
+        cm("westen"),
+        cm("hosen"),
+      ],
     },
     {
       brand: "venti",
       brandKey: "venti",
-      url: "https://www.venti.com/de/de/herren/jacken-mantel",
-      productUrlPattern: /venti\.com\/de\/de\/[a-z0-9-]+-\d+-\d+/i,
+      categories: [
+        vt("hemden-modern-fit"),
+        vt("hemde-body-fit"),
+        vt("hemden-extra-lang"),
+        vt("hemden-buegelfrei"),
+        vt("sakkos-westen"),
+        vt("sakkos-westen-neu"),
+        vt("anzuege"),
+        vt("strick"),
+      ],
     },
   ],
 };
 
 const FIRECRAWL_BASE = "https://api.firecrawl.dev/v2";
+const UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
 
-async function firecrawlMap(url: string, apiKey: string): Promise<unknown[]> {
-  const res = await fetch(`${FIRECRAWL_BASE}/map`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ url, limit: 1500, includeSubdomains: false }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Firecrawl map failed [${res.status}]: ${body}`);
+/** Fetch raw HTML / JSON directly. Returns null on failure. */
+async function directFetch(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": UA,
+        Accept:
+          "text/html,application/xhtml+xml,application/json,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+      },
+    });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
   }
-  const data = await res.json();
-  const links: string[] =
-    (Array.isArray(data?.links) && data.links) ||
-    (Array.isArray(data?.data?.links) && data.data.links) ||
-    [];
-  return links;
 }
 
-async function firecrawlScrapeLinks(
+/** Firecrawl scrape fallback. Returns merged HTML+links text (best-effort). */
+async function firecrawlFallback(
   url: string,
   apiKey: string,
-): Promise<unknown[]> {
-  const res = await fetch(`${FIRECRAWL_BASE}/scrape`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      url,
-      formats: ["links", "html"],
-      onlyMainContent: false,
-      waitFor: 5000,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Firecrawl scrape failed [${res.status}]: ${body}`);
+): Promise<string | null> {
+  try {
+    const res = await fetch(`${FIRECRAWL_BASE}/scrape`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["html", "links"],
+        onlyMainContent: false,
+        waitFor: 4000,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const html: string =
+      (typeof data?.html === "string" && data.html) ||
+      (typeof data?.data?.html === "string" && data.data.html) ||
+      "";
+    const links: unknown[] =
+      (Array.isArray(data?.links) && data.links) ||
+      (Array.isArray(data?.data?.links) && data.data.links) ||
+      [];
+    const linkStrs = links
+      .map((l) =>
+        typeof l === "string"
+          ? l
+          : ((l as Record<string, unknown>)?.url as string) ?? "",
+      )
+      .join(" ");
+    return `${html} ${linkStrs}`;
+  } catch {
+    return null;
   }
-  const data = await res.json();
-  const links: string[] =
-    (Array.isArray(data?.links) && data.links) ||
-    (Array.isArray(data?.data?.links) && data.data.links) ||
-    [];
-  // Also pull links out of the raw HTML (Firecrawl's "links" format sometimes
-  // misses non-anchor matches like image color swatches).
-  const html: string =
-    (typeof data?.html === "string" && data.html) ||
-    (typeof data?.data?.html === "string" && data.data.html) ||
-    "";
-  if (html) {
-    const found = html.match(/https?:\/\/[^\s"'<>]+/gi) ?? [];
-    return Array.from(new Set([...links, ...found]));
-  }
-  return links;
 }
 
-function extractProductUrls(
-  links: unknown[],
-  pattern: RegExp,
-): string[] {
+function extractUrlsFromText(text: string, pattern: RegExp): string[] {
+  const matches = text.match(pattern) ?? [];
   const set = new Set<string>();
-  for (const link of links) {
-    let raw = "";
-    if (typeof link === "string") {
-      raw = link;
-    } else if (link && typeof link === "object") {
-      const obj = link as Record<string, unknown>;
-      raw =
-        (typeof obj.url === "string" && obj.url) ||
-        (typeof obj.href === "string" && obj.href) ||
-        "";
-    }
-    if (!raw) continue;
-    const m = raw.match(pattern);
-    if (m) {
-      const clean = m[0].split(/[?#]/)[0].toLowerCase();
-      set.add(clean);
-    }
+  for (const m of matches) {
+    set.add(m.split(/[?#]/)[0].toLowerCase());
   }
   return Array.from(set);
+}
+
+/** Read product URLs from a single brand category. */
+async function fetchCategoryUrls(
+  cat: BrandCategory,
+  firecrawlKey: string,
+): Promise<string[]> {
+  // 1) Direct fetch
+  let body = await directFetch(cat.url);
+  let textForRegex = "";
+
+  if (body && cat.fetchMode === "casamoda-json") {
+    try {
+      const json = JSON.parse(body);
+      textForRegex = String(json?.product_list ?? "");
+    } catch {
+      textForRegex = body;
+    }
+  } else if (body) {
+    textForRegex = body;
+  }
+
+  let urls = textForRegex
+    ? extractUrlsFromText(textForRegex, cat.productUrlPattern)
+    : [];
+
+  // 2) Fallback to Firecrawl if we got nothing
+  if (urls.length === 0) {
+    const fc = await firecrawlFallback(cat.url, firecrawlKey);
+    if (fc) urls = extractUrlsFromText(fc, cat.productUrlPattern);
+  }
+
+  return urls;
 }
 
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = any;
 
+interface SyncResult {
+  season: Season;
+  brand: string;
+  urls_found: number;
+  handles_matched: number;
+  per_category: Record<string, number>;
+  error?: string;
+}
+
 async function syncSeason(
   season: Season,
   firecrawlKey: string,
   supabase: SupabaseLike,
-): Promise<
-  {
-    season: Season;
-    brand: string;
-    urls_found: number;
-    handles_matched: number;
-    error?: string;
-  }[]
-> {
-  const results: {
-    season: Season;
-    brand: string;
-    urls_found: number;
-    handles_matched: number;
-    error?: string;
-  }[] = [];
+): Promise<SyncResult[]> {
+  const results: SyncResult[] = [];
 
   for (const source of SOURCES[season]) {
     try {
-      // 1) Get brand-side product URLs from the season page (always scrape — /map
-      //    only returns sitemap-listed URLs, which omits dynamic listing pages).
-      const links = await firecrawlScrapeLinks(source.url, firecrawlKey);
-      const productUrls = extractProductUrls(links, source.productUrlPattern);
+      // 1) Collect product URLs from all category pages
+      const allUrls = new Set<string>();
+      const perCategory: Record<string, number> = {};
+
+      // Fetch categories sequentially to be polite (and avoid rate limits)
+      for (const cat of source.categories) {
+        const urls = await fetchCategoryUrls(cat, firecrawlKey);
+        perCategory[cat.label] = urls.length;
+        for (const u of urls) allUrls.add(u);
+      }
 
       console.log(
-        `[season-sync] ${season}/${source.brand}: scrape returned ${links.length} links, ${productUrls.length} matched product pattern`,
+        `[season-sync] ${season}/${source.brand}: ${allUrls.size} unique product URLs across ${source.categories.length} categories`,
+        perCategory,
       );
-      if (productUrls.length > 0) {
-        console.log(
-          `[season-sync] sample urls: ${productUrls.slice(0, 3).join(", ")}`,
-        );
-      }
 
       let matchedHandles: string[] = [];
 
-      if (productUrls.length > 0) {
-        // 2) Fetch all known (handle, source_url) pairs for this brand from the cache
+      if (allUrls.size > 0) {
+        // 2) Load brand cache (handle, source_url) and match
         const { data: cacheRows, error: cacheErr } = await supabase
           .from("product_price_cache")
           .select("handle, source_url")
           .eq("brand", source.brandKey);
-
         if (cacheErr) throw cacheErr;
 
-        // Normalize: strip protocol + leading "www." + query/hash so both sides match.
         const normalize = (u: string) =>
           u
             .replace(/^https?:\/\//i, "")
@@ -213,7 +281,7 @@ async function syncSeason(
             .split(/[?#]/)[0]
             .toLowerCase();
 
-        const productUrlSet = new Set(productUrls.map(normalize));
+        const productUrlSet = new Set([...allUrls].map(normalize));
         const seen = new Set<string>();
         for (const row of cacheRows ?? []) {
           if (!row.source_url) continue;
@@ -230,7 +298,7 @@ async function syncSeason(
           `[season-sync] ${season}/${source.brand}: matched ${matchedHandles.length} handles from ${cacheRows?.length ?? 0} cache rows`,
         );
 
-        // 3) Replace previous mapping for this brand+season
+        // 3) Replace mapping for this brand+season
         await supabase
           .from("brand_season_products")
           .delete()
@@ -242,7 +310,7 @@ async function syncSeason(
             brand: source.brandKey,
             season,
             handle,
-            source_url: source.url,
+            source_url: source.categories[0].url,
           }));
           const { error: insertError } = await supabase
             .from("brand_season_products")
@@ -254,8 +322,9 @@ async function syncSeason(
       results.push({
         season,
         brand: source.brandKey,
-        urls_found: productUrls.length,
+        urls_found: allUrls.size,
         handles_matched: matchedHandles.length,
+        per_category: perCategory,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -265,6 +334,7 @@ async function syncSeason(
         brand: source.brandKey,
         urls_found: 0,
         handles_matched: 0,
+        per_category: {},
         error: msg,
       });
     }
@@ -279,17 +349,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
-    if (!firecrawlKey) {
-      return new Response(
-        JSON.stringify({ error: "FIRECRAWL_API_KEY not configured" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
+    const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRole);
@@ -298,7 +358,7 @@ Deno.serve(async (req) => {
     try {
       payload = await req.json();
     } catch {
-      // GET or empty body -> default to "all"
+      // empty body
     }
 
     const target = (payload.season ?? "all").toLowerCase();
@@ -309,7 +369,7 @@ Deno.serve(async (req) => {
           ? ["hw-2026"]
           : ["fs-2026", "hw-2026"];
 
-    const allResults: Awaited<ReturnType<typeof syncSeason>> = [];
+    const allResults: SyncResult[] = [];
     for (const s of seasons) {
       const r = await syncSeason(s, firecrawlKey, supabase);
       allResults.push(...r);
