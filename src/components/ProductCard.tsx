@@ -95,6 +95,12 @@ export const ProductCard = ({ product, priority }: Props) => {
           </span>
         )}
 
+        {!soldOut && onSale && discount && (
+          <span className="absolute left-3 top-3 bg-destructive px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground">
+            -{discount}%
+          </span>
+        )}
+
         {!soldOut && (
           <button
             onClick={handleQuickAdd}
