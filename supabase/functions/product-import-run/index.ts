@@ -486,13 +486,19 @@ async function createMultiColorProduct(
 
   const variants = [];
   for (const c of colors) {
+    // Prefer the real manufacturer article number from each colour's scrape.
+    // Fallback to the base article number, then to the URL-derived handle.
+    const articleNo = c.scraped.article_number || base.article_number || "";
+    const skuBase = articleNo
+      ? articleNo.replace(/[^a-z0-9-]/gi, "")
+      : `${handle}-${c.colorId}`.replace(/[^a-z0-9-]/gi, "").toLowerCase();
     for (const size of sizes) {
       variants.push({
         option1: size,
         option2: c.colorName,
         price: priceChf,
         compare_at_price: compareAt,
-        sku: `${handle}-${c.colorId}-${size}`.replace(/[^a-z0-9-]/gi, "").toLowerCase(),
+        sku: `${skuBase}-${size}`.replace(/[^A-Za-z0-9-]/g, "").toUpperCase(),
         inventory_management: null,
         inventory_policy: "continue",
       });
@@ -505,7 +511,13 @@ async function createMultiColorProduct(
       body_html: base.description_html || base.description || "",
       vendor: base.vendor,
       product_type: base.product_type ?? "Bekleidung",
-      tags: base.tags.join(","),
+      tags: [
+        ...base.tags,
+        ...colors
+          .map((c) => c.scraped.article_number)
+          .filter((n): n is string => !!n)
+          .map((n) => `art:${n}`),
+      ].join(","),
       handle,
       status: "active",
       options: [
