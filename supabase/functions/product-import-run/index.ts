@@ -89,11 +89,31 @@ function parseProductIds(url: string): { articleId: string; colorId: string } | 
  *  Venti format:     "Businesshemd Hellblau - Modern Fit 001480 - VENTI" */
 function cleanTitle(rawTitle: string, brand: string): string {
   let t = decode(rawTitle).trim();
-  // Strip brand suffix
   t = t.replace(/\s*-\s*(CASAMODA|VENTI)\s*$/i, "");
-  // Strip trailing 6+ digit article codes
   t = t.replace(/\s+\d{6,}\s*$/g, "");
   return t.trim();
+}
+
+/** Strip a colour token from the end of a title so we get the colour-neutral
+ *  base title (e.g. "Businesshemd Hellblau" → "Businesshemd"). */
+const COLOR_WORDS_RE =
+  /\s+(hell|dunkel|mittel|tief|graues?|altes?)?\s*(blau|hellblau|mittelblau|dunkelblau|marine|navy|rot|mittelrot|dunkelrot|weinrot|weiss|weiß|ecru|creme|champagner|champagner[- ]beige|schwarz|tiefschwarz|anthrazit|grau|hellgrau|dunkelgrau|silber|beige|sand|khaki|camel|braun|mittelbraun|dunkelbraun|cognac|gr(?:ue|ü)n|mittelgr(?:ue|ü)n|dunkelgr(?:ue|ü)n|oliv|olive|mint|gelb|senf|ocker|orange|rost|rosa|pink|altrosa|lila|violett|t(?:ue|ü)rkis|petrol)\s*$/i;
+function stripColorFromTitle(title: string): string {
+  let t = title;
+  for (let i = 0; i < 3; i++) {
+    const m = t.match(COLOR_WORDS_RE);
+    if (!m) break;
+    t = t.slice(0, t.length - m[0].length).trim();
+  }
+  return t.replace(/[\s,–-]+$/g, "").trim();
+}
+
+/** Pull the colour name from a (Casa Moda / Venti) product title. */
+function extractColorFromTitle(title: string): string | null {
+  const m = title.match(COLOR_WORDS_RE);
+  if (!m) return null;
+  // Re-build the matched colour phrase preserving case but trimmed
+  return m[0].trim().replace(/\s+/g, " ");
 }
 
 const BRAND_DEFAULT_SIZES: Record<string, string[]> = {
@@ -338,35 +358,69 @@ async function findShopifyProductByHandle(
   }
 }
 
-async function createShopifyProduct(
-  data: ScrapedProduct,
+/** Per-colour scraped data used to build a multi-variant product. */
+interface ColorData {
+  colorName: string;       // e.g. "Hellblau"
+  colorId: string;         // e.g. "314"
+  scraped: ScrapedProduct;
+}
+
+async function createMultiColorProduct(
+  base: ScrapedProduct,
+  colors: ColorData[],
   handle: string,
   adminToken: string,
-): Promise<{ id: string; duplicate?: boolean } | null> {
-  const priceChf = data.price_eur ? (data.price_eur * EUR_TO_CHF).toFixed(2) : "0.00";
-  const compareAt = data.compare_at_price_eur
-    ? (data.compare_at_price_eur * EUR_TO_CHF).toFixed(2)
-    : null;
+): Promise<{ id: string; duplicate?: boolean; variantImageMap: Array<{ colorName: string; imageSrc: string | null }> } | null> {
+  // Use the cheapest price across colours as the published price.
+  const minPriceEur = colors.reduce(
+    (m, c) => (c.scraped.price_eur != null && c.scraped.price_eur < m ? c.scraped.price_eur : m),
+    base.price_eur ?? Number.POSITIVE_INFINITY,
+  );
+  const compareEur = colors.reduce<number | null>(
+    (m, c) => {
+      const v = c.scraped.compare_at_price_eur;
+      if (v == null) return m;
+      if (m == null) return v;
+      return v > m ? v : m;
+    },
+    base.compare_at_price_eur,
+  );
+  const priceChf = isFinite(minPriceEur) ? (minPriceEur * EUR_TO_CHF).toFixed(2) : "0.00";
+  const compareAt = compareEur ? (compareEur * EUR_TO_CHF).toFixed(2) : null;
 
-  const sizes = data.sizes.length > 0 ? data.sizes : ["One Size"];
+  // Build the cross-product Größe × Farbe.
+  const sizes = base.sizes.length > 0 ? base.sizes : ["One Size"];
+  const colorNames = colors.map((c) => c.colorName);
+
+  const variants = [];
+  for (const c of colors) {
+    for (const size of sizes) {
+      variants.push({
+        option1: size,
+        option2: c.colorName,
+        price: priceChf,
+        compare_at_price: compareAt,
+        sku: `${handle}-${c.colorId}-${size}`.replace(/[^a-z0-9-]/gi, "").toLowerCase(),
+        inventory_management: null,
+        inventory_policy: "continue",
+      });
+    }
+  }
 
   const body = {
     product: {
-      title: data.title || handle,
-      body_html: data.description,
-      vendor: data.vendor,
-      product_type: data.product_type ?? "Bekleidung",
-      tags: data.tags.join(","),
+      title: base.title || handle,
+      body_html: base.description,
+      vendor: base.vendor,
+      product_type: base.product_type ?? "Bekleidung",
+      tags: base.tags.join(","),
       handle,
       status: "active",
-      options: [{ name: "Grösse", values: sizes }],
-      variants: sizes.map((s) => ({
-        option1: s,
-        price: priceChf,
-        compare_at_price: compareAt,
-        inventory_management: null, // don't track inventory
-        inventory_policy: "continue",
-      })),
+      options: [
+        { name: "Grösse", values: sizes },
+        { name: "Farbe", values: colorNames },
+      ],
+      variants,
     },
   };
 
@@ -382,16 +436,52 @@ async function createShopifyProduct(
   if (!res.ok) {
     const errText = await res.text();
     console.error(`[worker] create product ${res.status}: ${errText}`);
-    // Duplicate handle (422) → look up existing product, return its ID with duplicate flag
     if (res.status === 422 && /handle/i.test(errText) && /taken/i.test(errText)) {
       const existing = await findShopifyProductByHandle(handle, adminToken);
-      if (existing) return { id: existing, duplicate: true };
+      if (existing) return { id: existing, duplicate: true, variantImageMap: [] };
     }
     throw new Error(`Shopify ${res.status}: ${errText.slice(0, 300)}`);
   }
   const json = await res.json();
-  return { id: String(json.product.id) };
+  const productId = String(json.product.id);
+  // Map each colour to its first image so we can attach images to variants later.
+  const variantImageMap = colors.map((c) => ({
+    colorName: c.colorName,
+    imageSrc: c.scraped.image_urls[0] ?? null,
+  }));
+  return { id: productId, variantImageMap };
 }
+
+/** Upload an image and link it to all variants of a given colour. */
+async function uploadColorImage(
+  productId: string,
+  imageUrl: string,
+  variantIds: string[],
+  adminToken: string,
+): Promise<boolean> {
+  try {
+    const res = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}/images.json`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: { src: imageUrl, variant_ids: variantIds },
+        }),
+        adminToken,
+      },
+    );
+    if (!res.ok) {
+      console.error(`[worker] color image ${res.status}: ${await res.text()}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[worker] color image error:", err);
+    return false;
+  }
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -538,10 +628,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Pull a batch of pending items
+    // Pull a batch of pending items (need scraped_data for color_urls)
     const { data: items, error: fetchErr } = await supabase
       .from("product_import_log")
-      .select("id, brand, source_url, handle")
+      .select("id, brand, source_url, handle, scraped_data")
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(batchSize);
@@ -549,7 +639,6 @@ Deno.serve(async (req) => {
     if (fetchErr) throw fetchErr;
 
     if (!items || items.length === 0) {
-      // Done!
       await supabase
         .from("product_import_job")
         .update({
@@ -572,7 +661,15 @@ Deno.serve(async (req) => {
       processed++;
 
       try {
-        // Mark as scraping
+        // Resolve list of colour URLs. Fallback: just the source_url as a
+        // single colour group (handles legacy entries without scraped_data).
+        const sd = (item.scraped_data ?? {}) as {
+          color_urls?: Array<{ url: string; colorId: string }>;
+        };
+        const colorUrls = sd.color_urls && sd.color_urls.length > 0
+          ? sd.color_urls
+          : [{ url: item.source_url, colorId: "0" }];
+
         await supabase
           .from("product_import_log")
           .update({
@@ -582,13 +679,30 @@ Deno.serve(async (req) => {
           })
           .eq("id", item.id);
 
-        const html = await firecrawlScrape(item.source_url, firecrawlKey);
-        if (!html) {
+        // Scrape every colour sequentially.
+        const colors: ColorData[] = [];
+        for (const cu of colorUrls) {
+          const html = await firecrawlScrape(cu.url, firecrawlKey);
+          if (!html) {
+            console.warn(`[worker] firecrawl failed for ${cu.url} — skipping colour`);
+            continue;
+          }
+          const sc = extractFromHtml(html, item.brand, cu.url);
+          if (!sc.title || sc.price_eur === null) {
+            console.warn(`[worker] incomplete data for ${cu.url} — skipping colour`);
+            continue;
+          }
+          // Derive colour name from the title (or fall back to colorId)
+          const colorName = extractColorFromTitle(sc.title) || `Farbe ${cu.colorId}`;
+          colors.push({ colorName, colorId: cu.colorId, scraped: sc });
+        }
+
+        if (colors.length === 0) {
           await supabase
             .from("product_import_log")
             .update({
               status: "error",
-              error_message: "Firecrawl returned no HTML",
+              error_message: `Keine Farb-Variante konnte gescraped werden (${colorUrls.length} URLs)`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", item.id);
@@ -596,27 +710,35 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const scraped = extractFromHtml(html, item.brand, item.source_url);
-        if (!scraped.title || scraped.price_eur === null) {
-          await supabase
-            .from("product_import_log")
-            .update({
-              status: "error",
-              error_message: `Konnte Titel/Preis nicht extrahieren (title="${scraped.title}", price=${scraped.price_eur})`,
-              scraped_data: scraped,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", item.id);
-          errorCount++;
-          continue;
-        }
+        // Build colour-neutral base data from the first successful colour scrape.
+        const first = colors[0].scraped;
+        const baseTitle = stripColorFromTitle(first.title) || first.title;
+        const base: ScrapedProduct = {
+          ...first,
+          title: baseTitle,
+          // Aggregate every colour's images so we can attach them per-variant
+          image_urls: [],
+        };
+
+        const aggregatedScrape = {
+          base_title: baseTitle,
+          colors: colors.map((c) => ({
+            colorName: c.colorName,
+            colorId: c.colorId,
+            price_eur: c.scraped.price_eur,
+            image_urls: c.scraped.image_urls,
+          })),
+          sizes: base.sizes,
+          description: base.description,
+          color_urls: colorUrls,
+        };
 
         if (dryRun) {
           await supabase
             .from("product_import_log")
             .update({
               status: "scraped",
-              scraped_data: scraped,
+              scraped_data: aggregatedScrape,
               updated_at: new Date().toISOString(),
             })
             .eq("id", item.id);
@@ -624,24 +746,24 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Real run: create product, then attach images
+        // Real run — create the multi-colour product
         await supabase
           .from("product_import_log")
           .update({
             status: "creating",
-            scraped_data: scraped,
+            scraped_data: aggregatedScrape,
             updated_at: new Date().toISOString(),
           })
           .eq("id", item.id);
 
-        const created = await createShopifyProduct(
-          scraped,
+        const created = await createMultiColorProduct(
+          base,
+          colors,
           item.handle,
           adminToken,
         );
         if (!created) throw new Error("create returned null");
 
-        // If product already existed in Shopify, mark as skipped (not error, not new)
         if (created.duplicate) {
           await supabase
             .from("product_import_log")
@@ -655,22 +777,49 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Attach images sequentially via shopifyFetch (handles 429 retry + pacing)
-        for (const imgUrl of scraped.image_urls) {
-          await uploadImageToShopify(created.id, imgUrl, adminToken);
+        // Fetch back the created product to get variant IDs grouped by colour.
+        const variantsByColor = new Map<string, string[]>();
+        try {
+          const vRes = await shopifyFetch(
+            `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${created.id}.json?fields=variants`,
+            { method: "GET", adminToken },
+          );
+          if (vRes.ok) {
+            const vJson = await vRes.json();
+            for (const v of vJson?.product?.variants ?? []) {
+              const cn = String(v.option2 ?? "");
+              if (!variantsByColor.has(cn)) variantsByColor.set(cn, []);
+              variantsByColor.get(cn)!.push(String(v.id));
+            }
+          }
+        } catch (e) {
+          console.warn("[worker] could not fetch variants for image mapping", e);
         }
 
-        // Heartbeat after each product to keep the lock fresh
+        // Upload all images per colour and link them to that colour's variants
+        for (const c of colors) {
+          const variantIds = variantsByColor.get(c.colorName) ?? [];
+          for (const imgUrl of c.scraped.image_urls) {
+            await uploadColorImage(created.id, imgUrl, variantIds, adminToken);
+          }
+        }
+
+        // Heartbeat
         await supabase
           .from("product_import_job")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", "singleton");
 
+        // Persist a colour→variantIds map for the look-detail UI
+        const variants_summary = Object.fromEntries(
+          Array.from(variantsByColor.entries()),
+        );
         await supabase
           .from("product_import_log")
           .update({
             status: "created",
             shopify_product_id: created.id,
+            scraped_data: { ...aggregatedScrape, variants_summary },
             updated_at: new Date().toISOString(),
           })
           .eq("id", item.id);

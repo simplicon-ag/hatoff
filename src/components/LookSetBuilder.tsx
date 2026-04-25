@@ -11,6 +11,8 @@ interface Props {
   lookTitle: string;
   /** When true, each item shows a remove button (used in AI-generated sets). */
   allowRemove?: boolean;
+  /** Per-handle list of AI-recommended colours; first available is auto-selected. */
+  recommendedColors?: Record<string, string[]>;
 }
 
 type Selections = Record<string, Record<string, string>>; // productId -> { optionName -> value }
@@ -49,7 +51,7 @@ function isOptionAvailable(
   });
 }
 
-export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Props) => {
+export const LookSetBuilder = ({ products, lookTitle, allowRemove = false, recommendedColors }: Props) => {
   const addItems = useCartStore((s) => s.addItems);
   const isLoading = useCartStore((s) => s.isLoading);
   const [adding, setAdding] = useState(false);
@@ -67,7 +69,8 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Pro
     [products, removedIds],
   );
 
-  // Initialize: pre-select first available variant's options per product
+  // Initialize: pre-select first available variant's options per product,
+  // but if an AI-recommended colour is given, prefer a variant matching it.
   const [selections, setSelections] = useState<Selections>({});
 
   useEffect(() => {
@@ -75,7 +78,22 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Pro
       const next: Selections = { ...prev };
       for (const p of products) {
         if (next[p.node.id]) continue;
+        const recList = recommendedColors?.[p.node.handle] ?? [];
+        // Try each recommended colour in order until we find an in-stock variant
+        let chosenVariant = null as null | typeof p.node.variants.edges[number]["node"];
+        for (const recColor of recList) {
+          const match = p.node.variants.edges.find((v) =>
+            v.node.availableForSale &&
+            v.node.selectedOptions.some(
+              (o) =>
+                /farbe|color/i.test(o.name) &&
+                o.value.toLowerCase() === recColor.toLowerCase(),
+            ),
+          )?.node;
+          if (match) { chosenVariant = match; break; }
+        }
         const firstAvail =
+          chosenVariant ??
           p.node.variants.edges.find((v) => v.node.availableForSale)?.node ??
           p.node.variants.edges[0]?.node;
         if (!firstAvail) continue;
@@ -85,7 +103,7 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Pro
       }
       return next;
     });
-  }, [products]);
+  }, [products, recommendedColors]);
 
   const setOption = (productId: string, optionName: string, value: string) => {
     setSelections((prev) => ({

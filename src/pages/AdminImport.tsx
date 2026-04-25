@@ -119,7 +119,7 @@ export default function AdminImport() {
     try {
       const { data, error } = await supabase.functions.invoke("product-import-discover");
       if (error) throw error;
-      toast.success(`Entdeckung fertig: ${data?.inserted ?? 0} neue Produkte`);
+      toast.success(`Entdeckung fertig: ${data?.inserted ?? 0} gruppierte Produkte (Farben werden zu Varianten)`);
       fetchAll();
     } catch (err) {
       toast.error(`Entdeckung fehlgeschlagen: ${(err as Error).message}`);

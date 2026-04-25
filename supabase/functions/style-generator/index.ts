@@ -31,6 +31,7 @@ const PRODUCTS_LIST = `
           id title handle vendor productType tags
           priceRange { minVariantPrice { amount currencyCode } }
           images(first: 1) { edges { node { url } } }
+          options { name values }
           variants(first: 1) { edges { node { availableForSale } } }
         }
       }
@@ -49,6 +50,7 @@ interface ShopifyNode {
   description?: string;
   priceRange?: { minVariantPrice: { amount: string; currencyCode: string } };
   images?: { edges: Array<{ node: { url: string } }> };
+  options?: Array<{ name: string; values: string[] }>;
   variants?: { edges: Array<{ node: { availableForSale: boolean } }> };
 }
 
@@ -196,6 +198,7 @@ Deno.serve(async (req) => {
       vendor: p.vendor,
       category: p.cat,
       tags: (p.tags ?? []).slice(0, 6),
+      colors: (p.options ?? []).find((o) => /farbe|color/i.test(o.name))?.values ?? [],
     }));
 
     const anchorForPrompt = {
@@ -217,6 +220,7 @@ Regeln:
 - Wähle keine Stücke aus derselben Hauptkategorie wie der Anker (z.B. nicht zwei Hemden, nicht zwei Hosen).
 - KEINE Accessoires (Gürtel, Krawatte, Schal, Mütze, Cap, Socken, Einstecktuch) — fokussiere auf Hauptkleidungsstücke.
 - Achte auf Farbharmonie: vermeide harte Farbkonflikte; nutze klassische Kombinationen (Marine + Beige, Grau + Weiss, Khaki + Ecru, etc.).
+- Pro gewähltem Stück: empfehle 1–3 Farben aus dem "colors"-Array des Katalog-Eintrags, die zur Look-Stimmung passen. Nur Farbnamen verwenden, die im "colors"-Feld vorkommen.
 - Vermeide es, dass mehrere Stücke alle in EINER Marke sind, ausser es passt klar besser.
 - Bevorzuge gut bewertete, vielseitige Klassiker.
 - Formuliere die Begründung in Deutsch, 2 kurze Sätze, persönlich-freundlich, nicht werblich.`;
@@ -255,23 +259,30 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
                     type: "string",
                     description: "2 Sätze auf Deutsch, warum dieser Look stimmt.",
                   },
-                  items: {
-                    type: "array",
-                    minItems: 2,
-                    maxItems: 4,
                     items: {
-                      type: "object",
-                      properties: {
-                        handle: { type: "string", description: "Produkt-Handle aus dem Katalog." },
-                        role: {
-                          type: "string",
-                          description: "Rolle im Outfit, z.B. Hose, Sakko, Schuhe, Pullover. KEINE Accessoires (Gürtel, Schal, Krawatte, Mütze, Socken).",
+                      type: "array",
+                      minItems: 2,
+                      maxItems: 4,
+                      items: {
+                        type: "object",
+                        properties: {
+                          handle: { type: "string", description: "Produkt-Handle aus dem Katalog." },
+                          role: {
+                            type: "string",
+                            description: "Rolle im Outfit, z.B. Hose, Sakko, Schuhe, Pullover. KEINE Accessoires (Gürtel, Schal, Krawatte, Mütze, Socken).",
+                          },
+                          recommended_colors: {
+                            type: "array",
+                            description: "1–3 Farben aus dem 'colors'-Array des Katalog-Eintrags, die zum Look passen. Leer lassen wenn das Produkt keine Farbvarianten hat.",
+                            items: { type: "string" },
+                            minItems: 0,
+                            maxItems: 3,
+                          },
                         },
+                        required: ["handle", "role"],
+                        additionalProperties: false,
                       },
-                      required: ["handle", "role"],
-                      additionalProperties: false,
                     },
-                  },
                 },
                 required: ["rationale", "items"],
                 additionalProperties: false,
@@ -315,7 +326,7 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
     }
     const args = JSON.parse(toolCall.function.arguments) as {
       rationale: string;
-      items: Array<{ handle: string; role: string }>;
+      items: Array<{ handle: string; role: string; recommended_colors?: string[] }>;
     };
 
     // 5. Validate handles against catalog
@@ -331,6 +342,12 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
     // 6. Return enriched product info for the UI to render directly
     const enriched = validItems.map((it) => {
       const p = compactCatalog.find((c) => c.handle === it.handle)!;
+      const availableColors =
+        (p.options ?? []).find((o) => /farbe|color/i.test(o.name))?.values ?? [];
+      // Keep only colours that actually exist on the product
+      const recColors = (it.recommended_colors ?? []).filter((c) =>
+        availableColors.some((a) => a.toLowerCase() === c.toLowerCase()),
+      );
       return {
         handle: p.handle,
         title: p.title,
@@ -339,6 +356,8 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
         image: p.images?.edges?.[0]?.node.url ?? null,
         priceAmount: p.priceRange?.minVariantPrice.amount ?? null,
         currency: p.priceRange?.minVariantPrice.currencyCode ?? "CHF",
+        availableColors,
+        recommendedColors: recColors,
       };
     });
 

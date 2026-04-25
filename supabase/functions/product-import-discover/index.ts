@@ -106,14 +106,43 @@ function extractUrls(text: string, pattern: RegExp): string[] {
   return Array.from(set);
 }
 
-function urlToHandle(url: string): string {
-  // Keep the article-color suffix so each variant gets a unique handle:
-  // https://www.casamoda.com/de/de/freizeithemd-kurzarm-blau-14909-154
-  //   → freizeithemd-kurzarm-blau-14909-154
-  // Without this suffix, multiple distinct products would collide on the same
-  // handle (e.g. 6 different "freizeithemd-kurzarm-blau" articles).
-  const path = url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "");
-  return path.replace(/\/$/, "").toLowerCase();
+/** Parse the brand URL into its semantic parts.
+ *  Both Casa Moda and Venti use:  /de/de/<slug>-<articleId>-<colorId>
+ *  e.g.  /de/de/businesshemd-3760-474  →  slug="businesshemd", art="3760", color="474"
+ *  We strip the colour suffix from the slug so colour names like "blau", "beige"
+ *  don't end up in the canonical handle. */
+function parseProductUrl(url: string): { slugBase: string; articleId: string; colorId: string } | null {
+  const path = url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/\/$/, "").toLowerCase();
+  const m = path.match(/^([a-z0-9-]+?)-(\d{3,6})-(\d{2,5})$/);
+  if (!m) return null;
+  // Strip trailing colour-name token from the slug (best-effort, but the
+  // articleId is what really groups variants — slug is just for display).
+  const COLOR_WORDS = new Set([
+    "blau","hellblau","mittelblau","dunkelblau","marine","navy",
+    "rot","mittelrot","dunkelrot","weinrot",
+    "weiss","weiß","ecru","creme","champagner","champagner-beige",
+    "schwarz","tiefschwarz","anthrazit","grau","hellgrau","dunkelgrau","silber",
+    "beige","sand","khaki","camel","braun","mittelbraun","dunkelbraun","cognac",
+    "gruen","grün","mittelgruen","dunkelgruen","oliv","olive","mint",
+    "gelb","senf","ocker","orange","rost",
+    "rosa","pink","altrosa","lila","violett","tuerkis","türkis","petrol",
+    "graues","mittel","dunkel","hell",
+  ]);
+  let slugBase = m[1];
+  // Strip up to 2 trailing colour words ("graues-mittelblau", "champagner-beige")
+  for (let i = 0; i < 2; i++) {
+    const parts = slugBase.split("-");
+    if (parts.length > 1 && COLOR_WORDS.has(parts[parts.length - 1])) {
+      parts.pop();
+      slugBase = parts.join("-");
+    } else break;
+  }
+  return { slugBase, articleId: m[2], colorId: m[3] };
+}
+
+function buildBaseHandle(brand: string, slugBase: string, articleId: string): string {
+  // Colour-neutral handle: "casa-moda-businesshemd-3760"
+  return `${brand}-${slugBase}-${articleId}`.toLowerCase();
 }
 
 async function discoverBrandUrls(
@@ -213,21 +242,44 @@ Deno.serve(async (req) => {
     const existing = await fetchAllShopifyHandles();
     console.log(`[discover] Shopify already has ${existing.size} handles`);
 
-    const candidates: { brand: string; source_url: string; handle: string }[] =
-      [];
+    // ---- Group every URL by base handle (brand + slug + articleId) ----
+    // Each group becomes ONE Shopify product with multiple colour variants.
+    type Group = {
+      brand: string;
+      handle: string;
+      slugBase: string;
+      articleId: string;
+      color_urls: Array<{ url: string; colorId: string }>;
+    };
+    const groups = new Map<string, Group>();
 
-    for (const url of cmUrls) {
-      const handle = urlToHandle(url);
-      if (existing.has(handle)) continue;
-      candidates.push({ brand: "casa-moda", source_url: url, handle });
-    }
-    for (const url of vtUrls) {
-      const handle = urlToHandle(url);
-      if (existing.has(handle)) continue;
-      candidates.push({ brand: "venti", source_url: url, handle });
+    function addUrl(brand: string, url: string) {
+      const parsed = parseProductUrl(url);
+      if (!parsed) return;
+      const handle = buildBaseHandle(brand, parsed.slugBase, parsed.articleId);
+      if (existing.has(handle)) return;
+      let g = groups.get(handle);
+      if (!g) {
+        g = {
+          brand,
+          handle,
+          slugBase: parsed.slugBase,
+          articleId: parsed.articleId,
+          color_urls: [],
+        };
+        groups.set(handle, g);
+      }
+      if (!g.color_urls.find((c) => c.colorId === parsed.colorId)) {
+        g.color_urls.push({ url, colorId: parsed.colorId });
+      }
     }
 
-    console.log(`[discover] ${candidates.length} new product candidates`);
+    for (const url of cmUrls) addUrl("casa-moda", url);
+    for (const url of vtUrls) addUrl("venti", url);
+
+    console.log(
+      `[discover] ${groups.size} grouped products (from ${cmUrls.length + vtUrls.length} URLs)`,
+    );
 
     // Wipe previous pending/error rows and re-insert fresh discovery.
     // Keep created/skipped rows so we have a permanent log.
@@ -236,19 +288,28 @@ Deno.serve(async (req) => {
       .delete()
       .in("status", ["pending", "error", "scraping", "scraped", "creating"]);
 
-    // Filter out URLs that are already logged (e.g. previously created)
+    // Filter out handles that are already logged as created/skipped
     const { data: alreadyLogged } = await supabase
       .from("product_import_log")
-      .select("source_url");
+      .select("handle");
     const loggedSet = new Set(
-      (alreadyLogged ?? []).map((r) => String(r.source_url)),
+      (alreadyLogged ?? []).map((r) => String(r.handle ?? "")),
     );
 
-    const toInsert = candidates
-      .filter((c) => !loggedSet.has(c.source_url))
-      .map((c) => ({ ...c, status: "pending" as const }));
+    const toInsert = Array.from(groups.values())
+      .filter((g) => !loggedSet.has(g.handle))
+      .map((g) => ({
+        brand: g.brand,
+        source_url: g.color_urls[0].url,
+        handle: g.handle,
+        status: "pending" as const,
+        scraped_data: {
+          color_urls: g.color_urls,
+          article_id: g.articleId,
+          slug_base: g.slugBase,
+        },
+      }));
 
-    // Insert in chunks
     let inserted = 0;
     for (let i = 0; i < toInsert.length; i += 200) {
       const chunk = toInsert.slice(i, i + 200);
@@ -272,7 +333,7 @@ Deno.serve(async (req) => {
       .from("product_import_job")
       .update({
         total: pendingTotal ?? 0,
-        message: `Entdeckt: ${inserted} neue Produkte`,
+        message: `Entdeckt: ${inserted} gruppierte Produkte`,
         updated_at: new Date().toISOString(),
       })
       .eq("id", "singleton");
@@ -283,7 +344,7 @@ Deno.serve(async (req) => {
         casamoda_urls: cmUrls.length,
         venti_urls: vtUrls.length,
         shopify_existing: existing.size,
-        new_candidates: candidates.length,
+        groups: groups.size,
         inserted,
         pending_total: pendingTotal ?? 0,
       }),
