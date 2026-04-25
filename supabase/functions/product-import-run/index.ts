@@ -370,20 +370,23 @@ async function createShopifyProduct(
     },
   };
 
-  const res = await fetch(
+  const res = await shopifyFetch(
     `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json`,
     {
       method: "POST",
-      headers: {
-        "X-Shopify-Access-Token": adminToken,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      adminToken,
     },
   );
   if (!res.ok) {
     const errText = await res.text();
     console.error(`[worker] create product ${res.status}: ${errText}`);
+    // Duplicate handle (422) → look up existing product, return its ID with duplicate flag
+    if (res.status === 422 && /handle/i.test(errText) && /taken/i.test(errText)) {
+      const existing = await findShopifyProductByHandle(handle, adminToken);
+      if (existing) return { id: existing, duplicate: true };
+    }
     throw new Error(`Shopify ${res.status}: ${errText.slice(0, 300)}`);
   }
   const json = await res.json();
