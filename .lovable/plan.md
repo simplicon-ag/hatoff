@@ -1,54 +1,42 @@
-## Ziel
-**Looks-first** bleibt das Herzstück. Im Shop ergänzen wir die volle Produkt-Range beider Marken, und die Startseite bekommt zwei neue dynamische Sections **"Neu eingetroffen"** und **"Sale-Highlights"**.
+## Problem
+Der Worker bekommt von Shopify durchgehend `401: Invalid API key or access token`. Das Secret `SHOPIFY_ADMIN_API_TOKEN` ist abgelaufen, widerrufen oder gehört zu einem anderen Store. Im Trockenlauf merkst du das nicht (da läuft nur Firecrawl + DB), aber sobald der echte Import Produkte in Shopify anlegen will, scheitert jeder einzelne Aufruf — daher die vielen Errors.
 
-## Ausgangslage (gerade gemessen)
-- Shopify hat **243 Produkte** total — alle bereits via `fetchAllProducts()` abrufbar
-- `product_price_cache`: 595 Einträge (Casa-Moda + Venti zusammen, inkl. Varianten)
-- Davon **114 ok**, **147 mismatch** (gesperrt), **333 fallback** (Shopify-Preis), 1 not_found
-- Saison-Mappings: nur 115 Produkte → der Rest wird im Shop sowieso schon gezeigt
+## Schritt 1 — Token in Shopify generieren (manuell durch dich)
 
-## Plan
+1. Öffne den Shopify-Admin: `https://admin.shopify.com/store/style-compass-6nrqi`
+2. Gehe zu **Settings → Apps and sales channels → Develop apps**
+3. Falls noch keine Custom-App existiert: Klick **"Create an app"**, nenne sie z.B. *"Lovable Product Importer"*
+4. Klick auf die App → Tab **"Configuration"** → bei *Admin API integration* auf **"Configure"**
+5. Folgende Scopes freigeben:
+   - `write_products`
+   - `read_products`
+   - `write_product_listings`
+6. **Save** klicken
+7. Tab **"API credentials"** → **"Install app"** klicken
+8. Den **Admin API access token** kopieren (beginnt mit `shpat_...`) — wird nur EINMAL angezeigt!
 
-### 1. Mehr Kategorien scrapen (Saison-Coverage erhöhen)
-In `supabase/functions/season-sync/index.ts` die `SOURCES`-Map ergänzen:
-- **Casa Moda zusätzlich**: `pullover`, `sweat`, `accessoires`, `business`, `casual`, `sale`
-- **Venti zusätzlich**: `business-hemden`, `casual-hemden`, `sale`, `pullover`, `strick` (für FS auch), `freizeithemden`
+## Schritt 2 — Token via `add_secret` aktualisieren
 
-Die saisonalen Hard-Excludes (Bermudas raus aus H/W etc.) greifen weiterhin automatisch. Ergebnis: deutlich mehr Produkte landen in den richtigen Saisons → die Looks-Seite + Saison-Seiten zeigen mehr Auswahl.
+Nach Plan-Genehmigung rufe ich `add_secret` auf und du fügst den Token im sicheren Eingabefeld für **`SHOPIFY_ADMIN_API_TOKEN`** ein. Der alte Wert wird überschrieben, alle Edge-Functions sehen den neuen Token sofort.
 
-Danach: einmal `season-sync` manuell triggern, damit die neuen Kategorien sofort wirksam sind.
+## Schritt 3 — Worker absichern (Code-Änderung)
 
-### 2. Neue Frontseiten-Section: **"Neu eingetroffen"**
-Neue Section auf `src/pages/Index.tsx` zwischen "Featured Looks" und "Brand Strip":
-- Lädt die 8 neuesten Shopify-Produkte (Query `created_at:>2025-01-01`, sortiert via Shopify-Default neueste-zuerst)
-- 4-spaltiges Grid (auf mobile 2-spaltig), gleiche `ProductCard`-Komponente wie bisher
-- Header: "Frisch im Sortiment" + Link "Alle neuen Stücke →" (führt zu `/shop?sort=neu`)
+In `supabase/functions/product-import-run/index.ts`:
+- **Fail-fast Auth-Check**: Vor dem ersten Produkt einen Test-Request gegen `/admin/api/2025-07/shop.json` machen. Bei 401 sofort den Job auf `error` setzen mit Klartext-Meldung "Shopify-Token ungültig — bitte SHOPIFY_ADMIN_API_TOKEN aktualisieren". Verhindert dass 1006 Produkte als `error` geflaggt werden, nur weil der Token kaputt ist.
+- **Token-Quelle loggen**: Beim Start loggen welches Secret gewählt wurde (`SHOPIFY_ADMIN_API_TOKEN` vs Fallback) — Debug-Hilfe für künftige Auth-Probleme.
 
-### 3. Neue Frontseiten-Section: **"Sale-Highlights"**
-Neue Section vor dem Magazin-Teaser:
-- Lädt aus `product_price_cache` alle Einträge mit `on_sale = true` und `status != 'mismatch'` (sortiert nach grösster prozentualer Ersparnis)
-- Holt für die Top 4 Handles die Shopify-Daten via `fetchProductsByHandles()`
-- Sale-Badge (rot) auf jeder Karte mit "-XX %"
-- Header: "🔥 Aktuelle Deals" + Link "Alle Sale-Stücke →" (führt zu `/sale`)
+## Schritt 4 — Stuck-Errors zurücksetzen & echten Import starten
 
-### 4. Sale-Seite: bestehende Sale.tsx aufwerten
-Die bereits vorhandene `src/pages/Sale.tsx` füllen wir mit echtem Inhalt:
-- Lädt **alle** `on_sale=true` & `status != 'mismatch'`-Handles aus dem Cache
-- Holt Shopify-Daten und zeigt sie mit Standard-Filtern (Marke, Grösse) — Layout wie `Shop.tsx`
-- Sortiert default nach grösster Ersparnis
-- Link "Sale" in der `SiteHeader`-Nav prominent (rote Akzentfarbe), damit's auffällt
+Nach Token-Update führe ich automatisch aus:
+- Reset aller `error`-Logs zurück auf `pending`
+- Job-State auf `idle`
 
-### 5. Cleanup / kleine Verbesserungen
-- Im Shop (`src/pages/Shop.tsx`): Sortier-Option **"Neueste zuerst"** ergänzen (nutzt Shopify's `query` Parameter)
-- Sicherstellen, dass `useLivePrice` für die neuen Sections funktioniert (sollte automatisch der Fall sein, da `ProductCard` bereits den Hook nutzt)
+Du gehst dann auf `/admin/import`, schaltest **Trockenlauf AUS**, klickst **Start** — diesmal werden Produkte tatsächlich in Shopify angelegt.
 
-## Was wir NICHT machen (bewusst)
-- **Looks-Struktur unverändert** — Looks-first bleibt
-- **Brand-Tiles, Hero-Switcher, Lookbook-Karussell** verschoben auf später (kann ich gerne als nächstes anbieten)
-- **Cron manuell triggern**: nicht nötig, der Plan beinhaltet ohnehin einen einmaligen `season-sync`-Run für die neuen Kategorien
+## Was du jetzt tun musst
+1. Token in Shopify generieren (Schritt 1 oben)
+2. Plan genehmigen → ich frage den Token via `add_secret` ab und mache Schritte 3 + 4
 
-## Erwartetes Ergebnis
-- Saison-Mappings wachsen von ~115 auf voraussichtlich **180–220** Produkte
-- Startseite hat **2 neue dynamische Sections**, die sich täglich automatisch aktualisieren (Cron läuft 03:00 UTC)
-- Sale-Rubrik ist nutzbar und zeigt alle ~30–80 reduzierten Produkte
-- Shop bleibt wie er ist, nur mit neuer Sortier-Option
+<lov-actions>
+<lov-link url="https://admin.shopify.com/store/style-compass-6nrqi">Shopify-Admin öffnen</lov-link>
+</lov-actions>
