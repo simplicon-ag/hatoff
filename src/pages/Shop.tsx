@@ -426,6 +426,7 @@ const Shop = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="featured">Empfohlen</SelectItem>
+                <SelectItem value="newest">Neueste zuerst</SelectItem>
                 <SelectItem value="price-asc">Preis aufsteigend</SelectItem>
                 <SelectItem value="price-desc">Preis absteigend</SelectItem>
                 <SelectItem value="title-asc">A – Z</SelectItem>
