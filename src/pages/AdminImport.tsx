@@ -240,6 +240,36 @@ export default function AdminImport() {
           </AlertDescription>
         </Alert>
 
+        {/* Shopify purge card — destructive operation */}
+        <Card className="p-6 space-y-3 border-destructive/40 bg-destructive/5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="space-y-1">
+              <h2 className="font-medium flex items-center gap-2">
+                <Trash2 className="h-4 w-4 text-destructive" />
+                Shopify komplett purgen
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Löscht ALLE CASA MODA + VENTI Produkte direkt aus Shopify (per Vendor-Suche, paginiert).
+                Nutze dies vor einem sauberen Re-Import um Duplikate zu vermeiden.
+              </p>
+              {purgeProgress && (
+                <p className="text-xs font-mono text-muted-foreground border-l-2 border-destructive/50 pl-2 mt-2">
+                  {purgeProgress}
+                </p>
+              )}
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={runPurgeShopify}
+              disabled={purging || isRunning}
+            >
+              {purging ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Alle löschen
+            </Button>
+          </div>
+        </Card>
+
         {/* Job state card */}
         <Card className="p-6 space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
