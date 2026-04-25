@@ -21,6 +21,9 @@ export const ProductCard = ({ product, priority }: Props) => {
   const price = p.priceRange.minVariantPrice;
   const { price: livePrice } = useLivePrice(p.handle);
   const displayPrice = formatLivePrice(livePrice) ?? formatPrice(price.amount, price.currencyCode);
+  const originalPrice = formatOriginalPrice(livePrice);
+  const discount = discountPercent(livePrice);
+  const onSale = !!livePrice?.on_sale && originalPrice;
 
   const firstAvailable = p.variants.edges.find((e) => e.node.availableForSale)?.node;
   const soldOut = !firstAvailable;
