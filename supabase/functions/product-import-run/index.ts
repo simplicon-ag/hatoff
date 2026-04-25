@@ -358,35 +358,69 @@ async function findShopifyProductByHandle(
   }
 }
 
-async function createShopifyProduct(
-  data: ScrapedProduct,
+/** Per-colour scraped data used to build a multi-variant product. */
+interface ColorData {
+  colorName: string;       // e.g. "Hellblau"
+  colorId: string;         // e.g. "314"
+  scraped: ScrapedProduct;
+}
+
+async function createMultiColorProduct(
+  base: ScrapedProduct,
+  colors: ColorData[],
   handle: string,
   adminToken: string,
-): Promise<{ id: string; duplicate?: boolean } | null> {
-  const priceChf = data.price_eur ? (data.price_eur * EUR_TO_CHF).toFixed(2) : "0.00";
-  const compareAt = data.compare_at_price_eur
-    ? (data.compare_at_price_eur * EUR_TO_CHF).toFixed(2)
-    : null;
+): Promise<{ id: string; duplicate?: boolean; variantImageMap: Array<{ colorName: string; imageSrc: string | null }> } | null> {
+  // Use the cheapest price across colours as the published price.
+  const minPriceEur = colors.reduce(
+    (m, c) => (c.scraped.price_eur != null && c.scraped.price_eur < m ? c.scraped.price_eur : m),
+    base.price_eur ?? Number.POSITIVE_INFINITY,
+  );
+  const compareEur = colors.reduce<number | null>(
+    (m, c) => {
+      const v = c.scraped.compare_at_price_eur;
+      if (v == null) return m;
+      if (m == null) return v;
+      return v > m ? v : m;
+    },
+    base.compare_at_price_eur,
+  );
+  const priceChf = isFinite(minPriceEur) ? (minPriceEur * EUR_TO_CHF).toFixed(2) : "0.00";
+  const compareAt = compareEur ? (compareEur * EUR_TO_CHF).toFixed(2) : null;
 
-  const sizes = data.sizes.length > 0 ? data.sizes : ["One Size"];
+  // Build the cross-product Größe × Farbe.
+  const sizes = base.sizes.length > 0 ? base.sizes : ["One Size"];
+  const colorNames = colors.map((c) => c.colorName);
+
+  const variants = [];
+  for (const c of colors) {
+    for (const size of sizes) {
+      variants.push({
+        option1: size,
+        option2: c.colorName,
+        price: priceChf,
+        compare_at_price: compareAt,
+        sku: `${handle}-${c.colorId}-${size}`.replace(/[^a-z0-9-]/gi, "").toLowerCase(),
+        inventory_management: null,
+        inventory_policy: "continue",
+      });
+    }
+  }
 
   const body = {
     product: {
-      title: data.title || handle,
-      body_html: data.description,
-      vendor: data.vendor,
-      product_type: data.product_type ?? "Bekleidung",
-      tags: data.tags.join(","),
+      title: base.title || handle,
+      body_html: base.description,
+      vendor: base.vendor,
+      product_type: base.product_type ?? "Bekleidung",
+      tags: base.tags.join(","),
       handle,
       status: "active",
-      options: [{ name: "Grösse", values: sizes }],
-      variants: sizes.map((s) => ({
-        option1: s,
-        price: priceChf,
-        compare_at_price: compareAt,
-        inventory_management: null, // don't track inventory
-        inventory_policy: "continue",
-      })),
+      options: [
+        { name: "Grösse", values: sizes },
+        { name: "Farbe", values: colorNames },
+      ],
+      variants,
     },
   };
 
@@ -402,16 +436,52 @@ async function createShopifyProduct(
   if (!res.ok) {
     const errText = await res.text();
     console.error(`[worker] create product ${res.status}: ${errText}`);
-    // Duplicate handle (422) → look up existing product, return its ID with duplicate flag
     if (res.status === 422 && /handle/i.test(errText) && /taken/i.test(errText)) {
       const existing = await findShopifyProductByHandle(handle, adminToken);
-      if (existing) return { id: existing, duplicate: true };
+      if (existing) return { id: existing, duplicate: true, variantImageMap: [] };
     }
     throw new Error(`Shopify ${res.status}: ${errText.slice(0, 300)}`);
   }
   const json = await res.json();
-  return { id: String(json.product.id) };
+  const productId = String(json.product.id);
+  // Map each colour to its first image so we can attach images to variants later.
+  const variantImageMap = colors.map((c) => ({
+    colorName: c.colorName,
+    imageSrc: c.scraped.image_urls[0] ?? null,
+  }));
+  return { id: productId, variantImageMap };
 }
+
+/** Upload an image and link it to all variants of a given colour. */
+async function uploadColorImage(
+  productId: string,
+  imageUrl: string,
+  variantIds: string[],
+  adminToken: string,
+): Promise<boolean> {
+  try {
+    const res = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}/images.json`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: { src: imageUrl, variant_ids: variantIds },
+        }),
+        adminToken,
+      },
+    );
+    if (!res.ok) {
+      console.error(`[worker] color image ${res.status}: ${await res.text()}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[worker] color image error:", err);
+    return false;
+  }
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
