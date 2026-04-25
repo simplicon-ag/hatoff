@@ -172,11 +172,27 @@ const ProductDetail = () => {
           </div>
 
           {selectedVariant && (
-            <div className="mt-5 flex items-baseline gap-3">
-              <p className="text-2xl font-medium">
-                {formatLivePrice(livePrice) ??
-                  formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
-              </p>
+            <div className="mt-5 flex flex-wrap items-baseline gap-3">
+              {livePrice?.on_sale && formatOriginalPrice(livePrice) ? (
+                <>
+                  <p className="text-2xl font-medium text-destructive">
+                    {formatLivePrice(livePrice)}
+                  </p>
+                  <p className="text-lg text-foreground/50 line-through">
+                    {formatOriginalPrice(livePrice)}
+                  </p>
+                  {discountPercent(livePrice) && (
+                    <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                      -{discountPercent(livePrice)}%
+                    </span>
+                  )}
+                </>
+              ) : (
+                <p className="text-2xl font-medium">
+                  {formatLivePrice(livePrice) ??
+                    formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                </p>
+              )}
               <span className="text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</span>
             </div>
           )}
