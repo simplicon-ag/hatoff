@@ -204,7 +204,7 @@ export default function AdminImport() {
                 {job?.state ?? "—"}
               </Badge>
               {job?.dry_run && <Badge variant="secondary">Trockenlauf</Badge>}
-              {isRunning && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              {(isRunning || isStopping) && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2 mr-3">
@@ -221,7 +221,7 @@ export default function AdminImport() {
                 Entdecken
               </Button>
               {!isRunning ? (
-                <Button onClick={runStart} disabled={busy || (job?.total ?? 0) === 0} size="sm">
+                <Button onClick={runStart} disabled={busy || isStopping || (job?.total ?? 0) === 0} size="sm">
                   <Play className="h-4 w-4 mr-2" />
                   Start
                 </Button>
