@@ -14,7 +14,7 @@ import {
   formatPrice,
   type ShopifyProduct,
 } from "@/lib/shopify";
-import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
+import { useLivePrice, formatLivePrice, formatOriginalPrice, discountPercent } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { looks } from "@/data/looks";
 import { toast } from "sonner";
@@ -172,11 +172,27 @@ const ProductDetail = () => {
           </div>
 
           {selectedVariant && (
-            <div className="mt-5 flex items-baseline gap-3">
-              <p className="text-2xl font-medium">
-                {formatLivePrice(livePrice) ??
-                  formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
-              </p>
+            <div className="mt-5 flex flex-wrap items-baseline gap-3">
+              {livePrice?.on_sale && formatOriginalPrice(livePrice) ? (
+                <>
+                  <p className="text-2xl font-medium text-destructive">
+                    {formatLivePrice(livePrice)}
+                  </p>
+                  <p className="text-lg text-foreground/50 line-through">
+                    {formatOriginalPrice(livePrice)}
+                  </p>
+                  {discountPercent(livePrice) && (
+                    <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                      -{discountPercent(livePrice)}%
+                    </span>
+                  )}
+                </>
+              ) : (
+                <p className="text-2xl font-medium">
+                  {formatLivePrice(livePrice) ??
+                    formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                </p>
+              )}
               <span className="text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</span>
             </div>
           )}
@@ -328,9 +344,16 @@ const ProductDetail = () => {
           <div className="flex-1">
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{product.vendor}</p>
             {selectedVariant && (
-              <p className="text-sm font-medium">
-                {formatLivePrice(livePrice) ??
-                  formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+              <p className="flex items-baseline gap-2 text-sm font-medium">
+                <span className={livePrice?.on_sale ? "text-destructive" : ""}>
+                  {formatLivePrice(livePrice) ??
+                    formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                </span>
+                {livePrice?.on_sale && formatOriginalPrice(livePrice) && (
+                  <span className="text-xs text-foreground/50 line-through">
+                    {formatOriginalPrice(livePrice)}
+                  </span>
+                )}
               </p>
             )}
           </div>

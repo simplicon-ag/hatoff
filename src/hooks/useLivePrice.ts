@@ -7,6 +7,9 @@ export interface LivePrice {
   source_url: string | null;
   raw_price_eur: number | null;
   display_price_chf: number;
+  original_price_eur: number | null;
+  original_price_chf: number | null;
+  on_sale: boolean;
   status: "ok" | "fallback" | "not_found";
   fetched_at: string;
 }
@@ -117,4 +120,18 @@ export function useLivePrice(handle: string | undefined) {
 export function formatLivePrice(price?: LivePrice | null): string | null {
   if (!price) return null;
   return `CHF ${price.display_price_chf.toFixed(2)}`;
+}
+
+/** Formatierung des Originalpreises (UVP). */
+export function formatOriginalPrice(price?: LivePrice | null): string | null {
+  if (!price || !price.on_sale || price.original_price_chf == null) return null;
+  return `CHF ${price.original_price_chf.toFixed(2)}`;
+}
+
+/** Rabatt in Prozent (gerundet), oder null wenn nicht im Sale. */
+export function discountPercent(price?: LivePrice | null): number | null {
+  if (!price || !price.on_sale || !price.original_price_chf) return null;
+  const diff = price.original_price_chf - price.display_price_chf;
+  if (diff <= 0) return null;
+  return Math.round((diff / price.original_price_chf) * 100);
 }

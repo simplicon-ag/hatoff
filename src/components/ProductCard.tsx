@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Loader2, ShoppingBag } from "lucide-react";
 import type { ShopifyProduct } from "@/lib/shopify";
 import { formatPrice } from "@/lib/shopify";
-import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
+import { useLivePrice, formatLivePrice, formatOriginalPrice, discountPercent } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,9 @@ export const ProductCard = ({ product, priority }: Props) => {
   const price = p.priceRange.minVariantPrice;
   const { price: livePrice } = useLivePrice(p.handle);
   const displayPrice = formatLivePrice(livePrice) ?? formatPrice(price.amount, price.currencyCode);
+  const originalPrice = formatOriginalPrice(livePrice);
+  const discount = discountPercent(livePrice);
+  const onSale = !!livePrice?.on_sale && originalPrice;
 
   const firstAvailable = p.variants.edges.find((e) => e.node.availableForSale)?.node;
   const soldOut = !firstAvailable;
@@ -92,6 +95,12 @@ export const ProductCard = ({ product, priority }: Props) => {
           </span>
         )}
 
+        {!soldOut && onSale && discount && (
+          <span className="absolute left-3 top-3 bg-destructive px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground">
+            -{discount}%
+          </span>
+        )}
+
         {!soldOut && (
           <button
             onClick={handleQuickAdd}
@@ -107,7 +116,14 @@ export const ProductCard = ({ product, priority }: Props) => {
       <div className="mt-4 space-y-1">
         <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
         <h3 className="font-display text-lg leading-tight">{p.title}</h3>
-        <p className="text-sm text-foreground/80">{displayPrice}</p>
+        {onSale ? (
+          <p className="flex items-baseline gap-2 text-sm">
+            <span className="font-medium text-destructive">{displayPrice}</span>
+            <span className="text-foreground/50 line-through">{originalPrice}</span>
+          </p>
+        ) : (
+          <p className="text-sm text-foreground/80">{displayPrice}</p>
+        )}
       </div>
     </Link>
   );
