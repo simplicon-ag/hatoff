@@ -405,7 +405,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const scraped = extractFromHtml(html, item.brand);
+        const scraped = extractFromHtml(html, item.brand, item.source_url);
         if (!scraped.title || scraped.price_eur === null) {
           await supabase
             .from("product_import_log")
