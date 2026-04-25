@@ -258,6 +258,28 @@ Deno.serve(async (req) => {
     for (const handle of handles) {
       // Cache-Hit?
       const c = cacheMap.get(handle);
+
+      // Mismatch-Einträge: vom Audit als falsch markiert. Cache-Wert NICHT
+      // ausliefern (sonst kämen falsche Sale-Preise in die UI) und auch
+      // NICHT überschreiben (sonst geht die Mismatch-Markierung verloren).
+      // Stattdessen: stiller Shopify-Fallback ohne Sale-Badge.
+      if (c && c.status === "mismatch") {
+        const display = fallbackPrice(shopifyPrices[handle]);
+        results.push({
+          handle,
+          brand: c.brand,
+          source_url: null,
+          raw_price_eur: null,
+          display_price_chf: display,
+          original_price_eur: null,
+          original_price_chf: null,
+          on_sale: false,
+          status: "fallback",
+          fetched_at: new Date().toISOString(),
+        });
+        continue;
+      }
+
       if (c) {
         const ageHrs =
           (Date.now() - new Date(c.fetched_at).getTime()) / 3_600_000;

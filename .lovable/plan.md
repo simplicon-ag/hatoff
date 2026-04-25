@@ -1,64 +1,50 @@
-# VENTI & CASAMODA Vollkatalog-Import
+# Preise wirklich korrigieren
 
-## Ziel
-Bestehende 7 Demo-Produkte löschen und durch den **echten Vollkatalog** beider Marken ersetzen — alle Kategorien (Hemden, Polos, Pullover, Hosen, Jacken, Accessoires), inkl. Beschreibungen, Material, Pflege, Bilder, Grössen-Varianten.
+## Aktueller Stand (verifiziert)
 
-## Kontext (bestätigt)
-- ✅ Autorisierter Händler — rechtlich abgedeckt
-- ✅ Alle Kategorien
-- ✅ Reihenfolge egal / parallel
-- ✅ Preisformel: **EUR × 2.8**, gerundet auf .90 (z. B. €49.95 → CHF 139.90)
+Cache-Status Casa Moda: 26 `ok`, 64 `fallback`, **147 `mismatch`**, 1 `not_found`.
 
-## Realistische Erwartungen
-- ~150–300 Produkte pro Marke = **300–600 total**
-- ~1'500–3'000 Firecrawl-Calls (Map + Scrape)
-- Geschätzte Laufzeit: **30–60 min**
-- Bilder werden via Hersteller-CDN-URLs verlinkt (als autorisierter Händler ok); Fallback: Upload zu Shopify, falls Hotlink-Schutz
+**Du bist gerade auf `/product/casa-moda-polo-shirt-ivory`.** DB-Eintrag:
+- `status = 'mismatch'` ✅ (durch Audit korrekt markiert)
+- `on_sale = true, display = 39.95, original = 79.95` ❌ (falscher Preis steht aber noch im Cache)
 
-## Phase 1 — Setup
-1. **Lovable Cloud aktivieren** (falls noch nicht aktiv) — für sichere Secret-Speicherung.
-2. **Firecrawl-Connector verbinden** via `standard_connectors--connect` (`firecrawl`). Du wählst eine bestehende oder neue Connection im Picker.
-3. Import-Skript `scripts/import-brand.ts` schreiben — wird per `code--exec` im Sandbox ausgeführt, ruft direkt Firecrawl REST v2 + `shopify--create_product` auf.
+→ Die UI zeigt trotzdem den falschen Sale, weil die Edge-Function den `mismatch`-Status beim Lesen nicht filtert.
 
-## Phase 2 — URL-Discovery (Stop-Punkt!)
-4. `firecrawl map` auf `casamoda.com` und `venti.de` (mit Filter auf Produkt-URL-Patterns).
-5. **Stop & Review**: Ich melde mich mit den URL-Counts pro Marke/Kategorie zurück, bevor wir Credits in den vollen Scrape stecken.
+## Zwei offene Bugs
 
-## Phase 3 — Strukturierte Extraktion
-6. Pro Produkt-URL `firecrawl scrape` mit JSON-Schema:
-   - title, brand, price_eur
-   - description_short, description_long
-   - material, care_instructions
-   - fit, color
-   - sizes_available[], image_urls[]
-   - category, season
+**Bug 1:** `supabase/functions/product-price/index.ts` Zeile 258–280 — der Cache-Read gibt jeden Eintrag innerhalb der TTL zurück, egal ob `status='ok'`, `'fallback'` oder `'mismatch'`. Die Audit-Markierung wird ignoriert.
 
-## Phase 4 — Demo-Cleanup & Shopify-Import
-7. Alle 7 Demo-Produkte via `shopify--list_products` + `shopify--delete_product` entfernen.
-8. Pro Produkt `shopify--create_product`:
-   - Preisumrechnung: `chf = round(eur × 2.8 / 10) × 10 - 0.10`
-   - Optionen: Grösse + ggf. Farbe
-   - Varianten: alle Grössen-Kombinationen
-   - Bilder: Hersteller-CDN-URLs
-   - Tags: `marke:*`, `welt:*` (business/smart-casual/freizeit/sommer abgeleitet aus Kategorie), `anlass:*`
-9. Live-Logging; Fehler-Toleranz mit Zusammenfassung am Ende.
+**Bug 2:** Beim Re-Scrapen (TTL abgelaufen oder force) gibt es keinen Bild-Vergleich → derselbe falsche URL wird wieder gecached.
 
-## Phase 5 — Frontend-Anpassung
-10. **`src/data/looks.ts`**: kuratierte Looks auf neue echte Produkt-Handles ummappen.
-11. **Marken-Detailseiten** `/marke/casamoda` und `/marke/venti` mit Filtern (Kategorie/Farbe/Grösse).
-12. **Shop-Seite** mit Brand- und Kategorie-Filter erweitern.
-13. TypeScript-Check + QA-Stichprobe der Storefront.
+## Schritt 1 — Mismatch-Filter (löst sofort das UI-Problem)
 
-## Risiken & Fallbacks
-- **Firecrawl-Credits aufgebraucht** → Pause + Hinweis (`LOVABLE50` Coupon falls managed).
-- **Bilder mit Hotlink-Schutz** → Fallback: Bilder via Firecrawl scrapen + zu Shopify hochladen (langsamer).
-- **Anti-Bot / Rate-Limits** → Firecrawl handhabt das meist; ggf. Delays einbauen.
+In `product-price/index.ts`:
+- Cache-Lese-Schleife: wenn `c.status === 'mismatch'` → Eintrag ignorieren.
+- Stattdessen direkt Shopify-Fallback zurückgeben (`status='fallback'`, `on_sale=false`) **ohne** `upsert` (sonst geht die Mismatch-Markierung verloren).
 
-## Was du sehen wirst, sobald freigegeben
-1. Wechsel in Default-Modus.
-2. Lovable Cloud aktivieren (falls nötig).
-3. Firecrawl-Connection-Picker — du wählst die Connection.
-4. Map-Resultate mit URL-Counts → **Stop-Punkt für deine Bestätigung**.
-5. Voller Scrape + Import läuft, Live-Log.
-6. Frontend-Updates (Looks-Mapping, Marken-Seiten, Shop-Filter).
-7. Final-Check und QA-Bericht.
+Effekt: Polo Shirt Ivory + die 146 anderen Mismatches zeigen sofort den Shopify-Standardpreis ohne falsches Sale-Badge.
+
+## Schritt 2 — Bild-Match-Schutz vor neuem Cache-Eintrag
+
+In `product-price/index.ts`:
+- `firecrawlScrape` zusätzlich Produktbild aus dem Casa-Moda-Markdown extrahieren (erstes `images.casamoda.com`-Bild).
+- Body-Payload erweitern um `shopifyImages: Record<handle, imageUrl>`.
+- Vor `upsert`: dHash-Vergleich (9×8 Graustufen, 64-Bit-Hash via `imagescript` aus deno.land/x). Hamming-Distanz ≤ 12 = Match.
+- Kein Match → `status='mismatch'` speichern statt `'ok'`.
+
+## Schritt 3 — Hook + Aufrufer Shopify-Bild mitschicken
+
+`src/hooks/useLivePrice.ts`: Signatur `useLivePrice(handle, shopifyImage?)` und `useLivePrices(handles, shopifyImages?)`. Body-Payload um `shopifyImages` ergänzen.
+
+Aufrufer aktualisieren: `ProductCard.tsx`, `ProductDetail.tsx`, `LookSetBuilder.tsx`, `AiStyleGenerator.tsx` → `primary?.url` mitgeben.
+
+## Schritt 4 — Verifikation
+
+- Polo Shirt Ivory neu laden → erwartet: kein Sale-Badge, Shopify-Standardpreis.
+- Stichprobe 3 weitere Mismatch-Handles aus dem Cache.
+- Ein sauberer `ok`-Handle muss weiterhin korrekten Sale zeigen.
+
+## Nicht geändert
+- Keine DB-Migrationen.
+- 26 `ok` + 64 `fallback`-Einträge bleiben.
+- Venti unberührt.
