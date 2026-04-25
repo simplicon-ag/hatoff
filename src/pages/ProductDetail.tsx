@@ -366,6 +366,15 @@ const ProductDetail = () => {
       {/* Spacer for mobile sticky bar */}
       <div className="h-20 md:hidden" />
 
+      {/* AI Style Generator — nur für stilfähige Hauptstücke */}
+      {(() => {
+        const hay = `${product.productType ?? ""} ${(product.tags ?? []).join(" ")} ${product.title}`.toLowerCase();
+        const isStyleable = /(hemd|polo|t-?shirt|shirt|pullover|pulli|sweater|strick|sakko|blazer|jacke|mantel|hose|chino|jeans|bermuda|short|kleid|anzug)/.test(hay);
+        return isStyleable ? (
+          <AiStyleGenerator productHandle={product.handle} productTitle={product.title} />
+        ) : null;
+      })()}
+
       {/* Related — same vendor */}
       {related.length > 0 && (
         <section className="container-editorial border-t border-border py-16">
