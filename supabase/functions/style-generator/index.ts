@@ -220,6 +220,7 @@ Regeln:
 - Wähle keine Stücke aus derselben Hauptkategorie wie der Anker (z.B. nicht zwei Hemden, nicht zwei Hosen).
 - KEINE Accessoires (Gürtel, Krawatte, Schal, Mütze, Cap, Socken, Einstecktuch) — fokussiere auf Hauptkleidungsstücke.
 - Achte auf Farbharmonie: vermeide harte Farbkonflikte; nutze klassische Kombinationen (Marine + Beige, Grau + Weiss, Khaki + Ecru, etc.).
+- Pro gewähltem Stück: empfehle 1–3 Farben aus dem "colors"-Array des Katalog-Eintrags, die zur Look-Stimmung passen. Nur Farbnamen verwenden, die im "colors"-Feld vorkommen.
 - Vermeide es, dass mehrere Stücke alle in EINER Marke sind, ausser es passt klar besser.
 - Bevorzuge gut bewertete, vielseitige Klassiker.
 - Formuliere die Begründung in Deutsch, 2 kurze Sätze, persönlich-freundlich, nicht werblich.`;
