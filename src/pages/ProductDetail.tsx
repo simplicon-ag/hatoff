@@ -8,6 +8,7 @@ import { ProductGallery } from "@/components/ProductGallery";
 import { ProductDescription } from "@/components/ProductDescription";
 import { TrustBadges } from "@/components/TrustBadges";
 import { ProductCard } from "@/components/ProductCard";
+import { AiStyleGenerator } from "@/components/AiStyleGenerator";
 import {
   fetchProductByHandle,
   fetchProducts,
@@ -364,6 +365,15 @@ const ProductDetail = () => {
       </div>
       {/* Spacer for mobile sticky bar */}
       <div className="h-20 md:hidden" />
+
+      {/* AI Style Generator — nur für stilfähige Hauptstücke */}
+      {(() => {
+        const hay = `${product.productType ?? ""} ${(product.tags ?? []).join(" ")} ${product.title}`.toLowerCase();
+        const isStyleable = /(hemd|polo|t-?shirt|shirt|pullover|pulli|sweater|strick|sakko|blazer|jacke|mantel|hose|chino|jeans|bermuda|short|kleid|anzug)/.test(hay);
+        return isStyleable ? (
+          <AiStyleGenerator productHandle={product.handle} productTitle={product.title} />
+        ) : null;
+      })()}
 
       {/* Related — same vendor */}
       {related.length > 0 && (
