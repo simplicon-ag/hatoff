@@ -191,6 +191,9 @@ const Shop = () => {
       );
     } else if (sort === "title-asc") {
       sorted.sort((a, b) => a.node.title.localeCompare(b.node.title));
+    } else if (sort === "newest") {
+      // Shopify gid IDs sind monoton steigend → höchste ID = neuestes Produkt
+      sorted.sort((a, b) => b.node.id.localeCompare(a.node.id));
     }
     return sorted;
   }, [
@@ -426,6 +429,7 @@ const Shop = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="featured">Empfohlen</SelectItem>
+                <SelectItem value="newest">Neueste zuerst</SelectItem>
                 <SelectItem value="price-asc">Preis aufsteigend</SelectItem>
                 <SelectItem value="price-desc">Preis absteigend</SelectItem>
                 <SelectItem value="title-asc">A – Z</SelectItem>

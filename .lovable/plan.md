@@ -1,41 +1,54 @@
 ## Ziel
-Beide Scraper laufen automatisch **täglich**, damit Preise und Saison-Listen immer frisch sind — ohne manuelles Anstossen.
+**Looks-first** bleibt das Herzstück. Im Shop ergänzen wir die volle Produkt-Range beider Marken, und die Startseite bekommt zwei neue dynamische Sections **"Neu eingetroffen"** und **"Sale-Highlights"**.
 
-## Was läuft heute?
-- **`product-price`**: Holt Live-Preise von casamoda.com / venti.com (Cache 7 Tage). Wird heute nur **on-demand** beim Seitenaufruf getriggert.
-- **`season-sync`**: Aggregiert pro Saison die Produktlisten der Marken-Kategorieseiten. Wird heute **manuell** aufgerufen.
-- **Extensions `pg_cron` / `pg_net`**: aktuell **nicht aktiviert** (Check ergab leeres Resultat).
+## Ausgangslage (gerade gemessen)
+- Shopify hat **243 Produkte** total — alle bereits via `fetchAllProducts()` abrufbar
+- `product_price_cache`: 595 Einträge (Casa-Moda + Venti zusammen, inkl. Varianten)
+- Davon **114 ok**, **147 mismatch** (gesperrt), **333 fallback** (Shopify-Preis), 1 not_found
+- Saison-Mappings: nur 115 Produkte → der Rest wird im Shop sowieso schon gezeigt
 
 ## Plan
 
-### 1. Extensions aktivieren (Migration)
-- `create extension if not exists pg_cron;`
-- `create extension if not exists pg_net;`
+### 1. Mehr Kategorien scrapen (Saison-Coverage erhöhen)
+In `supabase/functions/season-sync/index.ts` die `SOURCES`-Map ergänzen:
+- **Casa Moda zusätzlich**: `pullover`, `sweat`, `accessoires`, `business`, `casual`, `sale`
+- **Venti zusätzlich**: `business-hemden`, `casual-hemden`, `sale`, `pullover`, `strick` (für FS auch), `freizeithemden`
 
-### 2. Drei tägliche Cron-Jobs einrichten (SQL via DB-Insert, kein Migration-File — enthält Anon-Key)
+Die saisonalen Hard-Excludes (Bermudas raus aus H/W etc.) greifen weiterhin automatisch. Ergebnis: deutlich mehr Produkte landen in den richtigen Saisons → die Looks-Seite + Saison-Seiten zeigen mehr Auswahl.
 
-| Job | Zeit (UTC) | Funktion | Body |
-|---|---|---|---|
-| `season-sync-fs` | 02:00 | `season-sync` | `{"season":"fs-2026"}` |
-| `season-sync-hw` | 02:15 | `season-sync` | `{"season":"hw-2026"}` |
-| `product-price-refresh` | 03:00 | neuer Endpoint `product-price-refresh` | (kein Body) |
+Danach: einmal `season-sync` manuell triggern, damit die neuen Kategorien sofort wirksam sind.
 
-Zeiten gestaffelt, damit Firecrawl-Quota nicht in einem Burst aufgebraucht wird.
+### 2. Neue Frontseiten-Section: **"Neu eingetroffen"**
+Neue Section auf `src/pages/Index.tsx` zwischen "Featured Looks" und "Brand Strip":
+- Lädt die 8 neuesten Shopify-Produkte (Query `created_at:>2025-01-01`, sortiert via Shopify-Default neueste-zuerst)
+- 4-spaltiges Grid (auf mobile 2-spaltig), gleiche `ProductCard`-Komponente wie bisher
+- Header: "Frisch im Sortiment" + Link "Alle neuen Stücke →" (führt zu `/shop?sort=neu`)
 
-### 3. Neuer Edge-Endpoint `product-price-refresh`
-Da `product-price` aktuell **Handles als Input** erwartet, bauche ich eine neue kleine Funktion, die:
-- alle Handles aus `product_price_cache` lädt, deren `fetched_at` älter als **24 h** ist **und** Status nicht `mismatch` ist (Mismatches bleiben gesperrt — wie vom letzten Schritt vereinbart),
-- diese Handles in Batches (z.B. 20er) an die bestehende `product-price`-Funktion mit `force=1` weiterreicht,
-- pro Batch eine kurze Pause einlegt (Rate-Limit-Schutz für Firecrawl),
-- ein kurzes Resultat-JSON loggt (verarbeitet/erfolgreich/Fehler).
+### 3. Neue Frontseiten-Section: **"Sale-Highlights"**
+Neue Section vor dem Magazin-Teaser:
+- Lädt aus `product_price_cache` alle Einträge mit `on_sale = true` und `status != 'mismatch'` (sortiert nach grösster prozentualer Ersparnis)
+- Holt für die Top 4 Handles die Shopify-Daten via `fetchProductsByHandles()`
+- Sale-Badge (rot) auf jeder Karte mit "-XX %"
+- Header: "🔥 Aktuelle Deals" + Link "Alle Sale-Stücke →" (führt zu `/sale`)
 
-Vorteil: bestehende Logik in `product-price` bleibt unverändert, neue Funktion ist nur ein Orchestrator.
+### 4. Sale-Seite: bestehende Sale.tsx aufwerten
+Die bereits vorhandene `src/pages/Sale.tsx` füllen wir mit echtem Inhalt:
+- Lädt **alle** `on_sale=true` & `status != 'mismatch'`-Handles aus dem Cache
+- Holt Shopify-Daten und zeigt sie mit Standard-Filtern (Marke, Grösse) — Layout wie `Shop.tsx`
+- Sortiert default nach grösster Ersparnis
+- Link "Sale" in der `SiteHeader`-Nav prominent (rote Akzentfarbe), damit's auffällt
 
-### 4. Verifikation
-- Nach Setup: `select * from cron.job;` — die 3 Jobs müssen erscheinen.
-- Optional: Einen Job manuell triggern (`select cron.schedule(...)` → `select net.http_post(...)`) um Erfolg zu prüfen, ohne 24 h zu warten.
+### 5. Cleanup / kleine Verbesserungen
+- Im Shop (`src/pages/Shop.tsx`): Sortier-Option **"Neueste zuerst"** ergänzen (nutzt Shopify's `query` Parameter)
+- Sicherstellen, dass `useLivePrice` für die neuen Sections funktioniert (sollte automatisch der Fall sein, da `ProductCard` bereits den Hook nutzt)
 
-## Offene Detail-Frage
-**Sind 24 h Refresh-Intervall OK** oder soll ich auf z.B. **48 h / 7 Tage** gehen? Firecrawl hat Credits-Limits — bei ~170 Casa-Moda-Produkten + Venti-Produkten täglich kann das ins Geld gehen.
+## Was wir NICHT machen (bewusst)
+- **Looks-Struktur unverändert** — Looks-first bleibt
+- **Brand-Tiles, Hero-Switcher, Lookbook-Karussell** verschoben auf später (kann ich gerne als nächstes anbieten)
+- **Cron manuell triggern**: nicht nötig, der Plan beinhaltet ohnehin einen einmaligen `season-sync`-Run für die neuen Kategorien
 
-Falls du knausrig sein willst: Variante "nur **Sale-Produkte täglich**, Rest wöchentlich" wäre auch sauber umsetzbar — sag Bescheid.
+## Erwartetes Ergebnis
+- Saison-Mappings wachsen von ~115 auf voraussichtlich **180–220** Produkte
+- Startseite hat **2 neue dynamische Sections**, die sich täglich automatisch aktualisieren (Cron läuft 03:00 UTC)
+- Sale-Rubrik ist nutzbar und zeigt alle ~30–80 reduzierten Produkte
+- Shop bleibt wie er ist, nur mit neuer Sortier-Option
