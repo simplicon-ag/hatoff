@@ -165,7 +165,7 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Pro
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
             Komplettes Set
           </p>
-          <p className="mt-1 font-display text-2xl">{products.length} Stücke · {`CHF ${total.toFixed(2)}`}</p>
+          <p className="mt-1 font-display text-2xl">{visibleProducts.length} Stücke · {`CHF ${total.toFixed(2)}`}</p>
         </div>
         <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary">
           Set sparen — alles aus einer Bestellung
