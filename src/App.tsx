@@ -16,6 +16,7 @@ import ProductDetail from "./pages/ProductDetail.tsx";
 import AnlassPage from "./pages/Anlass.tsx";
 import { MarkenDetail, MarkenIndex } from "./pages/Marken.tsx";
 import { MagazinDetail, MagazinIndex } from "./pages/Magazin.tsx";
+import Groessen from "./pages/Groessen.tsx";
 
 const queryClient = new QueryClient();
 
