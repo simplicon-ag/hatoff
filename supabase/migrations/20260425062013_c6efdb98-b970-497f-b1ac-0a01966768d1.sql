@@ -1,0 +1,1 @@
+DELETE FROM public.product_price_cache;
