@@ -405,7 +405,8 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const batchSize = Math.min(Number(body.batch_size ?? 8), 15);
+    // Sequential processing with rate limit → keep batches small
+    const batchSize = Math.min(Math.max(Number(body.batch_size ?? 2), 1), 4);
 
     // Check job state
     const { data: job } = await supabase
@@ -435,6 +436,26 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    // Worker lock: if another worker updated the job in the last 25s, skip this tick
+    // to prevent overlapping workers hammering the Shopify rate limit.
+    if (job.state === "running" && job.updated_at) {
+      const ageMs = Date.now() - new Date(job.updated_at).getTime();
+      if (ageMs < 25_000) {
+        console.log(`[worker] skip tick — another worker active ${ageMs}ms ago`);
+        return new Response(
+          JSON.stringify({ success: true, state: "running", processed: 0, skipped: "lock" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    // Heartbeat — claim the lock now so overlapping ticks bail out
+    await supabase
+      .from("product_import_job")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", "singleton");
+
 
     const dryRun = Boolean(job.dry_run);
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
