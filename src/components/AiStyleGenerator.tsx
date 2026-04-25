@@ -205,6 +205,7 @@ export const AiStyleGenerator = ({ productHandle, productTitle }: Props) => {
             <LookSetBuilder
               products={setProducts}
               lookTitle={`${productTitle} · ${OCCASIONS.find((o) => o.id === occasion)?.label}`}
+              allowRemove
             />
           </div>
         )}
