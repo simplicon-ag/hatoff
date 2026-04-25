@@ -110,10 +110,36 @@ const BRAND_DEFAULT_SIZES: Record<string, string[]> = {
 function extractFromHtml(html: string, brand: string, sourceUrl: string): ScrapedProduct {
   const ids = parseProductIds(sourceUrl);
 
-  // 1) Title from <title> tag (server-rendered, reliable)
+  // 1) Title: prefer <h1>, then meta og:title, then <title>, then slug fallback.
+  // Casa Moda's <title> is buggy ("Loyalty Wallet" everywhere), so H1 wins.
   let title = "";
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  if (titleMatch) title = cleanTitle(titleMatch[1], brand);
+  const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (h1Match) {
+    const inner = h1Match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (inner.length > 1 && inner.length < 200) title = decode(inner);
+  }
+  if (!title) {
+    const og = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
+    if (og) title = cleanTitle(og[1], brand);
+  }
+  if (!title) {
+    const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (t) {
+      const cleaned = cleanTitle(t[1], brand);
+      // Only use it if it doesn't look like a generic UI label
+      if (cleaned && !/loyalty|wallet|warenkorb|cart|404/i.test(cleaned)) {
+        title = cleaned;
+      }
+    }
+  }
+  if (!title) {
+    // Slug fallback: "freizeithemd-kurzarm-blau" → "Freizeithemd Kurzarm Blau"
+    const slug = sourceUrl.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
+    title = slug
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
 
   // 2) Description from meta description
   let description = "";
@@ -122,29 +148,41 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   );
   if (descMatch) description = decode(descMatch[1]);
 
-  // 3) Price extraction: "39,99 €" or "39.99 €"
+  // 3) Price: prefer <div class="article-price"> blocks (definitive), else fallback to most-frequent.
   let price_eur: number | null = null;
   let compare_at_price_eur: number | null = null;
-  const priceMatches =
-    html.match(/(\d{1,4}[,.]\d{2})\s*€/g) ?? [];
-  if (priceMatches.length > 0) {
+
+  const articlePriceBlocks = html.match(
+    /<div[^>]*class="[^"]*article-price[^"]*"[\s\S]{0,400}?<\/div>/gi,
+  ) ?? [];
+  if (articlePriceBlocks.length > 0) {
+    const prices: number[] = [];
+    for (const block of articlePriceBlocks) {
+      const m = block.match(/(\d{1,4}[,.]\d{2})\s*€/);
+      if (m) {
+        const n = parseFloat(m[1].replace(",", "."));
+        if (!isNaN(n) && n > 1 && n < 2000) prices.push(n);
+      }
+    }
+    if (prices.length > 0) {
+      // Lowest = current price (sale or normal), highest = compare_at if differs
+      price_eur = Math.min(...prices);
+      const max = Math.max(...prices);
+      if (max > price_eur + 0.5) compare_at_price_eur = max;
+    }
+  }
+
+  // Fallback: frequency-based extraction from all "X,XX €" patterns
+  if (price_eur === null) {
+    const priceMatches = html.match(/(\d{1,4}[,.]\d{2})\s*€/g) ?? [];
     const nums = priceMatches
       .map((m) => parseFloat(m.replace(/[€\s]/g, "").replace(",", ".")))
       .filter((n) => !isNaN(n) && n > 5 && n < 1000);
     if (nums.length > 0) {
-      // Page often shows lots of unrelated prices (recommendations, etc.)
-      // The product price is usually the most-frequent value.
       const freq: Record<string, number> = {};
       for (const n of nums) freq[n.toFixed(2)] = (freq[n.toFixed(2)] ?? 0) + 1;
       const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
       price_eur = parseFloat(sorted[0][0]);
-      // If second-most-frequent is higher, it might be the original price (sale)
-      if (sorted.length > 1) {
-        const candidate = parseFloat(sorted[1][0]);
-        if (candidate > price_eur && sorted[1][1] >= 2) {
-          compare_at_price_eur = candidate;
-        }
-      }
     }
   }
   const on_sale = compare_at_price_eur !== null;
