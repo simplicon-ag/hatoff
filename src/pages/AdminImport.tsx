@@ -173,6 +173,49 @@ export default function AdminImport() {
     }
   };
 
+  const runPurgeShopify = async () => {
+    const confirmText = prompt(
+      "⚠️ Achtung: Löscht ALLE Produkte der Marken CASA MODA und VENTI direkt aus Shopify.\n\nTippe LÖSCHEN um zu bestätigen:",
+    );
+    if (confirmText !== "LÖSCHEN") {
+      toast.info("Abgebrochen");
+      return;
+    }
+
+    setPurging(true);
+    setPurgeProgress("Starte…");
+    let totalDeleted = 0;
+    let totalFailed = 0;
+    try {
+      for (let round = 1; round <= 20; round++) {
+        setPurgeProgress(`Runde ${round} läuft (bisher gelöscht: ${totalDeleted})…`);
+        const { data, error } = await supabase.functions.invoke("product-import-cleanup", {
+          body: { confirm: true, vendors: ["CASA MODA", "VENTI"], max: 200 },
+        });
+        if (error) throw error;
+        const deleted = (data?.deleted as number) ?? 0;
+        const failed = (data?.failed as number) ?? 0;
+        const remaining = (data?.remaining_estimate as number) ?? 0;
+        totalDeleted += deleted;
+        totalFailed += failed;
+        setPurgeProgress(
+          `Runde ${round}: ${deleted} gelöscht (Total: ${totalDeleted}). Geschätzt verbleibend: ${remaining}`,
+        );
+        if (deleted === 0 && remaining === 0) break;
+        if (deleted === 0 && failed === 0) break;
+      }
+      toast.success(
+        `Purge fertig: ${totalDeleted} Produkte gelöscht${totalFailed > 0 ? `, ${totalFailed} Fehler` : ""}`,
+      );
+      setPurgeProgress(`Fertig: ${totalDeleted} gelöscht`);
+    } catch (err) {
+      toast.error(`Purge-Fehler: ${(err as Error).message}`);
+      setPurgeProgress(`Fehler: ${(err as Error).message}`);
+    } finally {
+      setPurging(false);
+    }
+  };
+
   const isRunning = job?.state === "running";
   const isStopping = job?.state === "stopping";
   const progress = job && job.total > 0 ? (job.processed / job.total) * 100 : 0;
