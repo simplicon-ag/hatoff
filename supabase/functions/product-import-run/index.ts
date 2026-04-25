@@ -47,7 +47,7 @@ async function firecrawlScrape(
         url,
         formats: ["html"],
         onlyMainContent: false,
-        waitFor: 3000,
+        waitFor: 5000,
       }),
     });
     if (!res.ok) {
@@ -76,86 +76,163 @@ function decode(s: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-function extractFromHtml(html: string, brand: string): ScrapedProduct {
-  // Title
+/** Extract article id and color id from product URL.
+ *  https://www.casamoda.com/de/de/t-shirt-blau-14899-154 → { articleId: "14899", colorId: "154" } */
+function parseProductIds(url: string): { articleId: string; colorId: string } | null {
+  const m = url.match(/-(\d+)-(\d+)\/?$/);
+  if (!m) return null;
+  return { articleId: m[1], colorId: m[2] };
+}
+
+/** Build a clean title from the <title> tag content.
+ *  Casa Moda format: "T-Shirt Blau 126340041 - CASAMODA"
+ *  Venti format:     "Businesshemd Hellblau - Modern Fit 001480 - VENTI" */
+function cleanTitle(rawTitle: string, brand: string): string {
+  let t = decode(rawTitle).trim();
+  // Strip brand suffix
+  t = t.replace(/\s*-\s*(CASAMODA|VENTI)\s*$/i, "");
+  // Strip trailing 6+ digit article codes
+  t = t.replace(/\s+\d{6,}\s*$/g, "");
+  return t.trim();
+}
+
+const BRAND_DEFAULT_SIZES: Record<string, string[]> = {
+  Hemd: ["38", "39/40", "41/42", "43/44", "45/46", "47/48"],
+  Hose: ["46", "48", "50", "52", "54", "56"],
+  Shirt: ["S", "M", "L", "XL", "XXL"],
+  Polo: ["S", "M", "L", "XL", "XXL"],
+  Strick: ["S", "M", "L", "XL", "XXL"],
+  Jacke: ["46", "48", "50", "52", "54", "56"],
+  Sakko: ["46", "48", "50", "52", "54", "56"],
+  Accessoire: ["One Size"],
+};
+
+function extractFromHtml(html: string, brand: string, sourceUrl: string): ScrapedProduct {
+  const ids = parseProductIds(sourceUrl);
+
+  // 1) Title: prefer <h1>, then meta og:title, then <title>, then slug fallback.
+  // Casa Moda's <title> is buggy ("Loyalty Wallet" everywhere), so H1 wins.
   let title = "";
-  const titleMatch =
-    html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
-    html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
-  if (titleMatch) {
-    title = decode(titleMatch[1].replace(/<[^>]+>/g, "").trim());
+  const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (h1Match) {
+    const inner = h1Match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (inner.length > 1 && inner.length < 200) title = decode(inner);
+  }
+  if (!title) {
+    const og = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
+    if (og) title = cleanTitle(og[1], brand);
+  }
+  if (!title) {
+    const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (t) {
+      const cleaned = cleanTitle(t[1], brand);
+      // Only use it if it doesn't look like a generic UI label
+      if (cleaned && !/loyalty|wallet|warenkorb|cart|404/i.test(cleaned)) {
+        title = cleaned;
+      }
+    }
+  }
+  if (!title) {
+    // Slug fallback: "freizeithemd-kurzarm-blau" → "Freizeithemd Kurzarm Blau"
+    const slug = sourceUrl.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
+    title = slug
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
   }
 
-  // Description (og:description as a safe baseline)
+  // 2) Description from meta description
   let description = "";
-  const descMatch =
-    html.match(
-      /<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i,
-    ) ||
-    html.match(
-      /<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i,
-    );
+  const descMatch = html.match(
+    /<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i,
+  );
   if (descMatch) description = decode(descMatch[1]);
 
-  // Price extraction (Casa Moda + Venti both render "EUR 89,95" or "89,95 €")
+  // 3) Price: prefer <div class="article-price"> blocks (definitive), else fallback to most-frequent.
   let price_eur: number | null = null;
   let compare_at_price_eur: number | null = null;
 
-  const priceMatches = html.match(/(\d{1,4}[,.]\d{2})\s*(?:€|EUR)/gi) ?? [];
-  if (priceMatches.length > 0) {
+  const articlePriceBlocks = html.match(
+    /<div[^>]*class="[^"]*article-price[^"]*"[\s\S]{0,400}?<\/div>/gi,
+  ) ?? [];
+  if (articlePriceBlocks.length > 0) {
+    const prices: number[] = [];
+    for (const block of articlePriceBlocks) {
+      const m = block.match(/(\d{1,4}[,.]\d{2})\s*€/);
+      if (m) {
+        const n = parseFloat(m[1].replace(",", "."));
+        if (!isNaN(n) && n > 1 && n < 2000) prices.push(n);
+      }
+    }
+    if (prices.length > 0) {
+      // Lowest = current price (sale or normal), highest = compare_at if differs
+      price_eur = Math.min(...prices);
+      const max = Math.max(...prices);
+      if (max > price_eur + 0.5) compare_at_price_eur = max;
+    }
+  }
+
+  // Fallback: frequency-based extraction from all "X,XX €" patterns
+  if (price_eur === null) {
+    const priceMatches = html.match(/(\d{1,4}[,.]\d{2})\s*€/g) ?? [];
     const nums = priceMatches
-      .map((m) => parseFloat(m.replace(/[€EUR\s]/gi, "").replace(",", ".")))
+      .map((m) => parseFloat(m.replace(/[€\s]/g, "").replace(",", ".")))
       .filter((n) => !isNaN(n) && n > 5 && n < 1000);
     if (nums.length > 0) {
-      price_eur = Math.min(...nums);
-      const max = Math.max(...nums);
-      if (max > price_eur + 0.5) compare_at_price_eur = max;
+      const freq: Record<string, number> = {};
+      for (const n of nums) freq[n.toFixed(2)] = (freq[n.toFixed(2)] ?? 0) + 1;
+      const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+      price_eur = parseFloat(sorted[0][0]);
     }
   }
   const on_sale = compare_at_price_eur !== null;
 
-  // Image URLs — grab all product images from the page
+  // 4) Images: imgix.net product images filtered by article ID
+  // Format: https://<brand>-b2c-(cloud-)?production.imgix.net/product/<articleId>/<colorId>/<articleId>-<colorId>-image-N-<hash>.jpg
   const imgUrls = new Set<string>();
-  // og:image is always reliable
-  const ogImg = html.match(
-    /<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i,
-  );
-  if (ogImg) imgUrls.add(ogImg[1]);
-
-  const imgRegex =
-    brand === "casa-moda"
-      ? /https:\/\/(?:www\.)?casamoda\.com\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi
-      : /https:\/\/(?:www\.)?venti\.com\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi;
-  const m = html.match(imgRegex) ?? [];
-  for (const u of m) {
-    // Filter out obvious junk (icons, sprites)
-    if (/icon|sprite|logo|favicon/i.test(u)) continue;
-    imgUrls.add(u.split("?")[0]);
+  if (ids) {
+    const { articleId, colorId } = ids;
+    // Match images whose path contains /product/<articleId>/<colorId>/
+    const imgRegex = new RegExp(
+      `https://[a-z0-9.-]*imgix\\.net/product/${articleId}/${colorId}/[^"'\\s]+?-image-\\d+-[a-f0-9]+\\.(?:jpg|jpeg|png|webp)`,
+      "gi",
+    );
+    const m = html.match(imgRegex) ?? [];
+    // Dedupe by image-N (ignoring imgix transform suffix)
+    const seen = new Map<string, string>();
+    for (const u of m) {
+      const cleanUrl = u.split("?")[0]; // strip imgix params
+      const imgN = cleanUrl.match(/-image-(\d+)-/);
+      const key = imgN ? imgN[1] : cleanUrl;
+      if (!seen.has(key)) {
+        // Use a high-res variant (no width param = full size)
+        seen.set(key, cleanUrl);
+      }
+    }
+    // Sort by image number ascending
+    const sortedImgs = Array.from(seen.entries()).sort((a, b) =>
+      Number(a[0]) - Number(b[0]),
+    );
+    for (const [, url] of sortedImgs) imgUrls.add(url);
   }
 
-  // Sizes: typical labels S, M, L, XL, XXL, 38, 39, ... 48, etc.
-  const sizes = new Set<string>();
-  const sizeBlock = html.match(
-    /(?:Gr(?:ö|oe)sse|Size)[^<]*<[\s\S]{0,3000}?<\/(?:ul|div|select)/i,
-  );
-  if (sizeBlock) {
-    const numericSizes = sizeBlock[0].match(/\b(3[6-9]|4[0-9]|5[0-6])\b/g) ?? [];
-    for (const s of numericSizes) sizes.add(s);
-    const letterSizes =
-      sizeBlock[0].match(/\b(XS|S|M|L|XL|XXL|XXXL|3XL|4XL)\b/g) ?? [];
-    for (const s of letterSizes) sizes.add(s);
-  }
-
-  // Product type heuristic from URL handle / title
+  // 5) Product type heuristic
   let product_type: string | null = null;
   const t = title.toLowerCase();
-  if (/hemd/.test(t)) product_type = "Hemd";
-  else if (/hose|chino|jeans/.test(t)) product_type = "Hose";
+  if (/sakko/.test(t)) product_type = "Sakko";
+  else if (/anzug/.test(t)) product_type = "Sakko";
+  else if (/hemd/.test(t)) product_type = "Hemd";
+  else if (/hose|chino|jeans|bermuda/.test(t)) product_type = "Hose";
   else if (/polo/.test(t)) product_type = "Polo";
   else if (/shirt|t-shirt/.test(t)) product_type = "Shirt";
-  else if (/strick|pullover|sweater/.test(t)) product_type = "Strick";
-  else if (/jacke|mantel|sakko/.test(t)) product_type = "Jacke";
-  else if (/krawatt|fliege|tuch|gürtel|guertel/.test(t)) product_type = "Accessoire";
+  else if (/strick|pullover|sweater|sweat|cardigan/.test(t)) product_type = "Strick";
+  else if (/jacke|mantel|parka|weste/.test(t)) product_type = "Jacke";
+  else if (/krawatt|fliege|tuch|gürtel|guertel|schal|cap/.test(t)) product_type = "Accessoire";
+
+  // 6) Sizes: use sensible defaults per product type (page sizes are JS-loaded)
+  const sizes = product_type
+    ? BRAND_DEFAULT_SIZES[product_type] ?? ["S", "M", "L", "XL", "XXL"]
+    : ["S", "M", "L", "XL", "XXL"];
 
   return {
     title,
@@ -164,7 +241,7 @@ function extractFromHtml(html: string, brand: string): ScrapedProduct {
     compare_at_price_eur,
     on_sale,
     image_urls: Array.from(imgUrls).slice(0, 6),
-    sizes: Array.from(sizes),
+    sizes,
     product_type,
     vendor: brand === "casa-moda" ? "Casa Moda" : "Venti",
     tags: [brand, ...(product_type ? [product_type.toLowerCase()] : [])],
@@ -366,7 +443,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const scraped = extractFromHtml(html, item.brand);
+        const scraped = extractFromHtml(html, item.brand, item.source_url);
         if (!scraped.title || scraped.price_eur === null) {
           await supabase
             .from("product_import_log")
