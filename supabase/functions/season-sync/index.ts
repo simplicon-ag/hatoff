@@ -68,7 +68,7 @@ const SOURCES: Record<Season, BrandSource[]> = {
 
 const FIRECRAWL_BASE = "https://api.firecrawl.dev/v2";
 
-async function firecrawlMap(url: string, apiKey: string): Promise<string[]> {
+async function firecrawlMap(url: string, apiKey: string): Promise<unknown[]> {
   const res = await fetch(`${FIRECRAWL_BASE}/map`, {
     method: "POST",
     headers: {
@@ -92,7 +92,7 @@ async function firecrawlMap(url: string, apiKey: string): Promise<string[]> {
 async function firecrawlScrapeLinks(
   url: string,
   apiKey: string,
-): Promise<string[]> {
+): Promise<unknown[]> {
   const res = await fetch(`${FIRECRAWL_BASE}/scrape`, {
     method: "POST",
     headers: {
