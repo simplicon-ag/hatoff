@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ShoppingBag, Check, AlertCircle } from "lucide-react";
+import { Loader2, ShoppingBag, Check, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPrice, type ShopifyProduct } from "@/lib/shopify";
 import { useLivePrices, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
-import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
 import { toast } from "sonner";
 
 interface Props {
   products: ShopifyProduct[];
   lookTitle: string;
+  /** When true, each item shows a remove button (used in AI-generated sets). */
+  allowRemove?: boolean;
 }
 
 type Selections = Record<string, Record<string, string>>; // productId -> { optionName -> value }
@@ -48,10 +49,23 @@ function isOptionAvailable(
   });
 }
 
-export const LookSetBuilder = ({ products, lookTitle }: Props) => {
+export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Props) => {
   const addItems = useCartStore((s) => s.addItems);
   const isLoading = useCartStore((s) => s.isLoading);
   const [adding, setAdding] = useState(false);
+
+  // Items the user hid from the set (only relevant when allowRemove)
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+
+  // Reset removed set if the products list changes (e.g. new AI generation)
+  useEffect(() => {
+    setRemovedIds(new Set());
+  }, [products]);
+
+  const visibleProducts = useMemo(
+    () => products.filter((p) => !removedIds.has(p.node.id)),
+    [products, removedIds],
+  );
 
   // Initialize: pre-select first available variant's options per product
   const [selections, setSelections] = useState<Selections>({});
@@ -80,22 +94,30 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
     }));
   };
 
-  // Compute selected variant + availability per product
+  const removeItem = (productId: string) => {
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(productId);
+      return next;
+    });
+  };
+
+  // Compute selected variant + availability per product (only visible ones count)
   const resolved = useMemo(
     () =>
-      products.map((p) => {
+      visibleProducts.map((p) => {
         const chosen = selections[p.node.id] ?? {};
         const variant = findVariant(p, chosen);
         return { product: p, chosen, variant };
       }),
-    [products, selections],
+    [visibleProducts, selections],
   );
 
   const allReady = resolved.every(
     (r) => r.variant && r.variant.availableForSale,
   );
 
-  const handles = useMemo(() => products.map((p) => p.node.handle), [products]);
+  const handles = useMemo(() => visibleProducts.map((p) => p.node.handle), [visibleProducts]);
   const { prices: livePrices } = useLivePrices(handles);
 
   const total = resolved.reduce((sum, r) => {
@@ -143,7 +165,7 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
             Komplettes Set
           </p>
-          <p className="mt-1 font-display text-2xl">{products.length} Stücke · {`CHF ${total.toFixed(2)}`}</p>
+          <p className="mt-1 font-display text-2xl">{visibleProducts.length} Stücke · {`CHF ${total.toFixed(2)}`}</p>
         </div>
         <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary">
           Set sparen — alles aus einer Bestellung
@@ -175,9 +197,21 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Stück {idx + 1}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Stück {idx + 1}
+                    </p>
+                    {allowRemove && visibleProducts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(p.node.id)}
+                        aria-label={`${cleanTitle} aus Set entfernen`}
+                        className="-mr-1 -mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:hidden"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                   <p className="text-sm font-medium leading-tight">
                     {cleanTitle}
                   </p>
@@ -188,6 +222,16 @@ export const LookSetBuilder = ({ products, lookTitle }: Props) => {
                         : "—")}
                   </p>
                 </div>
+                {allowRemove && visibleProducts.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeItem(p.node.id)}
+                    aria-label={`${cleanTitle} aus Set entfernen`}
+                    className="hidden h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:inline-flex"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
               <div className="flex flex-1 flex-wrap gap-3">

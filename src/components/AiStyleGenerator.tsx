@@ -69,12 +69,24 @@ export const AiStyleGenerator = ({ productHandle, productTitle }: Props) => {
       }
       if (!data) throw new Error("Keine Antwort erhalten");
 
+      // Client-side safeguard: filter out anything that looks like an accessory
+      // (belt, scarf, tie, cap, hat, socks, pocket square) — even if the model
+      // ignored the prompt instruction.
+      const ACCESSORY_RE = /(g[üu]rtel|belt|krawatte|fliege|tie|einstecktuch|m[üu]tze|cap|hut|schal|tuch|socke|sock)/i;
+      const cleanedItems = data.items.filter(
+        (i) => !ACCESSORY_RE.test(`${i.title} ${i.role}`),
+      );
+      if (cleanedItems.length < 2) {
+        throw new Error("Zu wenig passende Stücke gefunden — bitte erneut generieren.");
+      }
+      const cleaned: GenerateResponse = { ...data, items: cleanedItems };
+
       // Fetch full Shopify product objects (incl. variants) for anchor + items
-      const allHandles = [productHandle, ...data.items.map((i) => i.handle)];
+      const allHandles = [productHandle, ...cleaned.items.map((i) => i.handle)];
       const fullProducts = await fetchProductsByHandles(allHandles);
       if (fullProducts.length < 2) throw new Error("Produkte konnten nicht geladen werden");
 
-      setResult(data);
+      setResult(cleaned);
       setSetProducts(fullProducts);
       toast.success("Look generiert", { position: "top-right" });
     } catch (e) {
@@ -193,6 +205,7 @@ export const AiStyleGenerator = ({ productHandle, productTitle }: Props) => {
             <LookSetBuilder
               products={setProducts}
               lookTitle={`${productTitle} · ${OCCASIONS.find((o) => o.id === occasion)?.label}`}
+              allowRemove
             />
           </div>
         )}
