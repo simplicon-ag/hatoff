@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search } from "lucide-react";
-import SiteLayout from "@/components/SiteLayout";
+import { SiteLayout } from "@/components/SiteLayout";
 
 type JobRow = {
   id: string;
