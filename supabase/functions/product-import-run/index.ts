@@ -403,7 +403,11 @@ Deno.serve(async (req) => {
       }
 
       // Fail-fast auth probe — verify token works before processing batch
-      console.log(`[worker] using token from ${tokenSource}`);
+      const tokenPrefix = adminToken.slice(0, 6);
+      const tokenLen = adminToken.length;
+      console.log(
+        `[worker] token source=${tokenSource} prefix=${tokenPrefix}... length=${tokenLen} domain=${SHOPIFY_DOMAIN}`,
+      );
       const probe = await fetch(
         `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/shop.json`,
         { headers: { "X-Shopify-Access-Token": adminToken } },
