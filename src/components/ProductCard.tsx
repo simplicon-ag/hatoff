@@ -116,7 +116,14 @@ export const ProductCard = ({ product, priority }: Props) => {
       <div className="mt-4 space-y-1">
         <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
         <h3 className="font-display text-lg leading-tight">{p.title}</h3>
-        <p className="text-sm text-foreground/80">{displayPrice}</p>
+        {onSale ? (
+          <p className="flex items-baseline gap-2 text-sm">
+            <span className="font-medium text-destructive">{displayPrice}</span>
+            <span className="text-foreground/50 line-through">{originalPrice}</span>
+          </p>
+        ) : (
+          <p className="text-sm text-foreground/80">{displayPrice}</p>
+        )}
       </div>
     </Link>
   );
