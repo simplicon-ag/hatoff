@@ -54,6 +54,8 @@ export default function AdminImport() {
   const [dryRun, setDryRun] = useState(true);
   const [busy, setBusy] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeProgress, setPurgeProgress] = useState<string>("");
   const tickRef = useRef<number | null>(null);
 
   const fetchAll = async () => {
