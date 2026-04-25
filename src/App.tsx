@@ -17,6 +17,7 @@ import { MarkenDetail, MarkenIndex } from "./pages/Marken.tsx";
 import { MagazinDetail, MagazinIndex } from "./pages/Magazin.tsx";
 import Groessen from "./pages/Groessen.tsx";
 import Saison from "./pages/Saison.tsx";
+import AdminImport from "./pages/AdminImport.tsx";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="/magazin/:slug" element={<MagazinDetail />} />
               <Route path="/groessentabellen" element={<Groessen />} />
               <Route path="/saison/:slug" element={<Saison />} />
+              <Route path="/admin/import" element={<AdminImport />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </SizeAdvisorProvider>
