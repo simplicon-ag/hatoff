@@ -22,6 +22,9 @@ export type Database = {
           fetched_at: string
           handle: string
           id: string
+          on_sale: boolean
+          original_price_chf: number | null
+          original_price_eur: number | null
           raw_price_eur: number | null
           source_url: string | null
           status: string
@@ -33,6 +36,9 @@ export type Database = {
           fetched_at?: string
           handle: string
           id?: string
+          on_sale?: boolean
+          original_price_chf?: number | null
+          original_price_eur?: number | null
           raw_price_eur?: number | null
           source_url?: string | null
           status?: string
@@ -44,6 +50,9 @@ export type Database = {
           fetched_at?: string
           handle?: string
           id?: string
+          on_sale?: boolean
+          original_price_chf?: number | null
+          original_price_eur?: number | null
           raw_price_eur?: number | null
           source_url?: string | null
           status?: string
