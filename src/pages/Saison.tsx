@@ -25,7 +25,10 @@ const isSaisonSlug = (s: string | undefined): s is SaisonSlug =>
   s === "fs-2026" || s === "hw-2026";
 
 const Saison = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const validSlug: SaisonSlug = isSaisonSlug(slug) ? slug : "fs-2026";
+  const saison = saisons[validSlug];
+  const cross = saisons[saison.cross];
+
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortKey>("relevance");
@@ -35,13 +38,6 @@ const Saison = () => {
       .then(setProducts)
       .finally(() => setLoading(false));
   }, []);
-
-  if (!isSaisonSlug(slug)) {
-    return <Navigate to="/saison/fs-2026" replace />;
-  }
-
-  const saison = saisons[slug];
-  const cross = saisons[saison.cross];
 
   const filtered = useMemo(() => {
     const list = filterProductsForSaison(products, saison);
@@ -64,6 +60,10 @@ const Saison = () => {
     }
     return list;
   }, [products, saison, sort]);
+
+  if (!isSaisonSlug(slug)) {
+    return <Navigate to="/saison/fs-2026" replace />;
+  }
 
   return (
     <SiteLayout>
