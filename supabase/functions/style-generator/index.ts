@@ -110,11 +110,15 @@ function complementaryCats(anchor: string): string[] {
 async function fetchAllProducts(maxPages = 10, pageSize = 250): Promise<ShopifyNode[]> {
   const all: ShopifyNode[] = [];
   let after: string | null = null;
+  type ListResp = {
+    products: {
+      edges: Array<{ node: ShopifyNode }>;
+      pageInfo: { hasNextPage: boolean; endCursor: string };
+    };
+  };
   for (let i = 0; i < maxPages; i++) {
-    const data = await shopify<{
-      products: { edges: Array<{ node: ShopifyNode }>; pageInfo: { hasNextPage: boolean; endCursor: string } };
-    }>(PRODUCTS_LIST, { first: pageSize, after });
-    all.push(...data.products.edges.map((e) => e.node));
+    const data: ListResp = await shopify<ListResp>(PRODUCTS_LIST, { first: pageSize, after });
+    all.push(...data.products.edges.map((e: { node: ShopifyNode }) => e.node));
     if (!data.products.pageInfo.hasNextPage) break;
     after = data.products.pageInfo.endCursor;
   }
