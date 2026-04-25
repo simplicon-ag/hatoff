@@ -5,7 +5,7 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { FeaturedLook } from "@/components/FeaturedLook";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
-import { anlaesse, looks, magazinArtikel, marken, welten } from "@/data/looks";
+import { looks, magazinArtikel, marken, welten } from "@/data/looks";
 import { fetchProducts, type ShopifyProduct } from "@/lib/shopify";
 import heroImg from "@/assets/hero.jpg";
 
