@@ -44,6 +44,87 @@ export type Database = {
         }
         Relationships: []
       }
+      product_import_job: {
+        Row: {
+          created_count: number
+          dry_run: boolean
+          error_count: number
+          id: string
+          message: string | null
+          processed: number
+          started_at: string | null
+          state: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          created_count?: number
+          dry_run?: boolean
+          error_count?: number
+          id: string
+          message?: string | null
+          processed?: number
+          started_at?: string | null
+          state?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          created_count?: number
+          dry_run?: boolean
+          error_count?: number
+          id?: string
+          message?: string | null
+          processed?: number
+          started_at?: string | null
+          state?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      product_import_log: {
+        Row: {
+          brand: string
+          created_at: string
+          dry_run: boolean
+          error_message: string | null
+          handle: string | null
+          id: string
+          scraped_data: Json | null
+          shopify_product_id: string | null
+          source_url: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          dry_run?: boolean
+          error_message?: string | null
+          handle?: string | null
+          id?: string
+          scraped_data?: Json | null
+          shopify_product_id?: string | null
+          source_url: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          dry_run?: boolean
+          error_message?: string | null
+          handle?: string | null
+          id?: string
+          scraped_data?: Json | null
+          shopify_product_id?: string | null
+          source_url?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       product_price_cache: {
         Row: {
           brand: string
