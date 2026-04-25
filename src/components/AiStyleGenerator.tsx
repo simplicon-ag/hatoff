@@ -18,6 +18,8 @@ interface GeneratedItem {
   vendor: string;
   role: string;
   image: string | null;
+  availableColors?: string[];
+  recommendedColors?: string[];
 }
 
 interface GenerateResponse {
