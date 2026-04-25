@@ -32,18 +32,19 @@ export const SiteFooter = () => {
           <ul className="space-y-2 text-muted-foreground">
             <li><Link to="/looks" className="hover:text-primary">Alle Looks</Link></li>
             <li><Link to="/shop" className="hover:text-primary">Shop</Link></li>
+            <li><Link to="/sale" className="hover:text-primary">Sale</Link></li>
             <li><Link to="/marken" className="hover:text-primary">Marken</Link></li>
             <li><Link to="/magazin" className="hover:text-primary">Magazin</Link></li>
           </ul>
         </div>
 
         <div className="space-y-3 text-sm">
-          <h4 className="font-display text-base">Anlässe</h4>
+          <h4 className="font-display text-base">Service</h4>
           <ul className="space-y-2 text-muted-foreground">
+            <li><Link to="/groessentabellen" className="hover:text-primary">Grössentabellen</Link></li>
             <li><Link to="/anlass/buero" className="hover:text-primary">Büro</Link></li>
             <li><Link to="/anlass/alltag" className="hover:text-primary">Alltag</Link></li>
             <li><Link to="/anlass/ausgang" className="hover:text-primary">Ausgang</Link></li>
-            <li><Link to="/anlass/sommer" className="hover:text-primary">Sommer</Link></li>
           </ul>
         </div>
       </div>
