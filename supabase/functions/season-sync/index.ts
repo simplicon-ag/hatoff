@@ -24,6 +24,31 @@ const corsHeaders = {
 
 type Season = "fs-2026" | "hw-2026";
 
+/**
+ * Hard-Exclude-Tokens pro Saison: Wenn der Shopify-Handle eines dieser Tokens
+ * enthält, wird das Produkt NICHT in die Saison aufgenommen — auch dann nicht,
+ * wenn die Marke es auf einer Saison-Kategorie-Seite gelistet hat (z.B. Casa
+ * Moda zeigt Bermudas auf der "Hosen"-Seite, die wir für H/W scrapen).
+ */
+const SEASON_HANDLE_EXCLUDES: Record<Season, RegExp[]> = {
+  "fs-2026": [
+    /(^|-)(mantel|wintermantel|daunen|puffer|parka|fleece|wollmantel)(-|$)/,
+    /(^|-)(strick|knit|cashmere)(-|$)/,
+  ],
+  "hw-2026": [
+    /(^|-)(bermuda|bermudas|shorts?|short)(-|$)/,
+    /(^|-)(badehose|swim|swimshorts)(-|$)/,
+    /(^|-)(tank|tanktop|tank-top)(-|$)/,
+    /(^|-)(espadrille|sandale|sandalen)(-|$)/,
+    /(^|-)(leinen|linen)(-|$)/,
+  ],
+};
+
+function isExcludedForSeason(handle: string, season: Season): boolean {
+  const h = handle.toLowerCase();
+  return SEASON_HANDLE_EXCLUDES[season].some((re) => re.test(h));
+}
+
 interface BrandCategory {
   // Identifier for logging
   label: string;
@@ -288,10 +313,12 @@ async function syncSeason(
           const cleaned = normalize(String(row.source_url));
           if (productUrlSet.has(cleaned)) {
             const handle = String(row.handle).toLowerCase();
-            if (!seen.has(handle)) {
-              seen.add(handle);
-              matchedHandles.push(handle);
-            }
+            if (seen.has(handle)) continue;
+            // Saison-spezifische Hard-Excludes (z.B. Bermudas raus aus H/W,
+            // auch wenn die Marke sie auf der Hosen-Seite listet)
+            if (isExcludedForSeason(handle, season)) continue;
+            seen.add(handle);
+            matchedHandles.push(handle);
           }
         }
         console.log(
