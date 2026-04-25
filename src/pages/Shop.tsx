@@ -191,6 +191,9 @@ const Shop = () => {
       );
     } else if (sort === "title-asc") {
       sorted.sort((a, b) => a.node.title.localeCompare(b.node.title));
+    } else if (sort === "newest") {
+      // Shopify gid IDs sind monoton steigend → höchste ID = neuestes Produkt
+      sorted.sort((a, b) => b.node.id.localeCompare(a.node.id));
     }
     return sorted;
   }, [
