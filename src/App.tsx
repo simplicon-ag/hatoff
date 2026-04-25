@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound.tsx";
 import LooksPage from "./pages/Looks.tsx";
 import LookDetail from "./pages/LookDetail.tsx";
 import Shop from "./pages/Shop.tsx";
+import Sale from "./pages/Sale.tsx";
 import ProductDetail from "./pages/ProductDetail.tsx";
 import AnlassPage from "./pages/Anlass.tsx";
 import { MarkenDetail, MarkenIndex } from "./pages/Marken.tsx";
