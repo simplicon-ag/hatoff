@@ -25,10 +25,10 @@ Deno.serve(async (req) => {
 
     if (action === "start") {
       // Mark job as running. Reset progress counters.
-      const { data: pending } = await supabase
+      const { count: total } = await supabase
         .from("product_import_log")
         .select("id", { count: "exact", head: true })
-        .in("status", ["pending", "error"]);
+        .in("status", ["pending", "error", "scraped"]);
 
       await supabase
         .from("product_import_job")
@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
           state: "running",
           dry_run: dryRun,
           processed: 0,
+          total: total ?? 0,
           created_count: 0,
           error_count: 0,
           message: dryRun ? "Trockenlauf gestartet" : "Echter Import gestartet",
@@ -67,8 +68,21 @@ Deno.serve(async (req) => {
     }
 
     if (action === "reset") {
-      // Reset job state and clear all log entries (use with care)
-      await supabase.from("product_import_log").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      const { count: total } = await supabase
+        .from("product_import_log")
+        .select("id", { count: "exact", head: true });
+
+      await supabase
+        .from("product_import_log")
+        .update({
+          status: "pending",
+          scraped_data: null,
+          error_message: null,
+          shopify_product_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .in("status", ["scraping", "scraped", "creating", "error"]);
+
       await supabase
         .from("product_import_job")
         .update({
@@ -76,8 +90,8 @@ Deno.serve(async (req) => {
           processed: 0,
           created_count: 0,
           error_count: 0,
-          total: 0,
-          message: "Zurückgesetzt",
+          total: total ?? 0,
+          message: "Zurückgesetzt — bereit zum Neustart",
           started_at: null,
           updated_at: new Date().toISOString(),
         })
