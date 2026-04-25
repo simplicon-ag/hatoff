@@ -20,6 +20,10 @@ const SHOPIFY_ADMIN_VERSION = "2025-07";
 interface ScrapedProduct {
   title: string;
   description: string;
+  description_html: string;
+  material: string;
+  article_number: string;
+  care_labels: string[];
   price_eur: number | null;
   compare_at_price_eur: number | null;
   on_sale: boolean;
@@ -341,6 +345,10 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   return {
     title,
     description,
+    description_html: descriptionHtml,
+    material,
+    article_number: articleNumber,
+    care_labels: careLabels,
     price_eur,
     compare_at_price_eur,
     on_sale,
