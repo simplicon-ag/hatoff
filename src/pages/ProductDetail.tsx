@@ -14,7 +14,7 @@ import {
   formatPrice,
   type ShopifyProduct,
 } from "@/lib/shopify";
-import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
+import { useLivePrice, formatLivePrice, formatOriginalPrice, discountPercent } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { looks } from "@/data/looks";
 import { toast } from "sonner";
