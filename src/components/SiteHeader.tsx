@@ -40,7 +40,13 @@ export const SiteHeader = () => {
               to={item.to}
               className={({ isActive }) =>
                 `text-sm font-medium tracking-wide transition-colors ${
-                  isActive ? "text-primary" : "text-foreground/80 hover:text-primary"
+                  item.highlight
+                    ? isActive
+                      ? "text-destructive"
+                      : "text-destructive/90 hover:text-destructive"
+                    : isActive
+                      ? "text-primary"
+                      : "text-foreground/80 hover:text-primary"
                 }`
               }
             >
