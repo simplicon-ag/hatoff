@@ -71,18 +71,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Anlässe Strip */}
-      <section className="border-y border-border bg-secondary/40">
-        <div className="container-editorial flex flex-wrap items-center justify-center gap-3 py-8 md:gap-6">
-          <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Anlässe</span>
-          {anlaesse.map((a) => (
-            <Link key={a.slug} to={`/anlass/${a.slug}`} className="rounded-full border border-border bg-background px-4 py-2 text-sm hover:border-primary hover:text-primary">
-              {a.title}
-            </Link>
-          ))}
-        </div>
-      </section>
-
       {/* Featured Looks */}
       <section className="container-editorial py-20 md:py-28">
         <div className="mb-12 flex items-end justify-between gap-6">
