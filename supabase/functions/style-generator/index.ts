@@ -259,23 +259,30 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
                     type: "string",
                     description: "2 Sätze auf Deutsch, warum dieser Look stimmt.",
                   },
-                  items: {
-                    type: "array",
-                    minItems: 2,
-                    maxItems: 4,
                     items: {
-                      type: "object",
-                      properties: {
-                        handle: { type: "string", description: "Produkt-Handle aus dem Katalog." },
-                        role: {
-                          type: "string",
-                          description: "Rolle im Outfit, z.B. Hose, Sakko, Schuhe, Pullover. KEINE Accessoires (Gürtel, Schal, Krawatte, Mütze, Socken).",
+                      type: "array",
+                      minItems: 2,
+                      maxItems: 4,
+                      items: {
+                        type: "object",
+                        properties: {
+                          handle: { type: "string", description: "Produkt-Handle aus dem Katalog." },
+                          role: {
+                            type: "string",
+                            description: "Rolle im Outfit, z.B. Hose, Sakko, Schuhe, Pullover. KEINE Accessoires (Gürtel, Schal, Krawatte, Mütze, Socken).",
+                          },
+                          recommended_colors: {
+                            type: "array",
+                            description: "1–3 Farben aus dem 'colors'-Array des Katalog-Eintrags, die zum Look passen. Leer lassen wenn das Produkt keine Farbvarianten hat.",
+                            items: { type: "string" },
+                            minItems: 0,
+                            maxItems: 3,
+                          },
                         },
+                        required: ["handle", "role"],
+                        additionalProperties: false,
                       },
-                      required: ["handle", "role"],
-                      additionalProperties: false,
                     },
-                  },
                 },
                 required: ["rationale", "items"],
                 additionalProperties: false,
