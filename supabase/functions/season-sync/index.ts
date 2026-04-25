@@ -129,7 +129,7 @@ async function firecrawlScrapeLinks(
 }
 
 function extractProductUrls(
-  links: Array<string | { url?: string; href?: string }>,
+  links: unknown[],
   pattern: RegExp,
 ): string[] {
   const set = new Set<string>();
