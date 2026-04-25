@@ -117,7 +117,7 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false }: Pro
     (r) => r.variant && r.variant.availableForSale,
   );
 
-  const handles = useMemo(() => products.map((p) => p.node.handle), [products]);
+  const handles = useMemo(() => visibleProducts.map((p) => p.node.handle), [visibleProducts]);
   const { prices: livePrices } = useLivePrices(handles);
 
   const total = resolved.reduce((sum, r) => {
