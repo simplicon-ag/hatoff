@@ -121,3 +121,17 @@ export function formatLivePrice(price?: LivePrice | null): string | null {
   if (!price) return null;
   return `CHF ${price.display_price_chf.toFixed(2)}`;
 }
+
+/** Formatierung des Originalpreises (UVP). */
+export function formatOriginalPrice(price?: LivePrice | null): string | null {
+  if (!price || !price.on_sale || price.original_price_chf == null) return null;
+  return `CHF ${price.original_price_chf.toFixed(2)}`;
+}
+
+/** Rabatt in Prozent (gerundet), oder null wenn nicht im Sale. */
+export function discountPercent(price?: LivePrice | null): number | null {
+  if (!price || !price.on_sale || !price.original_price_chf) return null;
+  const diff = price.original_price_chf - price.display_price_chf;
+  if (diff <= 0) return null;
+  return Math.round((diff / price.original_price_chf) * 100);
+}
