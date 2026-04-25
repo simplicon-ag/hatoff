@@ -20,6 +20,10 @@ const SHOPIFY_ADMIN_VERSION = "2025-07";
 interface ScrapedProduct {
   title: string;
   description: string;
+  description_html: string;
+  material: string;
+  article_number: string;
+  care_labels: string[];
   price_eur: number | null;
   compare_at_price_eur: number | null;
   on_sale: boolean;
@@ -47,7 +51,15 @@ async function firecrawlScrape(
         url,
         formats: ["html"],
         onlyMainContent: false,
-        waitFor: 5000,
+        // Casa Moda / Venti are SPAs — material, care, description and SKU
+        // are only injected after JS hydration. We need ~12s + a scroll to
+        // ensure the product-detail accordion is rendered into the DOM.
+        waitFor: 12000,
+        actions: [
+          { type: "wait", milliseconds: 4000 },
+          { type: "scroll", direction: "down" },
+          { type: "wait", milliseconds: 3000 },
+        ],
       }),
     });
     if (!res.ok) {
@@ -65,6 +77,7 @@ async function firecrawlScrape(
     return null;
   }
 }
+
 
 function decode(s: string): string {
   return s
@@ -161,12 +174,87 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
       .join(" ");
   }
 
-  // 2) Description from meta description
+  // 2) Description: Casa Moda / Venti put the marketing copy + material + care
+  //    in a hydrated <div class="article-detail"> block. We pull the FULL block,
+  //    strip outer wrapper, and reuse the inner HTML for Shopify body_html.
   let description = "";
-  const descMatch = html.match(
-    /<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i,
+  let descriptionHtml = "";
+  let material = "";
+  let articleNumber = "";
+  const careLabels: string[] = [];
+
+  // (a) marketing copy: first <p> in product description area
+  // The hydrated structure on casamoda.com is:
+  //   <div class="row article-detail-text">
+  //     <p>...marketing text...</p>
+  //   </div>
+  const marketingMatch = html.match(
+    /<(?:div|section)[^>]*class="[^"]*article-detail-text[^"]*"[^>]*>([\s\S]*?)<\/(?:div|section)>/i,
   );
-  if (descMatch) description = decode(descMatch[1]);
+  if (marketingMatch) {
+    const inner = marketingMatch[1];
+    // Take only the first <p> with substantial text
+    const pMatch = inner.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    if (pMatch) {
+      const text = decode(pMatch[1].replace(/<[^>]+>/g, " "))
+        .replace(/\s+/g, " ").trim();
+      if (text.length > 40) description = text;
+    }
+  }
+  // Fallback: meta description
+  if (!description) {
+    const metaDesc = html.match(
+      /<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i,
+    );
+    if (metaDesc) description = decode(metaDesc[1]);
+  }
+
+  // (b) Material — "<strong>Material</strong><br> 100 % Baumwolle"
+  const matMatch = html.match(
+    /<strong[^>]*>\s*Material\s*<\/strong>\s*<br\s*\/?>\s*([^<]+)/i,
+  );
+  if (matMatch) material = decode(matMatch[1]).replace(/\s+/g, " ").trim();
+
+  // (c) Article number
+  const artMatch = html.match(
+    /<strong[^>]*>\s*Artikelnummer\s*<\/strong>\s*<br\s*\/?>\s*([^<]+)/i,
+  );
+  if (artMatch) articleNumber = decode(artMatch[1]).replace(/\s+/g, " ").trim();
+
+  // (d) Care icons — pull alt-text from <img class="care-icon" ... alt="...">
+  const careRegex =
+    /<img[^>]*class="[^"]*care-icon[^"]*"[^>]*alt="([^"]+)"/gi;
+  let careMatch: RegExpExecArray | null;
+  const seenCare = new Set<string>();
+  while ((careMatch = careRegex.exec(html)) !== null) {
+    const label = decode(careMatch[1])
+      .replace(/^Icon:\s*/i, "")
+      .trim();
+    if (label && !seenCare.has(label)) {
+      seenCare.add(label);
+      careLabels.push(label);
+    }
+  }
+
+  // Build rich body_html for Shopify
+  const parts: string[] = [];
+  if (description) parts.push(`<p>${description}</p>`);
+  if (material) {
+    parts.push(`<p><strong>Material:</strong> ${material}</p>`);
+  }
+  if (careLabels.length > 0) {
+    parts.push(
+      `<p><strong>Pflegehinweise:</strong></p><ul>${
+        careLabels.map((c) => `<li>${c}</li>`).join("")
+      }</ul>`,
+    );
+  }
+  if (articleNumber) {
+    parts.push(
+      `<p><small>Artikelnummer: ${articleNumber}</small></p>`,
+    );
+  }
+  descriptionHtml = parts.join("\n");
 
   // 3) Price: prefer <div class="article-price"> blocks (definitive), else fallback to most-frequent.
   let price_eur: number | null = null;
@@ -257,6 +345,10 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   return {
     title,
     description,
+    description_html: descriptionHtml,
+    material,
+    article_number: articleNumber,
+    care_labels: careLabels,
     price_eur,
     compare_at_price_eur,
     on_sale,
@@ -410,7 +502,7 @@ async function createMultiColorProduct(
   const body = {
     product: {
       title: base.title || handle,
-      body_html: base.description,
+      body_html: base.description_html || base.description || "",
       vendor: base.vendor,
       product_type: base.product_type ?? "Bekleidung",
       tags: base.tags.join(","),
@@ -730,6 +822,10 @@ Deno.serve(async (req) => {
           })),
           sizes: base.sizes,
           description: base.description,
+          description_html: base.description_html,
+          material: base.material,
+          article_number: base.article_number,
+          care_labels: base.care_labels,
           color_urls: colorUrls,
         };
 
