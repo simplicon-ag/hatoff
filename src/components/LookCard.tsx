@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CuratedLook } from "@/data/looks";
-import { fetchProductsByHandles } from "@/lib/shopify";
+import { fetchProductByHandle } from "@/lib/shopify";
+import { parseLookHandle } from "@/lib/lookHandles";
 
 export const LookCard = ({ look }: { look: CuratedLook }) => {
   const [fallbackImage, setFallbackImage] = useState<string | null>(null);
@@ -9,9 +10,26 @@ export const LookCard = ({ look }: { look: CuratedLook }) => {
   useEffect(() => {
     if (look.hero) return;
     let active = true;
-    fetchProductsByHandles(look.productHandles.slice(0, 1))
-      .then((res) => {
-        if (active) setFallbackImage(res[0]?.node.images.edges[0]?.node.url ?? null);
+    const first = look.productHandles[0];
+    if (!first) return;
+    const { handle, color } = parseLookHandle(first);
+    fetchProductByHandle(handle)
+      .then((node) => {
+        if (!active || !node) return;
+        // Wenn eine Farbe gewünscht ist, suche das passende Variantenbild
+        if (color) {
+          const variant = node.variants?.edges?.find((v: { node: { selectedOptions: Array<{ name: string; value: string }>; image?: { url: string } | null } }) =>
+            v.node.selectedOptions.some(
+              (o) => /farbe|color|colour/i.test(o.name) && o.value.toLowerCase() === color.toLowerCase(),
+            ),
+          )?.node;
+          const variantImg = variant?.image?.url;
+          if (variantImg) {
+            setFallbackImage(variantImg);
+            return;
+          }
+        }
+        setFallbackImage(node.images?.edges?.[0]?.node?.url ?? null);
       })
       .catch(() => {});
     return () => {
