@@ -121,6 +121,34 @@ export default function AdminLooks() {
     } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); }
   };
 
+  const generateForHandle = async () => {
+    const h = singleHandle.trim();
+    if (!h) {
+      toast.error("Bitte einen Produkt-Handle eingeben");
+      return;
+    }
+    setSingleBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("look-generate", {
+        body: { productHandle: h, force: true },
+      });
+      if (error) throw new Error(error.message);
+      const created = (data as { created?: number; reason?: string })?.created ?? 0;
+      const reason = (data as { reason?: string })?.reason;
+      if (created > 0) {
+        toast.success(`${created} neue Look-Draft(s) für "${h}" erstellt`);
+        setSingleHandle("");
+        refresh();
+      } else {
+        toast.warning(`Keine neuen Looks erzeugt${reason ? `: ${reason}` : ""}`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Look-Generierung fehlgeschlagen");
+    } finally {
+      setSingleBusy(false);
+    }
+  };
+
   const runBackfill = async () => {
     if (!confirm("Looks für ALLE Produkte ohne Anker-Look generieren? Das kann mehrere Minuten dauern und verbraucht AI-Credits.")) return;
     setBackfilling(true);
