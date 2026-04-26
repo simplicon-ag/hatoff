@@ -173,6 +173,29 @@ async function discoverBrandUrls(
   return Array.from(all);
 }
 
+async function fetchSitemapUrls(brand: string, sitemapRoot: string, pattern: RegExp): Promise<string[]> {
+  // Reads sitemap.xml (or a sitemap index) and returns every product URL it finds.
+  const all = new Set<string>();
+  try {
+    const root = await directFetch(sitemapRoot);
+    if (!root) return [];
+    // If it's a sitemap index, follow each child sitemap
+    const childMatches = root.match(/<loc>([^<]+\.xml[^<]*)<\/loc>/gi) ?? [];
+    const sitemaps = childMatches.length > 0
+      ? childMatches.map((m) => m.replace(/<\/?loc>/g, ""))
+      : [sitemapRoot];
+
+    for (const sm of sitemaps.slice(0, 30)) {
+      const body = await directFetch(sm);
+      if (!body) continue;
+      for (const u of extractUrls(body, pattern)) all.add(u);
+    }
+  } catch (e) {
+    console.warn(`[discover] sitemap fetch failed for ${brand}:`, e);
+  }
+  return Array.from(all);
+}
+
 async function fetchAllShopifyHandles(): Promise<Set<string>> {
   // Use Storefront API since we can read it without admin credentials and
   // it's enough to know which handles already exist.

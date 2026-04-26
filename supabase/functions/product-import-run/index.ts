@@ -1,11 +1,13 @@
 // Worker: processes a small batch of pending products.
-// Steps per item:
-//  1. Scrape product page via Firecrawl (HTML+links+screenshot off, html only)
-//  2. Extract title, description, price, compare_at_price, image URLs, sizes
-//  3. If dry_run: store scraped_data, mark `scraped`
-//  4. Else: download images, upload to Shopify, create product+variants, mark `created`
+// Each `pending` row in product_import_log carries `scraped_data.color_urls`
+// (set by product-import-discover). For every group we:
+//   1. Scrape all colour variants via Firecrawl (with JS-actions for accordion)
+//   2. Build ONE Shopify product with Size + Colour options
+//   3. Create OR update (when row.update_mode = true OR handle exists)
 //
-// Trigger: POST { batch_size?: number }. Returns processed count.
+// Trigger: POST { batch_size?: number, only_if_running?: boolean }
+//   - only_if_running=true → no-op when product_import_job.state !== 'running'.
+//     Used by the pg_cron tick so it doesn't fire when nothing is queued.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -16,6 +18,11 @@ const corsHeaders = {
 
 const SHOPIFY_DOMAIN = "style-compass-6nrqi.myshopify.com";
 const SHOPIFY_ADMIN_VERSION = "2025-07";
+const EUR_TO_CHF = 0.95;
+
+// ============================================================
+// Types
+// ============================================================
 
 interface ScrapedProduct {
   title: string;
@@ -24,6 +31,9 @@ interface ScrapedProduct {
   material: string;
   article_number: string;
   care_labels: string[];
+  fit: string;
+  is_new: boolean;
+  features: string[];
   price_eur: number | null;
   compare_at_price_eur: number | null;
   on_sale: boolean;
@@ -34,12 +44,94 @@ interface ScrapedProduct {
   tags: string[];
 }
 
-const EUR_TO_CHF = 0.95;
+interface ColorData {
+  colorName: string;
+  colorId: string;
+  scraped: ScrapedProduct;
+}
 
-async function firecrawlScrape(
-  url: string,
-  apiKey: string,
-): Promise<string | null> {
+// ============================================================
+// Helpers (mirrored from product-import-by-url)
+// ============================================================
+
+function decode(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+function parseProductIds(url: string): { articleId: string; colorId: string } | null {
+  const m = url.match(/-(\d+)-(\d+)\/?$/);
+  if (!m) return null;
+  return { articleId: m[1], colorId: m[2] };
+}
+
+const COLOR_WORDS_RE =
+  /\s+(hell|dunkel|mittel|tief|graues?|altes?)?\s*(blau|hellblau|mittelblau|dunkelblau|marine|navy|rot|mittelrot|dunkelrot|weinrot|weiss|weiß|ecru|creme|champagner|champagner[- ]beige|schwarz|tiefschwarz|anthrazit|grau|hellgrau|dunkelgrau|silber|beige|sand|khaki|camel|braun|mittelbraun|dunkelbraun|cognac|gr(?:ue|ü)n|mittelgr(?:ue|ü)n|dunkelgr(?:ue|ü)n|oliv|olive|mint|gelb|senf|ocker|orange|rost|rosa|pink|altrosa|lila|violett|t(?:ue|ü)rkis|petrol)\s*$/i;
+
+function stripColorFromTitle(title: string): string {
+  let t = title;
+  for (let i = 0; i < 3; i++) {
+    const m = t.match(COLOR_WORDS_RE);
+    if (!m) break;
+    t = t.slice(0, t.length - m[0].length).trim();
+  }
+  return t.replace(/[\s,–-]+$/g, "").trim();
+}
+
+function extractColorFromTitle(title: string): string | null {
+  const m = title.match(COLOR_WORDS_RE);
+  if (!m) return null;
+  return m[0].trim().replace(/\s+/g, " ");
+}
+
+function cleanTitle(rawTitle: string): string {
+  let t = decode(rawTitle).trim();
+  t = t.replace(/\s*-\s*(CASAMODA|VENTI)\s*$/i, "");
+  t = t.replace(/\s+\d{6,}\s*$/g, "");
+  return t.trim();
+}
+
+const BRAND_DEFAULT_SIZES: Record<string, string[]> = {
+  Hemd: ["38", "39/40", "41/42", "43/44", "45/46", "47/48"],
+  Hose: ["46", "48", "50", "52", "54", "56"],
+  Shirt: ["S", "M", "L", "XL", "XXL"],
+  Polo: ["S", "M", "L", "XL", "XXL"],
+  Strick: ["S", "M", "L", "XL", "XXL"],
+  Jacke: ["46", "48", "50", "52", "54", "56"],
+  Sakko: ["46", "48", "50", "52", "54", "56"],
+  Accessoire: ["One Size"],
+};
+
+function titleFromSlug(sourceUrl: string): string {
+  const slug = sourceUrl
+    .replace(/^https?:\/\/[^/]+\/de\/de\//i, "")
+    .replace(/-\d+-\d+\/?$/, "");
+  return slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function extractFit(sourceUrl: string, title: string): string {
+  const haystack = (sourceUrl + " " + title).toLowerCase();
+  if (/body[- ]?fit/.test(haystack)) return "Body Fit";
+  if (/modern[- ]?fit/.test(haystack)) return "Modern Fit";
+  if (/comfort[- ]?fit/.test(haystack)) return "Comfort Fit";
+  if (/regular[- ]?fit/.test(haystack)) return "Regular Fit";
+  if (/slim[- ]?fit/.test(haystack)) return "Slim Fit";
+  return "";
+}
+
+// ============================================================
+// Firecrawl
+// ============================================================
+
+async function firecrawlScrape(url: string, apiKey: string): Promise<string | null> {
   try {
     const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
       method: "POST",
@@ -51,9 +143,6 @@ async function firecrawlScrape(
         url,
         formats: ["html"],
         onlyMainContent: false,
-        // Casa Moda / Venti are SPAs — material, care, description and SKU
-        // are only injected after JS hydration. We need ~12s + a scroll to
-        // ensure the product-detail accordion is rendered into the DOM.
         waitFor: 12000,
         actions: [
           { type: "wait", milliseconds: 4000 },
@@ -78,73 +167,11 @@ async function firecrawlScrape(
   }
 }
 
-
-function decode(s: string): string {
-  return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&nbsp;/g, " ");
-}
-
-/** Extract article id and color id from product URL.
- *  https://www.casamoda.com/de/de/t-shirt-blau-14899-154 → { articleId: "14899", colorId: "154" } */
-function parseProductIds(url: string): { articleId: string; colorId: string } | null {
-  const m = url.match(/-(\d+)-(\d+)\/?$/);
-  if (!m) return null;
-  return { articleId: m[1], colorId: m[2] };
-}
-
-/** Build a clean title from the <title> tag content.
- *  Casa Moda format: "T-Shirt Blau 126340041 - CASAMODA"
- *  Venti format:     "Businesshemd Hellblau - Modern Fit 001480 - VENTI" */
-function cleanTitle(rawTitle: string, brand: string): string {
-  let t = decode(rawTitle).trim();
-  t = t.replace(/\s*-\s*(CASAMODA|VENTI)\s*$/i, "");
-  t = t.replace(/\s+\d{6,}\s*$/g, "");
-  return t.trim();
-}
-
-/** Strip a colour token from the end of a title so we get the colour-neutral
- *  base title (e.g. "Businesshemd Hellblau" → "Businesshemd"). */
-const COLOR_WORDS_RE =
-  /\s+(hell|dunkel|mittel|tief|graues?|altes?)?\s*(blau|hellblau|mittelblau|dunkelblau|marine|navy|rot|mittelrot|dunkelrot|weinrot|weiss|weiß|ecru|creme|champagner|champagner[- ]beige|schwarz|tiefschwarz|anthrazit|grau|hellgrau|dunkelgrau|silber|beige|sand|khaki|camel|braun|mittelbraun|dunkelbraun|cognac|gr(?:ue|ü)n|mittelgr(?:ue|ü)n|dunkelgr(?:ue|ü)n|oliv|olive|mint|gelb|senf|ocker|orange|rost|rosa|pink|altrosa|lila|violett|t(?:ue|ü)rkis|petrol)\s*$/i;
-function stripColorFromTitle(title: string): string {
-  let t = title;
-  for (let i = 0; i < 3; i++) {
-    const m = t.match(COLOR_WORDS_RE);
-    if (!m) break;
-    t = t.slice(0, t.length - m[0].length).trim();
-  }
-  return t.replace(/[\s,–-]+$/g, "").trim();
-}
-
-/** Pull the colour name from a (Casa Moda / Venti) product title. */
-function extractColorFromTitle(title: string): string | null {
-  const m = title.match(COLOR_WORDS_RE);
-  if (!m) return null;
-  // Re-build the matched colour phrase preserving case but trimmed
-  return m[0].trim().replace(/\s+/g, " ");
-}
-
-const BRAND_DEFAULT_SIZES: Record<string, string[]> = {
-  Hemd: ["38", "39/40", "41/42", "43/44", "45/46", "47/48"],
-  Hose: ["46", "48", "50", "52", "54", "56"],
-  Shirt: ["S", "M", "L", "XL", "XXL"],
-  Polo: ["S", "M", "L", "XL", "XXL"],
-  Strick: ["S", "M", "L", "XL", "XXL"],
-  Jacke: ["46", "48", "50", "52", "54", "56"],
-  Sakko: ["46", "48", "50", "52", "54", "56"],
-  Accessoire: ["One Size"],
-};
-
 function extractFromHtml(html: string, brand: string, sourceUrl: string): ScrapedProduct {
   const ids = parseProductIds(sourceUrl);
+  const slugTitle = titleFromSlug(sourceUrl);
 
-  // 1) Title: prefer <h1>, then meta og:title, then <title>, then slug fallback.
-  // Casa Moda's <title> is buggy ("Loyalty Wallet" everywhere), so H1 wins.
+  // Title
   let title = "";
   const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
   if (h1Match) {
@@ -153,113 +180,112 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   }
   if (!title) {
     const og = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
-    if (og) title = cleanTitle(og[1], brand);
+    if (og) title = cleanTitle(og[1]);
   }
   if (!title) {
     const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (t) {
-      const cleaned = cleanTitle(t[1], brand);
-      // Only use it if it doesn't look like a generic UI label
-      if (cleaned && !/loyalty|wallet|warenkorb|cart|404/i.test(cleaned)) {
-        title = cleaned;
-      }
+      const cleaned = cleanTitle(t[1]);
+      if (cleaned && !/loyalty|wallet|warenkorb|cart|404/i.test(cleaned)) title = cleaned;
     }
   }
-  if (!title) {
-    // Slug fallback: "freizeithemd-kurzarm-blau" → "Freizeithemd Kurzarm Blau"
-    const slug = sourceUrl.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
-    title = slug
-      .split("-")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-  }
+  if (!title) title = slugTitle;
 
-  // 2) Description: Casa Moda / Venti put the marketing copy + material + care
-  //    in a hydrated <div class="article-detail"> block. We pull the FULL block,
-  //    strip outer wrapper, and reuse the inner HTML for Shopify body_html.
+  // Description / material / article number / care labels / features
   let description = "";
-  let descriptionHtml = "";
   let material = "";
   let articleNumber = "";
   const careLabels: string[] = [];
+  const features: string[] = [];
 
-  // (a) marketing copy: first <p> in product description area
-  // The hydrated structure on casamoda.com is:
-  //   <div class="row article-detail-text">
-  //     <p>...marketing text...</p>
-  //   </div>
   const marketingMatch = html.match(
     /<(?:div|section)[^>]*class="[^"]*article-detail-text[^"]*"[^>]*>([\s\S]*?)<\/(?:div|section)>/i,
   );
   if (marketingMatch) {
     const inner = marketingMatch[1];
-    // Take only the first <p> with substantial text
     const pMatch = inner.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
     if (pMatch) {
-      const text = decode(pMatch[1].replace(/<[^>]+>/g, " "))
-        .replace(/\s+/g, " ").trim();
+      const text = decode(pMatch[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
       if (text.length > 40) description = text;
     }
   }
-  // Fallback: meta description
   if (!description) {
-    const metaDesc = html.match(
-      /<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i,
-    );
-    if (metaDesc) description = decode(metaDesc[1]);
+    const metaDesc = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
+    if (metaDesc) {
+      const t = decode(metaDesc[1]).trim();
+      if (t.length > 40) description = t;
+    }
   }
 
-  // (b) Material — "<strong>Material</strong><br> 100 % Baumwolle"
-  const matMatch = html.match(
-    /<strong[^>]*>\s*Material\s*<\/strong>\s*<br\s*\/?>\s*([^<]+)/i,
-  );
+  const matMatch = html.match(/<strong[^>]*>\s*Material\s*<\/strong>\s*<br\s*\/?>\s*([^<]+)/i);
   if (matMatch) material = decode(matMatch[1]).replace(/\s+/g, " ").trim();
+  if (!material) {
+    const m2 = html.match(/Material[\s:]*<[^>]+>\s*([^<]{5,200})/i);
+    if (m2) material = decode(m2[1]).replace(/\s+/g, " ").trim();
+  }
 
-  // (c) Article number
-  const artMatch = html.match(
-    /<strong[^>]*>\s*Artikelnummer\s*<\/strong>\s*<br\s*\/?>\s*([^<]+)/i,
-  );
+  const artMatch = html.match(/<strong[^>]*>\s*Artikelnummer\s*<\/strong>\s*<br\s*\/?>\s*([^<]+)/i);
   if (artMatch) articleNumber = decode(artMatch[1]).replace(/\s+/g, " ").trim();
+  if (!articleNumber) {
+    const a2 = html.match(/Artikel(?:nr|nummer)[\s:.\-]*<[^>]*>\s*([0-9]{6,})/i);
+    if (a2) articleNumber = a2[1].trim();
+  }
+  if (!articleNumber && ids) articleNumber = ids.articleId;
 
-  // (d) Care icons — pull alt-text from <img class="care-icon" ... alt="...">
-  const careRegex =
-    /<img[^>]*class="[^"]*care-icon[^"]*"[^>]*alt="([^"]+)"/gi;
+  const careRegex = /<img[^>]*class="[^"]*care-icon[^"]*"[^>]*alt="([^"]+)"/gi;
   let careMatch: RegExpExecArray | null;
   const seenCare = new Set<string>();
   while ((careMatch = careRegex.exec(html)) !== null) {
-    const label = decode(careMatch[1])
-      .replace(/^Icon:\s*/i, "")
-      .trim();
+    const label = decode(careMatch[1]).replace(/^Icon:\s*/i, "").trim();
     if (label && !seenCare.has(label)) {
       seenCare.add(label);
       careLabels.push(label);
     }
   }
 
-  // Build rich body_html for Shopify
+  const featureContainers = [
+    /<(?:ul|div)[^>]*class="[^"]*article-features[^"]*"[^>]*>([\s\S]{0,2000}?)<\/(?:ul|div)>/i,
+    /<(?:ul|div)[^>]*class="[^"]*product-features[^"]*"[^>]*>([\s\S]{0,2000}?)<\/(?:ul|div)>/i,
+    /<(?:ul|div)[^>]*class="[^"]*features?[- ]list[^"]*"[^>]*>([\s\S]{0,2000}?)<\/(?:ul|div)>/i,
+  ];
+  for (const re of featureContainers) {
+    const m = html.match(re);
+    if (!m) continue;
+    const liMatches = m[1].match(/<li[^>]*>([\s\S]*?)<\/li>/gi) ?? [];
+    for (const li of liMatches) {
+      const txt = decode(li.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+      if (txt && txt.length < 200) features.push(txt);
+    }
+    if (features.length > 0) break;
+  }
+
+  let isNew = false;
+  if (/class="[^"]*\b(?:badge|label|tag)[^"]*"[^>]*>\s*NEU\s*</i.test(html)) isNew = true;
+  if (/<span[^>]*>\s*NEU\s*<\/span>/i.test(html) && !/Newsletter/.test(html.slice(0, html.indexOf("NEU") + 50))) {
+    isNew = true;
+  }
+
+  const fit = extractFit(sourceUrl, title);
+
+  // body_html
   const parts: string[] = [];
   if (description) parts.push(`<p>${description}</p>`);
-  if (material) {
-    parts.push(`<p><strong>Material:</strong> ${material}</p>`);
+  if (features.length > 0) {
+    parts.push(`<ul>${features.map((f) => `<li>${f}</li>`).join("")}</ul>`);
   }
+  if (material) parts.push(`<p><strong>Material:</strong> ${material}</p>`);
+  if (fit) parts.push(`<p><strong>Passform:</strong> ${fit}</p>`);
   if (careLabels.length > 0) {
     parts.push(
-      `<p><strong>Pflegehinweise:</strong></p><ul>${
-        careLabels.map((c) => `<li>${c}</li>`).join("")
-      }</ul>`,
+      `<p><strong>Pflegehinweise:</strong></p><ul>${careLabels.map((c) => `<li>${c}</li>`).join("")}</ul>`,
     );
   }
-  if (articleNumber) {
-    parts.push(
-      `<p><small>Artikelnummer: ${articleNumber}</small></p>`,
-    );
-  }
-  descriptionHtml = parts.join("\n");
+  if (articleNumber) parts.push(`<p><small>Artikelnummer: ${articleNumber}</small></p>`);
+  const descriptionHtml = parts.join("\n");
 
-  // 3) Price: prefer <div class="article-price"> blocks (definitive), else fallback to most-frequent.
+  // Price
   let price_eur: number | null = null;
   let compare_at_price_eur: number | null = null;
-
   const articlePriceBlocks = html.match(
     /<div[^>]*class="[^"]*article-price[^"]*"[\s\S]{0,400}?<\/div>/gi,
   ) ?? [];
@@ -273,14 +299,11 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
       }
     }
     if (prices.length > 0) {
-      // Lowest = current price (sale or normal), highest = compare_at if differs
       price_eur = Math.min(...prices);
       const max = Math.max(...prices);
       if (max > price_eur + 0.5) compare_at_price_eur = max;
     }
   }
-
-  // Fallback: frequency-based extraction from all "X,XX €" patterns
   if (price_eur === null) {
     const priceMatches = html.match(/(\d{1,4}[,.]\d{2})\s*€/g) ?? [];
     const nums = priceMatches
@@ -295,40 +318,30 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   }
   const on_sale = compare_at_price_eur !== null;
 
-  // 4) Images: imgix.net product images filtered by article ID
-  // Format: https://<brand>-b2c-(cloud-)?production.imgix.net/product/<articleId>/<colorId>/<articleId>-<colorId>-image-N-<hash>.jpg
+  // Images
   const imgUrls = new Set<string>();
   if (ids) {
     const { articleId, colorId } = ids;
-    // Match images whose path contains /product/<articleId>/<colorId>/
     const imgRegex = new RegExp(
       `https://[a-z0-9.-]*imgix\\.net/product/${articleId}/${colorId}/[^"'\\s]+?-image-\\d+-[a-f0-9]+\\.(?:jpg|jpeg|png|webp)`,
       "gi",
     );
     const m = html.match(imgRegex) ?? [];
-    // Dedupe by image-N (ignoring imgix transform suffix)
     const seen = new Map<string, string>();
     for (const u of m) {
-      const cleanUrl = u.split("?")[0]; // strip imgix params
+      const cleanUrl = u.split("?")[0];
       const imgN = cleanUrl.match(/-image-(\d+)-/);
       const key = imgN ? imgN[1] : cleanUrl;
-      if (!seen.has(key)) {
-        // Use a high-res variant (no width param = full size)
-        seen.set(key, cleanUrl);
-      }
+      if (!seen.has(key)) seen.set(key, cleanUrl);
     }
-    // Sort by image number ascending
-    const sortedImgs = Array.from(seen.entries()).sort((a, b) =>
-      Number(a[0]) - Number(b[0]),
-    );
+    const sortedImgs = Array.from(seen.entries()).sort((a, b) => Number(a[0]) - Number(b[0]));
     for (const [, url] of sortedImgs) imgUrls.add(url);
   }
 
-  // 5) Product type heuristic
+  // Product type
   let product_type: string | null = null;
-  const t = title.toLowerCase();
-  if (/sakko/.test(t)) product_type = "Sakko";
-  else if (/anzug/.test(t)) product_type = "Sakko";
+  const t = (title + " " + slugTitle).toLowerCase();
+  if (/sakko|anzug/.test(t)) product_type = "Sakko";
   else if (/hemd/.test(t)) product_type = "Hemd";
   else if (/hose|chino|jeans|bermuda/.test(t)) product_type = "Hose";
   else if (/polo/.test(t)) product_type = "Polo";
@@ -337,10 +350,15 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   else if (/jacke|mantel|parka|weste/.test(t)) product_type = "Jacke";
   else if (/krawatt|fliege|tuch|gürtel|guertel|schal|cap/.test(t)) product_type = "Accessoire";
 
-  // 6) Sizes: use sensible defaults per product type (page sizes are JS-loaded)
   const sizes = product_type
     ? BRAND_DEFAULT_SIZES[product_type] ?? ["S", "M", "L", "XL", "XXL"]
     : ["S", "M", "L", "XL", "XXL"];
+
+  const tags = [brand];
+  if (product_type) tags.push(product_type.toLowerCase());
+  if (fit) tags.push(fit.toLowerCase().replace(/\s+/g, "-"));
+  if (isNew) tags.push("neu");
+  if (on_sale) tags.push("sale");
 
   return {
     title,
@@ -349,6 +367,9 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     material,
     article_number: articleNumber,
     care_labels: careLabels,
+    fit,
+    is_new: isNew,
+    features,
     price_eur,
     compare_at_price_eur,
     on_sale,
@@ -356,13 +377,14 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     sizes,
     product_type,
     vendor: brand === "casa-moda" ? "Casa Moda" : "Venti",
-    tags: [brand, ...(product_type ? [product_type.toLowerCase()] : [])],
+    tags,
   };
 }
 
-// ---------- Rate-limited Shopify fetch helper ----------
-// Shopify Admin REST API: 2 calls/sec sustained, bucket of 40.
-// We pace at ~1.5/sec (650ms gap) and retry 429 with Retry-After.
+// ============================================================
+// Shopify (rate-limited)
+// ============================================================
+
 const SHOPIFY_MIN_GAP_MS = 650;
 let lastShopifyCallAt = 0;
 
@@ -371,7 +393,6 @@ async function shopifyFetch(
   init: RequestInit & { adminToken: string },
   attempt = 1,
 ): Promise<Response> {
-  // Pace requests
   const since = Date.now() - lastShopifyCallAt;
   if (since < SHOPIFY_MIN_GAP_MS) {
     await new Promise((r) => setTimeout(r, SHOPIFY_MIN_GAP_MS - since));
@@ -381,58 +402,20 @@ async function shopifyFetch(
   const { adminToken, headers, ...rest } = init;
   const res = await fetch(url, {
     ...rest,
-    headers: {
-      ...(headers ?? {}),
-      "X-Shopify-Access-Token": adminToken,
-    },
+    headers: { ...(headers ?? {}), "X-Shopify-Access-Token": adminToken },
   });
 
   if (res.status === 429 && attempt <= 4) {
     const retryAfter = parseFloat(res.headers.get("Retry-After") ?? "2");
     const waitMs = Math.max(retryAfter * 1000, 2000 * attempt);
-    console.warn(
-      `[worker] 429 rate-limit, retry ${attempt}/4 after ${waitMs}ms`,
-    );
-    // Drain body to free the connection
     await res.text().catch(() => "");
     await new Promise((r) => setTimeout(r, waitMs));
     return shopifyFetch(url, init, attempt + 1);
   }
-
   return res;
 }
 
-async function uploadImageToShopify(
-  productId: string,
-  imageUrl: string,
-  adminToken: string,
-): Promise<boolean> {
-  try {
-    const res = await shopifyFetch(
-      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}/images.json`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: { src: imageUrl } }),
-        adminToken,
-      },
-    );
-    if (!res.ok) {
-      console.error(`[worker] image upload ${res.status}: ${await res.text()}`);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("[worker] image upload error:", err);
-    return false;
-  }
-}
-
-/** Look up an existing product by handle. Returns its Shopify ID or null. */
-async function findShopifyProductByHandle(
-  handle: string,
-  adminToken: string,
-): Promise<string | null> {
+async function findShopifyProductByHandle(handle: string, adminToken: string): Promise<string | null> {
   try {
     const res = await shopifyFetch(
       `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?handle=${encodeURIComponent(handle)}&fields=id,handle&limit=1`,
@@ -450,20 +433,49 @@ async function findShopifyProductByHandle(
   }
 }
 
-/** Per-colour scraped data used to build a multi-variant product. */
-interface ColorData {
-  colorName: string;       // e.g. "Hellblau"
-  colorId: string;         // e.g. "314"
-  scraped: ScrapedProduct;
+async function deleteAllImages(productId: string, adminToken: string): Promise<void> {
+  try {
+    const res = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}/images.json`,
+      { method: "GET", adminToken },
+    );
+    if (!res.ok) return;
+    const json = await res.json();
+    const images: Array<{ id: number }> = json?.images ?? [];
+    for (const img of images) {
+      await shopifyFetch(
+        `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}/images/${img.id}.json`,
+        { method: "DELETE", adminToken },
+      );
+    }
+  } catch (e) {
+    console.warn("[worker] delete images failed:", e);
+  }
 }
 
-async function createMultiColorProduct(
-  base: ScrapedProduct,
-  colors: ColorData[],
-  handle: string,
+async function uploadColorImage(
+  productId: string,
+  imageUrl: string,
+  variantIds: string[],
   adminToken: string,
-): Promise<{ id: string; duplicate?: boolean; variantImageMap: Array<{ colorName: string; imageSrc: string | null }> } | null> {
-  // Use the cheapest price across colours as the published price.
+): Promise<boolean> {
+  try {
+    const res = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}/images.json`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: { src: imageUrl, variant_ids: variantIds } }),
+        adminToken,
+      },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function buildProductPayload(base: ScrapedProduct, colors: ColorData[], handle: string) {
   const minPriceEur = colors.reduce(
     (m, c) => (c.scraped.price_eur != null && c.scraped.price_eur < m ? c.scraped.price_eur : m),
     base.price_eur ?? Number.POSITIVE_INFINITY,
@@ -480,14 +492,11 @@ async function createMultiColorProduct(
   const priceChf = isFinite(minPriceEur) ? (minPriceEur * EUR_TO_CHF).toFixed(2) : "0.00";
   const compareAt = compareEur ? (compareEur * EUR_TO_CHF).toFixed(2) : null;
 
-  // Build the cross-product Größe × Farbe.
   const sizes = base.sizes.length > 0 ? base.sizes : ["One Size"];
   const colorNames = colors.map((c) => c.colorName);
 
   const variants = [];
   for (const c of colors) {
-    // Prefer the real manufacturer article number from each colour's scrape.
-    // Fallback to the base article number, then to the URL-derived handle.
     const articleNo = c.scraped.article_number || base.article_number || "";
     const skuBase = articleNo
       ? articleNo.replace(/[^a-z0-9-]/gi, "")
@@ -505,7 +514,7 @@ async function createMultiColorProduct(
     }
   }
 
-  const body = {
+  return {
     product: {
       title: base.title || handle,
       body_html: base.description_html || base.description || "",
@@ -527,65 +536,209 @@ async function createMultiColorProduct(
       variants,
     },
   };
-
-  const res = await shopifyFetch(
-    `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      adminToken,
-    },
-  );
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error(`[worker] create product ${res.status}: ${errText}`);
-    if (res.status === 422 && /handle/i.test(errText) && /taken/i.test(errText)) {
-      const existing = await findShopifyProductByHandle(handle, adminToken);
-      if (existing) return { id: existing, duplicate: true, variantImageMap: [] };
-    }
-    throw new Error(`Shopify ${res.status}: ${errText.slice(0, 300)}`);
-  }
-  const json = await res.json();
-  const productId = String(json.product.id);
-  // Map each colour to its first image so we can attach images to variants later.
-  const variantImageMap = colors.map((c) => ({
-    colorName: c.colorName,
-    imageSrc: c.scraped.image_urls[0] ?? null,
-  }));
-  return { id: productId, variantImageMap };
 }
 
-/** Upload an image and link it to all variants of a given colour. */
-async function uploadColorImage(
-  productId: string,
-  imageUrl: string,
-  variantIds: string[],
+// ============================================================
+// Token resolution
+// ============================================================
+
+function resolveAdminToken(): string {
+  const direct = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+  if (direct && direct.startsWith("shpat_")) return direct;
+  for (const [k, v] of Object.entries(Deno.env.toObject())) {
+    if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v?.trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(v);
+        const t = parsed.access_token ?? parsed.accessToken ?? parsed.token;
+        if (typeof t === "string" && t.startsWith("shpat_")) return t;
+      } catch { /* ignore */ }
+    }
+  }
+  return direct ?? "";
+}
+
+function detectBrand(brandSlug: string): string {
+  if (brandSlug === "casa-moda" || brandSlug === "casamoda") return "casa-moda";
+  if (brandSlug === "venti") return "venti";
+  return brandSlug;
+}
+
+// ============================================================
+// Process a single grouped row
+// ============================================================
+
+interface LogRow {
+  id: string;
+  brand: string;
+  source_url: string;
+  handle: string | null;
+  scraped_data: { color_urls?: Array<{ url: string; colorId: string }>; article_id?: string } | null;
+  update_mode: boolean;
+}
+
+async function processRow(
+  row: LogRow,
   adminToken: string,
-): Promise<boolean> {
-  try {
+  firecrawlKey: string,
+  supabase: ReturnType<typeof createClient>,
+): Promise<{ ok: boolean; action?: "created" | "updated"; error?: string; productId?: string; title?: string; colorsCount?: number }> {
+  const brand = detectBrand(row.brand);
+  const handle = row.handle ?? "";
+  const colorUrls = row.scraped_data?.color_urls ?? [{ url: row.source_url, colorId: parseProductIds(row.source_url)?.colorId ?? "0" }];
+
+  // 1) Mark as scraping
+  await supabase.from("product_import_log").update({
+    status: "scraping",
+    updated_at: new Date().toISOString(),
+  }).eq("id", row.id);
+
+  // 2) Scrape every colour
+  const colors: ColorData[] = [];
+  for (const cu of colorUrls) {
+    const html = await firecrawlScrape(cu.url, firecrawlKey);
+    if (!html) {
+      console.warn(`[worker] firecrawl failed for ${cu.url}`);
+      continue;
+    }
+    const sc = extractFromHtml(html, brand, cu.url);
+    if (!sc.title || sc.price_eur === null) {
+      console.warn(`[worker] incomplete data for ${cu.url}`);
+      continue;
+    }
+    let colorName = extractColorFromTitle(sc.title) || "";
+    if (!colorName) {
+      const slug = cu.url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
+      const slugColor = extractColorFromTitle(" " + slug.replace(/-/g, " "));
+      if (slugColor) colorName = slugColor.replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    if (!colorName) colorName = `Farbe ${cu.colorId}`;
+    colors.push({ colorName, colorId: cu.colorId, scraped: sc });
+  }
+
+  if (colors.length === 0) {
+    return { ok: false, error: "Keine Farb-Variante konnte gescraped werden" };
+  }
+
+  // 3) Build base
+  const first = colors[0].scraped;
+  const baseTitle = stripColorFromTitle(first.title) || first.title;
+  const base: ScrapedProduct = { ...first, title: baseTitle, image_urls: [] };
+
+  // 4) Upsert
+  const existingId = await findShopifyProductByHandle(handle, adminToken);
+  const payload = buildProductPayload(base, colors, handle);
+
+  let productId: string;
+  let action: "created" | "updated";
+
+  if (existingId) {
+    await supabase.from("product_import_log").update({
+      status: "creating",
+      updated_at: new Date().toISOString(),
+    }).eq("id", row.id);
+
+    const updateBody = {
+      product: {
+        id: Number(existingId),
+        title: payload.product.title,
+        body_html: payload.product.body_html,
+        vendor: payload.product.vendor,
+        product_type: payload.product.product_type,
+        tags: payload.product.tags,
+        options: payload.product.options,
+        variants: payload.product.variants,
+      },
+    };
     const res = await shopifyFetch(
-      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}/images.json`,
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${existingId}.json`,
       {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: { src: imageUrl, variant_ids: variantIds },
-        }),
+        body: JSON.stringify(updateBody),
         adminToken,
       },
     );
     if (!res.ok) {
-      console.error(`[worker] color image ${res.status}: ${await res.text()}`);
-      return false;
+      const errText = await res.text();
+      return { ok: false, error: `Shopify update ${res.status}: ${errText.slice(0, 300)}` };
     }
-    return true;
-  } catch (err) {
-    console.error("[worker] color image error:", err);
-    return false;
+    productId = existingId;
+    action = "updated";
+    await deleteAllImages(productId, adminToken);
+  } else {
+    await supabase.from("product_import_log").update({
+      status: "creating",
+      updated_at: new Date().toISOString(),
+    }).eq("id", row.id);
+
+    const res = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        adminToken,
+      },
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      return { ok: false, error: `Shopify create ${res.status}: ${errText.slice(0, 300)}` };
+    }
+    const json = await res.json();
+    productId = String(json.product.id);
+    action = "created";
   }
+
+  // 5) Images per colour
+  const variantsByColor = new Map<string, string[]>();
+  try {
+    const vRes = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${productId}.json?fields=variants`,
+      { method: "GET", adminToken },
+    );
+    if (vRes.ok) {
+      const vJson = await vRes.json();
+      for (const v of vJson?.product?.variants ?? []) {
+        const cn = String(v.option2 ?? "");
+        if (!variantsByColor.has(cn)) variantsByColor.set(cn, []);
+        variantsByColor.get(cn)!.push(String(v.id));
+      }
+    }
+  } catch (e) {
+    console.warn("[worker] variant fetch failed:", e);
+  }
+
+  for (const c of colors) {
+    const variantIds = variantsByColor.get(c.colorName) ?? [];
+    for (const imgUrl of c.scraped.image_urls) {
+      await uploadColorImage(productId, imgUrl, variantIds, adminToken);
+    }
+  }
+
+  // 6) Save aggregated scrape data
+  await supabase.from("product_import_log").update({
+    status: action === "created" ? "created" : "skipped",
+    shopify_product_id: productId,
+    error_message: action === "updated" ? "Bestehendes Produkt aktualisiert" : null,
+    scraped_data: {
+      base_title: baseTitle,
+      title: baseTitle,
+      colors: colors.map((c) => ({ colorName: c.colorName, colorId: c.colorId })),
+      sizes: base.sizes,
+      price_eur: base.price_eur,
+      image_urls: colors.flatMap((c) => c.scraped.image_urls).slice(0, 6),
+      material: base.material,
+      article_number: base.article_number,
+    },
+    updated_at: new Date().toISOString(),
+  }).eq("id", row.id);
+
+  return { ok: true, action, productId, title: baseTitle, colorsCount: colors.length };
 }
 
+// ============================================================
+// Main handler
+// ============================================================
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -599,388 +752,145 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    // Sequential processing with rate limit → keep batches small
-    const batchSize = Math.min(Math.max(Number(body.batch_size ?? 2), 1), 4);
+    const batchSize = Math.max(1, Math.min(5, Number(body.batch_size ?? 3)));
+    const onlyIfRunning = Boolean(body.only_if_running ?? false);
 
-    // Check job state
-    const { data: job } = await supabase
+    // Cron-safety: skip when no job is running
+    const { data: jobRow } = await supabase
       .from("product_import_job")
-      .select("*")
+      .select("state, dry_run")
       .eq("id", "singleton")
-      .single();
+      .maybeSingle();
 
-    if (!job) {
-      return new Response(
-        JSON.stringify({ success: false, error: "no job row" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    if (onlyIfRunning && jobRow?.state !== "running") {
+      return new Response(JSON.stringify({ skipped: true, reason: "no_running_job", state: jobRow?.state }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    if (job.state === "stopping" || job.state === "stopped" || job.state === "idle") {
-      await supabase
-        .from("product_import_job")
-        .update({
-          state: "stopped",
-          message: "Gestoppt",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", "singleton");
-      return new Response(
-        JSON.stringify({ success: true, state: "stopped", processed: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    // If user pressed Stop, finalise and exit
+    if (jobRow?.state === "stopping") {
+      await supabase.from("product_import_job").update({
+        state: "stopped",
+        message: "Worker gestoppt",
+        updated_at: new Date().toISOString(),
+      }).eq("id", "singleton");
+      return new Response(JSON.stringify({ stopped: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Worker lock: if another worker updated the job in the last 25s, skip this tick
-    // to prevent overlapping workers hammering the Shopify rate limit.
-    if (job.state === "running" && job.updated_at) {
-      const ageMs = Date.now() - new Date(job.updated_at).getTime();
-      if (ageMs < 25_000) {
-        console.log(`[worker] skip tick — another worker active ${ageMs}ms ago`);
-        return new Response(
-          JSON.stringify({ success: true, state: "running", processed: 0, skipped: "lock" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
+    const adminToken = resolveAdminToken();
+    if (!adminToken) {
+      return new Response(JSON.stringify({ error: "SHOPIFY_ADMIN_API_TOKEN fehlt" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    // Heartbeat — claim the lock now so overlapping ticks bail out
-    await supabase
-      .from("product_import_job")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", "singleton");
-
-
-    const dryRun = Boolean(job.dry_run);
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
-
-    // Resolve a working Shopify Admin token. Order of preference:
-    //   1) SHOPIFY_ADMIN_API_TOKEN (manual custom-app token)
-    //   2) SHOPIFY_ACCESS_TOKEN    (legacy Lovable token)
-    //   3) SHOPIFY_ONLINE_ACCESS_TOKEN:user:* (current Lovable connection — JSON wrapped)
-    function resolveAdminToken(): { token: string; source: string } {
-      const direct =
-        Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ??
-        Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-      if (direct && direct.startsWith("shpat_")) {
-        return { token: direct, source: "SHOPIFY_ADMIN_API_TOKEN/ACCESS_TOKEN" };
-      }
-      // Look for SHOPIFY_ONLINE_ACCESS_TOKEN:user:* (JSON-wrapped)
-      for (const [k, v] of Object.entries(Deno.env.toObject())) {
-        if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v?.trim().startsWith("{")) {
-          try {
-            const parsed = JSON.parse(v);
-            const t = parsed.access_token ?? parsed.accessToken ?? parsed.token;
-            if (typeof t === "string" && t.startsWith("shpat_")) {
-              return { token: t, source: `${k} (Lovable Verbindung)` };
-            }
-          } catch { /* ignore */ }
-        }
-      }
-      // Last resort: return whatever direct value we had (even if not shpat_)
-      return { token: direct ?? "", source: "fallback" };
+    if (!firecrawlKey) {
+      return new Response(JSON.stringify({ error: "FIRECRAWL_API_KEY fehlt" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const { token: adminToken, source: tokenSource } = resolveAdminToken();
-
-    if (!dryRun) {
-      if (!adminToken) {
-        await supabase
-          .from("product_import_job")
-          .update({
-            state: "error",
-            message:
-              "SHOPIFY_ADMIN_API_TOKEN nicht konfiguriert — bitte Secret setzen.",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", "singleton");
-        return new Response(
-          JSON.stringify({ success: false, error: "no admin token" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-
-      // Fail-fast auth probe — verify token works before processing batch
-      const tokenPrefix = adminToken.slice(0, 6);
-      const tokenLen = adminToken.length;
-      console.log(
-        `[worker] token source=${tokenSource} prefix=${tokenPrefix}... length=${tokenLen} domain=${SHOPIFY_DOMAIN}`,
-      );
-      const probe = await fetch(
-        `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/shop.json`,
-        { headers: { "X-Shopify-Access-Token": adminToken } },
-      );
-      if (probe.status === 401 || probe.status === 403) {
-        const body = await probe.text().catch(() => "");
-        console.error(`[worker] auth probe failed ${probe.status}: ${body}`);
-        await supabase
-          .from("product_import_job")
-          .update({
-            state: "error",
-            message: `Shopify-Token ungültig (${probe.status}) — bitte SHOPIFY_ADMIN_API_TOKEN aktualisieren. Quelle: ${tokenSource}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", "singleton");
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: `shopify auth ${probe.status}`,
-            token_source: tokenSource,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-    }
-
-    // Pull a batch of pending items (need scraped_data for color_urls)
-    const { data: items, error: fetchErr } = await supabase
+    // Fetch a small batch of pending rows
+    const { data: rows, error: fetchErr } = await supabase
       .from("product_import_log")
-      .select("id, brand, source_url, handle, scraped_data")
+      .select("id, brand, source_url, handle, scraped_data, update_mode")
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(batchSize);
 
     if (fetchErr) throw fetchErr;
 
-    if (!items || items.length === 0) {
-      await supabase
-        .from("product_import_job")
-        .update({
-          state: "done",
-          message: "Alle Produkte verarbeitet",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", "singleton");
-      return new Response(
-        JSON.stringify({ success: true, state: "done", processed: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    if (!rows || rows.length === 0) {
+      // No more work — mark job done
+      await supabase.from("product_import_job").update({
+        state: "done",
+        message: "Alle Produkte verarbeitet",
+        updated_at: new Date().toISOString(),
+      }).eq("id", "singleton");
+
+      return new Response(JSON.stringify({ done: true, processed: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    let processed = 0;
     let createdCount = 0;
     let errorCount = 0;
+    const results: Array<{ handle: string | null; ok: boolean; action?: string; error?: string }> = [];
 
-    for (const item of items) {
-      processed++;
-
+    for (const row of rows) {
       try {
-        // Resolve list of colour URLs. Fallback: just the source_url as a
-        // single colour group (handles legacy entries without scraped_data).
-        const sd = (item.scraped_data ?? {}) as {
-          color_urls?: Array<{ url: string; colorId: string }>;
-        };
-        const colorUrls = sd.color_urls && sd.color_urls.length > 0
-          ? sd.color_urls
-          : [{ url: item.source_url, colorId: "0" }];
-
-        await supabase
-          .from("product_import_log")
-          .update({
-            status: "scraping",
-            dry_run: dryRun,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", item.id);
-
-        // Scrape every colour sequentially.
-        const colors: ColorData[] = [];
-        for (const cu of colorUrls) {
-          const html = await firecrawlScrape(cu.url, firecrawlKey);
-          if (!html) {
-            console.warn(`[worker] firecrawl failed for ${cu.url} — skipping colour`);
-            continue;
-          }
-          const sc = extractFromHtml(html, item.brand, cu.url);
-          if (!sc.title || sc.price_eur === null) {
-            console.warn(`[worker] incomplete data for ${cu.url} — skipping colour`);
-            continue;
-          }
-          // Derive colour name from the title (or fall back to colorId)
-          const colorName = extractColorFromTitle(sc.title) || `Farbe ${cu.colorId}`;
-          colors.push({ colorName, colorId: cu.colorId, scraped: sc });
-        }
-
-        if (colors.length === 0) {
-          await supabase
-            .from("product_import_log")
-            .update({
-              status: "error",
-              error_message: `Keine Farb-Variante konnte gescraped werden (${colorUrls.length} URLs)`,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", item.id);
-          errorCount++;
-          continue;
-        }
-
-        // Build colour-neutral base data from the first successful colour scrape.
-        const first = colors[0].scraped;
-        const baseTitle = stripColorFromTitle(first.title) || first.title;
-        const base: ScrapedProduct = {
-          ...first,
-          title: baseTitle,
-          // Aggregate every colour's images so we can attach them per-variant
-          image_urls: [],
-        };
-
-        const aggregatedScrape = {
-          base_title: baseTitle,
-          colors: colors.map((c) => ({
-            colorName: c.colorName,
-            colorId: c.colorId,
-            price_eur: c.scraped.price_eur,
-            image_urls: c.scraped.image_urls,
-          })),
-          sizes: base.sizes,
-          description: base.description,
-          description_html: base.description_html,
-          material: base.material,
-          article_number: base.article_number,
-          care_labels: base.care_labels,
-          color_urls: colorUrls,
-        };
-
-        if (dryRun) {
-          await supabase
-            .from("product_import_log")
-            .update({
-              status: "scraped",
-              scraped_data: aggregatedScrape,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", item.id);
+        const r = await processRow(row as LogRow, adminToken, firecrawlKey, supabase);
+        if (r.ok) {
           createdCount++;
-          continue;
-        }
-
-        // Real run — create the multi-colour product
-        await supabase
-          .from("product_import_log")
-          .update({
-            status: "creating",
-            scraped_data: aggregatedScrape,
+          results.push({ handle: row.handle, ok: true, action: r.action });
+          // Live "current item" message on the job
+          await supabase.from("product_import_job").update({
+            message: `${r.action === "created" ? "Neu" : "Aktualisiert"}: ${r.title} (${r.colorsCount} Farben)`,
             updated_at: new Date().toISOString(),
-          })
-          .eq("id", item.id);
-
-        const created = await createMultiColorProduct(
-          base,
-          colors,
-          item.handle,
-          adminToken,
-        );
-        if (!created) throw new Error("create returned null");
-
-        if (created.duplicate) {
-          await supabase
-            .from("product_import_log")
-            .update({
-              status: "skipped",
-              shopify_product_id: created.id,
-              error_message: "Bereits in Shopify vorhanden",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", item.id);
-          continue;
-        }
-
-        // Fetch back the created product to get variant IDs grouped by colour.
-        const variantsByColor = new Map<string, string[]>();
-        try {
-          const vRes = await shopifyFetch(
-            `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products/${created.id}.json?fields=variants`,
-            { method: "GET", adminToken },
-          );
-          if (vRes.ok) {
-            const vJson = await vRes.json();
-            for (const v of vJson?.product?.variants ?? []) {
-              const cn = String(v.option2 ?? "");
-              if (!variantsByColor.has(cn)) variantsByColor.set(cn, []);
-              variantsByColor.get(cn)!.push(String(v.id));
-            }
-          }
-        } catch (e) {
-          console.warn("[worker] could not fetch variants for image mapping", e);
-        }
-
-        // Upload all images per colour and link them to that colour's variants
-        for (const c of colors) {
-          const variantIds = variantsByColor.get(c.colorName) ?? [];
-          for (const imgUrl of c.scraped.image_urls) {
-            await uploadColorImage(created.id, imgUrl, variantIds, adminToken);
-          }
-        }
-
-        // Heartbeat
-        await supabase
-          .from("product_import_job")
-          .update({ updated_at: new Date().toISOString() })
-          .eq("id", "singleton");
-
-        // Persist a colour→variantIds map for the look-detail UI
-        const variants_summary = Object.fromEntries(
-          Array.from(variantsByColor.entries()),
-        );
-        await supabase
-          .from("product_import_log")
-          .update({
-            status: "created",
-            shopify_product_id: created.id,
-            scraped_data: { ...aggregatedScrape, variants_summary },
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", item.id);
-        createdCount++;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        await supabase
-          .from("product_import_log")
-          .update({
+          }).eq("id", "singleton");
+        } else {
+          errorCount++;
+          await supabase.from("product_import_log").update({
             status: "error",
-            error_message: msg.slice(0, 500),
+            error_message: r.error ?? "Unbekannter Fehler",
             updated_at: new Date().toISOString(),
-          })
-          .eq("id", item.id);
+          }).eq("id", row.id);
+          results.push({ handle: row.handle, ok: false, error: r.error });
+        }
+      } catch (e) {
         errorCount++;
+        const msg = e instanceof Error ? e.message : String(e);
+        await supabase.from("product_import_log").update({
+          status: "error",
+          error_message: msg,
+          updated_at: new Date().toISOString(),
+        }).eq("id", row.id);
+        results.push({ handle: row.handle, ok: false, error: msg });
       }
     }
 
     // Update job counters
-    await supabase
-      .from("product_import_job")
-      .update({
-        processed: (job.processed ?? 0) + processed,
-        created_count: (job.created_count ?? 0) + createdCount,
-        error_count: (job.error_count ?? 0) + errorCount,
-        message: `Batch fertig: ${createdCount} ok, ${errorCount} Fehler`,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", "singleton");
+    const { count: pendingTotal } = await supabase
+      .from("product_import_log")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        processed,
-        created: createdCount,
-        errors: errorCount,
-        state: "running",
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    const { count: doneTotal } = await supabase
+      .from("product_import_log")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["created", "skipped"]);
+
+    const { count: errTotal } = await supabase
+      .from("product_import_log")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "error");
+
+    const total = (pendingTotal ?? 0) + (doneTotal ?? 0) + (errTotal ?? 0);
+
+    await supabase.from("product_import_job").update({
+      processed: doneTotal ?? 0,
+      created_count: doneTotal ?? 0,
+      error_count: errTotal ?? 0,
+      total,
+      updated_at: new Date().toISOString(),
+      ...(pendingTotal === 0 ? { state: "done", message: "Alle Produkte verarbeitet" } : {}),
+    }).eq("id", "singleton");
+
+    return new Response(JSON.stringify({
+      processed: rows.length,
+      created: createdCount,
+      errors: errorCount,
+      pending: pendingTotal ?? 0,
+      results,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[worker] fatal:", msg);
-    await supabase
-      .from("product_import_job")
-      .update({
-        message: `Worker-Fehler: ${msg.slice(0, 200)}`,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", "singleton");
-    return new Response(JSON.stringify({ success: false, error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
