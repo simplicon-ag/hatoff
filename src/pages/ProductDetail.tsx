@@ -9,6 +9,9 @@ import { ProductDescription } from "@/components/ProductDescription";
 import { TrustBadges } from "@/components/TrustBadges";
 import { ProductCard } from "@/components/ProductCard";
 import { AiStyleGenerator } from "@/components/AiStyleGenerator";
+import { StyleInspirations } from "@/components/StyleInspirations";
+import { YouMightAlsoLike } from "@/components/YouMightAlsoLike";
+import { ClubMemberCta } from "@/components/ClubMemberCta";
 import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
 import {
   fetchProductByHandle,
@@ -677,6 +680,9 @@ const ProductDetail = () => {
       {/* Spacer for mobile sticky bar */}
       <div className="h-20 md:hidden" />
 
+      {/* Style-Ideen: 3 Inspirations-Bilder */}
+      <StyleInspirations productTitle={product.title} />
+
       {/* AI Style Generator — nur für stilfähige Hauptstücke */}
       {(() => {
         const hay = `${product.productType ?? ""} ${(product.tags ?? []).join(" ")} ${product.title}`.toLowerCase();
@@ -697,6 +703,15 @@ const ProductDetail = () => {
         </section>
       )}
 
+      {/* Das könnte dir auch gefallen — automatische Empfehlungen */}
+      <YouMightAlsoLike
+        productHandle={product.handle}
+        productType={product.productType}
+        vendor={product.vendor}
+        tags={product.tags}
+        excludeHandles={related.map((r) => r.node.handle)}
+      />
+
       {relatedLooks.length > 0 && (
         <section className="container-editorial border-t border-border py-16">
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Passt besonders gut zu</p>
@@ -713,6 +728,9 @@ const ProductDetail = () => {
           </div>
         </section>
       )}
+
+      {/* Club-Member CTA */}
+      <ClubMemberCta />
     </SiteLayout>
   );
 };

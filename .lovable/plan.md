@@ -1,56 +1,107 @@
-## Ausgangslage
+## Ziel
+Die Produktdetailseite (`src/pages/ProductDetail.tsx`) bekommt unterhalb des bestehenden Inhalts vier neue Abschnitte in dieser Reihenfolge:
 
-Beim Polo-Shirt 993106500 hat Casa Moda **15 Farben in einem einzigen Artikel** — der Importer macht das schon richtig: Alle Farb-URLs werden gruppiert und als **EIN Shopify-Produkt mit Varianten** (`option2: Farbe`) angelegt. Auf der Detail-Seite (`ProductDetail.tsx`) werden die Farben aktuell aber nur als **Text-Buttons** ("Schwarz", "Marine", "Rot"…) gerendert — ohne Bild, ohne automatischen Bildwechsel.
+1. **Style-Ideen** — 3 inspirierende Outfit-Bilder ("So trägst du es")
+2. **Style mit diesem Stück** (existiert bereits als `AiStyleGenerator` — bleibt) → wird ggf. leicht im Layout angepasst
+3. **Das könnte dir auch gefallen** — automatische Produktempfehlungen
+4. **Club-Member werden** — CTA-Banner mit Vorteilen
 
-Zusätzlich erwähnst du: derselbe Artikel existiert manchmal **zweimal als getrennte Produkte** (einmal "Sale", einmal "Neu") — das sind in Shopify aber zwei verschiedene Produkte mit unterschiedlichen Handles, weil Casa Moda sie unter zwei URLs führt. Diese müssen wir **cross-verlinken**, damit der Kunde aus der Sale-Variante zur Neu-Variante (oder umgekehrt) springen kann.
+---
 
-## Was ich ändere
+## 1. Style-Ideen (neue Komponente `StyleInspirations`)
 
-### 1. Farb-Swatches mit Produktbild (statt Text-Buttons)
-**Datei:** `src/pages/ProductDetail.tsx`
+**Was:** Ein redaktioneller Block mit 3 Bildern, die zeigen, mit welchen Stilen / Anlässen das Produkt getragen werden kann (z.B. "Im Office", "Am Wochenende", "Für den Abend"). 
 
-Wenn die Option `Farbe` heisst:
-- Statt eckige Text-Buttons → **runde/quadratische Bild-Swatches** wie auf casamoda.com (kleines Produktbild der jeweiligen Farbe)
-- Zuordnung Farbe → Bild über `images[].altText` oder die Bild-Reihenfolge (Importer hängt Bilder pro Farbe in Reihenfolge an)
-- Bei Klick auf eine Farbe: 
-  - `selectedVariantId` wechselt
-  - **Hauptbild + Galerie** scrollen automatisch zum ersten Bild dieser Farbe
-  - Preis aktualisiert sich (eine Farbe kann SALE sein, andere nicht — Shopify-Variant hat eigenen `price` + `compareAtPrice`)
-- Andere Optionen (Grösse) bleiben als Text-Buttons
+**Warum AI-generiert klingt verlockend, aber:** Bildgenerierung pro Produktaufruf wäre zu langsam und teuer. Stattdessen:
 
-### 2. Bilder pro Farb-Variante korrekt zuordnen
-**Datei:** `supabase/functions/product-import-run/index.ts`
+**Ansatz:** Statische, kuratierte Inspirations-Bilder pro **Produktkategorie** (Hemd, Polo, Hose, Sakko, Pullover, …). Die Komponente erkennt anhand von `productType` + `tags` + `title` die Kategorie (gleiche Logik wie schon im AI-Stylist-Gate verwendet) und zeigt die passenden 3 Bilder + Titel.
 
-Aktuell werden alle Bilder gemeinsam als Produkt-Bilder hochgeladen. Ich ergänze:
-- Pro Farb-Variante wird das **erste Bild dieser Farbe** über `attachImageToVariants(productId, imageUrl, [variantId])` an die Varianten-IDs gebunden (Funktion existiert schon in der Datei).
-- Dadurch kennt Shopify die Farbe→Bild-Zuordnung → das Frontend kann beim Variant-Switch automatisch das richtige Bild anzeigen.
+- Bilder werden als statische Assets in `src/assets/style-inspirations/` abgelegt (z.B. `hemd-1.jpg`, `hemd-2.jpg`, `hemd-3.jpg`, `polo-1.jpg`, …). Wir generieren sie einmalig per AI-Bildgenerierung im Build-Schritt (über das `ai-gateway`-Skript) und committen sie.
+- Pro Kategorie ein kurzer Titel + Beschreibung pro Bild ("Klassisch zum Anzug", "Lässig mit Jeans", "Layered im Herbst").
+- Layout: Grid mit 3 Spalten (Desktop), gestapelt mobil, im `container-editorial`, mit Top-Border wie die anderen Sections.
+- Fallback: Wenn keine Kategorie matched → Section wird nicht gerendert.
 
-### 3. Cross-Linking "Sale"-Produkt ↔ "Neu"-Produkt
-**Datei:** `supabase/functions/product-import-run/index.ts` + `src/pages/ProductDetail.tsx`
+**Datei-Struktur:**
+- `src/data/styleInspirations.ts` — Mapping `category → { images: string[], captions: string[] }`
+- `src/components/StyleInspirations.tsx` — Komponente
+- `src/assets/style-inspirations/*.jpg` — Bilder (einmalig generiert)
 
-Wenn derselbe `articleId` (z.B. `993106500`) in **zwei Shopify-Produkten** landet (eins aus `/sale/`, eins aus `/neuheiten/`):
-- Beim Anlegen wird im **Shopify-Tag** `related-article:993106500` gesetzt
-- Auf der PDP fragen wir per Storefront-API alle Produkte mit demselben Tag ab
-- Falls > 1 Treffer → Block **"Auch erhältlich als"** mit Verlinkung (z.B. "→ Diesen Artikel als Neuheit ansehen" / "→ Im Sale ansehen")
-- Badge `SALE` / `NEU` jeweils sichtbar
+---
 
-### 4. Sale-Badge & Compare-At-Preis sichtbar
-**Datei:** `src/pages/ProductDetail.tsx` + `src/components/ProductCard.tsx`
+## 2. Style mit diesem Stück (bestehend, keine Änderung)
 
-Wenn `compareAtPrice > price` der gewählten Variante:
-- Roter **SALE**-Badge oben links auf dem Hauptbild
-- Alter Preis durchgestrichen + neuer Preis in Akzentfarbe (wie im Screenshot)
-- Im ProductCard: Badge "NEU" wenn Tag `neu` vorhanden, "SALE" wenn `compareAtPrice > price`
+Der `AiStyleGenerator` bleibt wie er ist und rückt in der Reihenfolge **nach** den Style-Ideen.
 
-## Was ich NICHT ändere
+---
 
-- Der Importer-Flow bleibt wie er ist (Discover → Group by articleId → Run scrapt alle Farben → erstellt EIN Produkt pro Artikel)
-- Bestehende importierte Produkte bekommen die Bild→Variante-Zuordnung **beim nächsten Update-Run** (du hast Update-Mode an)
+## 3. „Das könnte dir auch gefallen" (neue Komponente `YouMightAlsoLike`)
 
-## Offene Punkte / Annahmen
+**Was:** Automatische Produktempfehlungen basierend auf dem aktuellen Produkt — **kein** AI-Call (zu langsam für jeden Pageview), sondern eine smarte Heuristik über die Storefront-API:
 
-- **Farb-Bild-Zuordnung**: Die Reihenfolge der Bilder pro Farbe ist im Scraper deterministisch (erst Farbe A alle Bilder, dann Farbe B). Ich nutze das + `imgix`-URL-Muster `/product/{articleId}/{colorId}/...` um Bilder dem Variant zuzuordnen.
-- **"Sale" vs "Neu" als getrennte Produkte**: Falls du das vermeiden willst, könnten wir alternativ den Discover so ändern, dass Sale + Neu desselben `articleId` zu **einem** Produkt mit Tags `sale` UND `neu` zusammenfallen. Das wäre sauberer als Cross-Linking. **Möchtest du das stattdessen?** → Sag Bescheid, dann passe ich Punkt 3 entsprechend an.
+**Logik (in dieser Reihenfolge, bis 4 unique Produkte gefunden):**
+1. Gleicher `productType` (z.B. "Hemd") + andere Marke → Cross-Brand-Vorschläge
+2. Gleicher Stil-Tag (sucht im Tag-Array nach `stil:*`, `anlass:*`, `saison:*`)
+3. Gleiche Preisklasse (±30%) + ähnlicher `productType`
+4. Auffüllen mit beliebten Produkten (z.B. neueste mit Tag `neu`)
 
-## Aufwand
-~30 Min Implementation, keine DB-Migration nötig.
+Aktuelle Karte ausschliessen, ebenso Produkte die schon in `related` (gleicher Vendor, oben) gezeigt werden, um Doppelungen zu vermeiden.
+
+**Layout:** Identisch zum bestehenden „Mehr von {vendor}"-Grid (4 Spalten Desktop, `ProductCard`).
+
+**Datei:** `src/components/YouMightAlsoLike.tsx` — nutzt `fetchProducts` mehrfach mit unterschiedlichen Queries und merged die Ergebnisse.
+
+**Position:** Nach „Mehr von {vendor}", vor dem Club-Banner.
+
+---
+
+## 4. Club-Member-CTA (neue Komponente `ClubMemberCta`)
+
+**Vorschlag fürs Konzept** (HATOFF Club):
+
+> **HATOFF CLUB — Werde Mitglied**  
+> Mehr Stil. Mehr Vorteile. Kostenlos.
+
+**Vier Vorteile (mit Icons):**
+1. 🎁 **10% Willkommensrabatt** auf deine erste Bestellung
+2. 🚚 **Gratis Versand & Retoure** ab dem ersten Einkauf — keine Mindestbestellung
+3. ✨ **Early Access** zu neuen Kollektionen & Sales (24 h vor allen anderen)
+4. 👔 **Persönlicher Stil-Concierge** — Outfit-Beratung per Mail oder Chat
+
+**Layout:** Voll-Breite Section mit dunklem Hintergrund (`bg-foreground text-background`), zentriertem Inhalt im `container-editorial`, Headline in `font-display`, 4-Spalten-Grid für die Vorteile (2×2 mobil), und ein primärer Call-to-Action-Button **„Jetzt kostenlos beitreten"**.
+
+**Funktionalität (für jetzt):** Der Button öffnet noch keinen Auth-Flow — es wird ein Toast „Bald verfügbar" angezeigt **oder** zu einer noch nicht existierenden Route `/club` verlinkt. **Frage an dich:** Soll der Button später eine echte Anmeldung haben (mit Lovable-Cloud-Auth), oder reicht erst mal nur das visuelle Konzept? Ich würde im ersten Schritt nur die Optik bauen und die Anmeldung in einem späteren Schritt nachziehen — sag mir, wenn das anders sein soll.
+
+**Datei:** `src/components/ClubMemberCta.tsx`
+
+---
+
+## Geänderte / neue Dateien
+
+**Neu:**
+- `src/components/StyleInspirations.tsx`
+- `src/components/YouMightAlsoLike.tsx`
+- `src/components/ClubMemberCta.tsx`
+- `src/data/styleInspirations.ts`
+- `src/assets/style-inspirations/*.jpg` (einmalig per AI generiert, ~9–12 Bilder für 3–4 Kategorien)
+
+**Bearbeitet:**
+- `src/pages/ProductDetail.tsx` — neue Sections in dieser Reihenfolge unterhalb der bestehenden Inhalte einbinden:
+  1. Bestehende Galerie + Produktinfo (unverändert)
+  2. Bestehende Accordions (unverändert)
+  3. **NEU:** `<StyleInspirations product={product} />`
+  4. Bestehender `<AiStyleGenerator />` (unverändert)
+  5. Bestehende „Mehr von {vendor}" Sektion (unverändert)
+  6. **NEU:** `<YouMightAlsoLike product={product} excludeHandles={[...related]} />`
+  7. Bestehende „In diesen Looks getragen" Sektion (unverändert)
+  8. **NEU:** `<ClubMemberCta />`
+
+---
+
+## Reihenfolge der Implementierung
+
+1. Style-Inspirationen-Bilder per AI generieren (Gemini Image Preview) und nach `src/assets/style-inspirations/` ablegen
+2. `styleInspirations.ts` Datenmapping anlegen
+3. `StyleInspirations`-Komponente
+4. `YouMightAlsoLike`-Komponente (mit Fetch-Logik)
+5. `ClubMemberCta`-Komponente
+6. `ProductDetail.tsx` integrieren
