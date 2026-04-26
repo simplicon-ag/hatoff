@@ -67,7 +67,7 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
 
   if (safeImages.length === 0) {
     return (
-      <div className="flex aspect-[4/5] items-center justify-center bg-secondary text-sm text-muted-foreground">
+      <div className="flex aspect-[4/5] items-center justify-center text-sm text-muted-foreground">
         Kein Bild
       </div>
     );
