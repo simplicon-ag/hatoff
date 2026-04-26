@@ -347,7 +347,7 @@ Deno.serve(async (req) => {
       .from("product_import_job")
       .update({
         total: pendingTotal ?? 0,
-        message: `Entdeckt: ${inserted} gruppierte Produkte`,
+        message: `Entdeckt: ${inserted} Produkte (${newCount} neu, ${updateCount} Update)`,
         updated_at: new Date().toISOString(),
       })
       .eq("id", "singleton");
@@ -359,6 +359,8 @@ Deno.serve(async (req) => {
         venti_urls: vtUrls.length,
         shopify_existing: existing.size,
         groups: groups.size,
+        new_count: newCount,
+        update_count: updateCount,
         inserted,
         pending_total: pendingTotal ?? 0,
       }),
