@@ -87,26 +87,51 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
   return (
     <>
       <div className="flex flex-col gap-4 md:flex-row">
-        {/* Thumbnails — desktop vertical */}
+        {/* Thumbnails — desktop vertical (windowed) */}
         {safeImages.length > 1 && (
-          <div className="order-2 hidden flex-col gap-2 md:order-1 md:flex">
-            {safeImages.map((img, i) => (
+          <div className="order-2 hidden flex-col items-center gap-2 md:order-1 md:flex">
+            {safeImages.length > THUMBS_VISIBLE && (
               <button
-                key={img.url + i}
-                onClick={() => setActive(i)}
-                className={cn(
-                  "relative h-20 w-16 overflow-hidden border transition",
-                  i === active ? "border-primary" : "border-transparent hover:border-border",
-                )}
-                aria-label={`Bild ${i + 1} ansehen`}
+                type="button"
+                onClick={() => setThumbStart((s) => Math.max(0, s - 1))}
+                disabled={thumbStart === 0}
+                className="flex h-6 w-16 items-center justify-center border border-transparent text-muted-foreground transition hover:border-border hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="Vorherige Bilder"
               >
-                <img
-                  src={img.url}
-                  alt={img.altText ?? `${title} ${i + 1}`}
-                  className="h-full w-full object-contain mix-blend-multiply"
-                />
+                <ChevronUp className="h-4 w-4" />
               </button>
-            ))}
+            )}
+            {safeImages.slice(thumbStart, thumbStart + THUMBS_VISIBLE).map((img, i) => {
+              const idx = thumbStart + i;
+              return (
+                <button
+                  key={img.url + idx}
+                  onClick={() => setActive(idx)}
+                  className={cn(
+                    "relative h-20 w-16 overflow-hidden border transition",
+                    idx === active ? "border-primary" : "border-transparent hover:border-border",
+                  )}
+                  aria-label={`Bild ${idx + 1} ansehen`}
+                >
+                  <img
+                    src={img.url}
+                    alt={img.altText ?? `${title} ${idx + 1}`}
+                    className="h-full w-full object-contain mix-blend-multiply"
+                  />
+                </button>
+              );
+            })}
+            {safeImages.length > THUMBS_VISIBLE && (
+              <button
+                type="button"
+                onClick={() => setThumbStart((s) => Math.min(maxStart, s + 1))}
+                disabled={thumbStart >= maxStart}
+                className="flex h-6 w-16 items-center justify-center border border-transparent text-muted-foreground transition hover:border-border hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="Weitere Bilder"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
 
