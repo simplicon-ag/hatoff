@@ -324,42 +324,134 @@ const ProductDetail = () => {
           {product.options.map((opt) => {
             // Skip default "Title" option that exists when product has no real variants
             if (opt.name === "Title" && opt.values.length === 1 && opt.values[0] === "Default Title") return null;
+
+            const isColor = opt.name === "Farbe" || opt.name === "Color";
+            const currentValue = selectedVariant?.selectedOptions.find((o) => o.name === opt.name)?.value;
+
             return (
               <div key={opt.name} className="mt-7">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{opt.name}</p>
-                  {selectedVariant && (
-                    <p className="text-xs text-muted-foreground">
-                      Gewählt: {selectedVariant.selectedOptions.find((o) => o.name === opt.name)?.value}
-                    </p>
+                  <p className="text-sm font-medium">
+                    {opt.name}
+                    {isColor && currentValue && (
+                      <span className="ml-2 font-normal text-muted-foreground">: {currentValue}</span>
+                    )}
+                  </p>
+                  {!isColor && currentValue && (
+                    <p className="text-xs text-muted-foreground">Gewählt: {currentValue}</p>
                   )}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {product.variants.edges.map(({ node: v }) => {
-                    const value = v.selectedOptions.find((o) => o.name === opt.name)?.value;
-                    if (!value) return null;
-                    const active = v.id === selectedVariantId;
-                    return (
-                      <button
-                        key={v.id}
-                        onClick={() => setSelectedVariantId(v.id)}
-                        disabled={!v.availableForSale}
-                        className={cn(
-                          "min-w-12 border px-4 py-2 text-sm transition",
-                          active
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-background hover:border-primary",
-                          !v.availableForSale && "line-through opacity-40",
-                        )}
-                      >
-                        {value}
-                      </button>
-                    );
-                  })}
-                </div>
+
+                {isColor ? (
+                  // Bild-Swatches für Farben
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {colorOptions.map((c) => {
+                      const active = c.value === currentValue;
+                      return (
+                        <button
+                          key={c.value}
+                          onClick={() => setSelectedVariantId(c.variantId)}
+                          disabled={!c.available}
+                          title={c.value}
+                          aria-label={c.value}
+                          className={cn(
+                            "relative h-14 w-14 overflow-hidden border-2 bg-secondary transition",
+                            active ? "border-primary ring-1 ring-primary/40" : "border-transparent hover:border-border",
+                            !c.available && "opacity-40",
+                          )}
+                        >
+                          {c.image ? (
+                            <img src={c.image} alt={c.value} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-wider text-muted-foreground">
+                              {c.value.slice(0, 4)}
+                            </span>
+                          )}
+                          {!c.available && (
+                            <span className="absolute inset-0 flex items-center justify-center bg-background/40 text-[9px] font-semibold uppercase tracking-wider text-foreground">
+                              ✕
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  // Text-Buttons für Grösse / sonstige Optionen
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(() => {
+                      // Eindeutige Werte basierend auf Varianten, die zur aktuell gewählten Farbe passen
+                      const colourValue = currentValue && isColor ? currentValue : selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                      const seen = new Map<string, { variantId: string; available: boolean }>();
+                      for (const { node: v } of product.variants.edges) {
+                        const value = v.selectedOptions.find((o) => o.name === opt.name)?.value;
+                        if (!value) continue;
+                        // Wenn es eine Farbe gibt, nur Varianten dieser Farbe für die Grössen-Buttons
+                        if (colourValue) {
+                          const vColor = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                          if (vColor && vColor !== colourValue) continue;
+                        }
+                        const existing = seen.get(value);
+                        if (!existing || (!existing.available && v.availableForSale)) {
+                          seen.set(value, { variantId: v.id, available: v.availableForSale });
+                        }
+                      }
+                      return Array.from(seen.entries()).map(([value, info]) => {
+                        const active = value === currentValue;
+                        return (
+                          <button
+                            key={value}
+                            onClick={() => setSelectedVariantId(info.variantId)}
+                            disabled={!info.available}
+                            className={cn(
+                              "min-w-12 border px-4 py-2 text-sm transition",
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-background hover:border-primary",
+                              !info.available && "line-through opacity-40",
+                            )}
+                          >
+                            {value}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
               </div>
             );
           })}
+
+          {/* Cross-Linking: dasselbe Modell als Sale/Neu */}
+          {siblings.length > 0 && (
+            <div className="mt-7 border border-border bg-secondary/40 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Auch erhältlich als
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {siblings.map((s) => {
+                  const isSale = s.node.tags?.some((t) => /sale/i.test(t.replace(/^[a-z]+:/i, "")));
+                  const isNew = s.node.tags?.some((t) => /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")));
+                  const label = isSale ? "Im Sale" : isNew ? "Als Neuheit" : s.node.title;
+                  return (
+                    <Link
+                      key={s.node.handle}
+                      to={`/product/${s.node.handle}`}
+                      className="inline-flex items-center gap-2 border border-border bg-background px-3 py-1.5 text-xs font-medium hover:border-primary"
+                    >
+                      <span className={cn(
+                        "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                        isSale ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background",
+                      )}>
+                        {isSale ? "Sale" : "Neu"}
+                      </span>
+                      → {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Quantity */}
           <div className="mt-7">
