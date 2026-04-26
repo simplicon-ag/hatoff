@@ -75,9 +75,12 @@ export const FeaturedLook = ({ look }: Props) => {
         const product = products.find((p) => p.node.handle === slot.handle);
         if (!product) return null;
         const variant = variantForColor(product.node, slot.color);
-        // Thumbnail zeigt IMMER das Hauptbild des Produkts (erstes Galeriebild),
-        // unabhängig von der Farb-Variante.
-        const image = product.node.images.edges[0]?.node.url ?? null;
+        // Thumbnail-Bild:
+        //  - Wenn der Slot eine Farbe vorgibt → Variant-Bild dieser Farbe (Fallback: Hauptbild)
+        //  - Sonst → Hauptbild des Produkts
+        const image = slot.color
+          ? variant?.image?.url ?? product.node.images.edges[0]?.node.url ?? null
+          : product.node.images.edges[0]?.node.url ?? null;
         return { product, variant, image, color: slot.color };
       })
       .filter(Boolean) as Array<{
