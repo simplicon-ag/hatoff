@@ -151,21 +151,21 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false, recom
       return;
     }
     const items = resolved
-      .map((r) =>
-        r.variant
+      .map((r) => {
+        const selectedImage = r.variant?.image?.url ?? r.product.node.images.edges[0]?.node.url ?? null;
+        return r.variant
           ? {
               productHandle: r.product.node.handle,
               productTitle: r.product.node.title,
-              productImage:
-                r.product.node.images.edges[0]?.node.url ?? null,
+              productImage: selectedImage,
               variantId: r.variant.id,
               variantTitle: r.variant.title,
               price: r.variant.price,
               quantity: 1,
               selectedOptions: r.variant.selectedOptions ?? [],
             }
-          : null,
-      )
+          : null;
+      })
       .filter(Boolean) as Parameters<typeof addItems>[0];
     setAdding(true);
     await addItems(items);
@@ -194,7 +194,7 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false, recom
         {resolved.map((r, idx) => {
           const p = r.product;
           const opts = p.node.options ?? [];
-          const img = p.node.images.edges[0]?.node.url;
+          const img = r.variant?.image?.url ?? p.node.images.edges[0]?.node.url;
           const cleanTitle = p.node.title
             .replace(/\s*–\s*Var\.?\s*\d+$/i, "")
             .trim();
