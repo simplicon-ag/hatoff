@@ -86,6 +86,7 @@ const ProductDetail = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [userPickedVariant, setUserPickedVariant] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [related, setRelated] = useState<ShopifyProduct[]>([]);
   const [siblings, setSiblings] = useState<ShopifyProduct[]>([]);
@@ -97,6 +98,7 @@ const ProductDetail = () => {
     if (!handle) return;
     setLoading(true);
     setQuantity(1);
+    setUserPickedVariant(false);
     window.scrollTo({ top: 0, behavior: "instant" });
     fetchProductByHandle(handle)
       .then((p: Product | null) => {
@@ -190,11 +192,14 @@ const ProductDetail = () => {
   }, [product]);
 
   // Bild-Index in der Galerie für die aktuelle Variante
+  // Bild-Index in der Galerie für die aktuelle Variante.
+  // Beim Initialaufruf zeigen wir IMMER das erste Bild — erst wenn der
+  // Nutzer aktiv eine andere Farbe wählt, springen wir zum Variantenbild.
   const variantImageIndex = useMemo(() => {
-    if (!product || !selectedVariant) return null;
+    if (!product || !selectedVariant || !userPickedVariant) return null;
     const imgs = product.images.edges.map((e) => e.node);
     return findVariantImageIndex(imgs, selectedVariant);
-  }, [product, selectedVariant]);
+  }, [product, selectedVariant, userPickedVariant]);
 
   const relatedLooks = useMemo(() => {
     if (!product) return [];
@@ -445,10 +450,12 @@ const ProductDetail = () => {
                                 return col === c.value && sz === currentSize;
                               });
                               if (match) {
+                                setUserPickedVariant(true);
                                 setSelectedVariantId(match.node.id);
                                 return;
                               }
                             }
+                            setUserPickedVariant(true);
                             setSelectedVariantId(c.variantId);
                           }}
                           disabled={!c.available}
@@ -507,7 +514,10 @@ const ProductDetail = () => {
                         return (
                           <button
                             key={value}
-                            onClick={() => setSelectedVariantId(info.variantId)}
+                            onClick={() => {
+                              setUserPickedVariant(true);
+                              setSelectedVariantId(info.variantId);
+                            }}
                             disabled={!info.available}
                             className={cn(
                               "min-w-12 border px-4 py-2 text-sm transition",
