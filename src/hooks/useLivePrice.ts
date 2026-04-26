@@ -18,6 +18,17 @@ export interface LivePrice {
 const memCache = new Map<string, LivePrice>();
 const inflight = new Map<string, Promise<LivePrice | null>>();
 
+function normalizeLivePrice(price: LivePrice): LivePrice {
+  return {
+    ...price,
+    // Sales werden ausschliesslich in Shopify (Variant compareAtPrice) gepflegt.
+    // Der Brand-Scrape liefert weiterhin den CHF-Anzeigepreis, aber nie Sale-Status.
+    on_sale: false,
+    original_price_chf: null,
+    original_price_eur: null,
+  };
+}
+
 /**
  * Lädt Live-Preise für eine Liste von Handles vom product-price Edge-Endpoint.
  * - Liest erst den DB-Cache (über die Edge-Function selbst — die fragt zuerst die Tabelle)
@@ -26,7 +37,7 @@ const inflight = new Map<string, Promise<LivePrice | null>>();
 async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
   const missing = handles.filter((h) => !memCache.has(h));
   if (missing.length === 0) {
-    return handles.map((h) => memCache.get(h)!).filter(Boolean);
+    return handles.map((h) => memCache.get(h)).filter(Boolean).map(normalizeLivePrice);
   }
 
   // Bereits laufende Requests für einzelne Handles wiederverwenden
@@ -39,16 +50,7 @@ async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
       });
       if (error) throw error;
       const rawPrices: LivePrice[] = data?.prices ?? [];
-      // Sales werden ausschliesslich in Shopify (Variant compareAtPrice) gepflegt.
-      // Der Brand-Scrape liefert weiterhin den CHF-Anzeigepreis, aber wir
-      // ignorieren `on_sale` / `original_price_*` aus dem Cache, damit nur
-      // manuell in Shopify gesetzte Sales sichtbar werden.
-      const prices: LivePrice[] = rawPrices.map((p) => ({
-        ...p,
-        on_sale: false,
-        original_price_chf: null,
-        original_price_eur: null,
-      }));
+      const prices = rawPrices.map(normalizeLivePrice);
       for (const p of prices) memCache.set(p.handle, p);
       return prices;
     })();
@@ -69,7 +71,7 @@ async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
   // Auf alle relevanten Inflights warten
   await Promise.all(missing.map((h) => inflight.get(h)).filter(Boolean));
 
-  return handles.map((h) => memCache.get(h)!).filter(Boolean);
+  return handles.map((h) => memCache.get(h)).filter(Boolean).map(normalizeLivePrice);
 }
 
 /**
@@ -83,7 +85,7 @@ export function useLivePrices(handles: string[]) {
     const out: Record<string, LivePrice> = {};
     for (const h of stableHandles) {
       const cached = memCache.get(h);
-      if (cached) out[h] = cached;
+      if (cached) out[h] = normalizeLivePrice(cached);
     }
     return out;
   });
