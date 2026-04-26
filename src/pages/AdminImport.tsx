@@ -36,6 +36,7 @@ type SingleImportResult = {
   description_length?: number;
   missing_fields?: string[];
   shopify_admin_url?: string;
+  look_generation_triggered?: boolean;
   error?: string;
 };
 
