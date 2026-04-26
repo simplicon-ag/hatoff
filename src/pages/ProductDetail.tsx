@@ -122,7 +122,7 @@ const ProductDetail = () => {
         }
       })
       .finally(() => setLoading(false));
-  }, [handle]);
+  }, [handle, colorParam]);
 
   const selectedVariant = useMemo(
     () => product?.variants.edges.find((e) => e.node.id === selectedVariantId)?.node,
