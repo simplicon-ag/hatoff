@@ -296,6 +296,69 @@ export default function AdminImport() {
           </AlertDescription>
         </Alert>
 
+        {/* Single URL import — quickest path */}
+        <Card className="p-6 space-y-4 border-primary/30 bg-primary/5">
+          <div className="space-y-1">
+            <h2 className="font-medium flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-primary" />
+              Einzelnes Produkt per URL importieren
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Füge eine Casa Moda oder Venti Produkt-URL ein. Findet automatisch alle Farb-Varianten,
+              zieht Beschreibung, Material, Pflegehinweise, Bilder und Preise und legt EIN Shopify-Produkt
+              mit allen Farben + Grössen an. Existiert das Produkt bereits, wird es aktualisiert.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              type="url"
+              value={singleUrl}
+              onChange={(e) => setSingleUrl(e.target.value)}
+              placeholder="https://www.casamoda.com/de/de/businesshemd-3760-474"
+              disabled={singleBusy}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !singleBusy) runSingleUrl();
+              }}
+              className="flex-1"
+            />
+            <Button onClick={runSingleUrl} disabled={singleBusy || !singleUrl.trim()}>
+              {singleBusy ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Lädt… (30–90s)
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Importieren
+                </>
+              )}
+            </Button>
+          </div>
+          {singleResult && singleResult.success && (
+            <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-1 text-sm">
+              <div className="flex items-center gap-2 font-medium text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" />
+                {singleResult.action === "created" ? "Neu angelegt" : "Aktualisiert"}: {singleResult.title}
+              </div>
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                <div>Handle: <span className="font-mono">{singleResult.handle}</span></div>
+                <div>Shopify-ID: <span className="font-mono">{singleResult.shopify_product_id}</span></div>
+                <div>{singleResult.colors_found} Farben: {singleResult.colors?.join(", ")}</div>
+                <div>{singleResult.sizes?.length} Grössen · {singleResult.images_uploaded} Bilder hochgeladen</div>
+                {singleResult.material && <div>Material: {singleResult.material}</div>}
+                {singleResult.article_number && <div>Artikelnr: {singleResult.article_number}</div>}
+                {singleResult.price_eur != null && <div>Preis: €{singleResult.price_eur}</div>}
+              </div>
+            </div>
+          )}
+          {singleResult && !singleResult.success && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              {singleResult.error}
+            </div>
+          )}
+        </Card>
+
         {/* Shopify purge card — destructive operation */}
         <Card className="p-6 space-y-3 border-destructive/40 bg-destructive/5">
           <div className="flex items-start justify-between gap-4 flex-wrap">
