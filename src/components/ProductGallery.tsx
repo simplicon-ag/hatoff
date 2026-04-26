@@ -18,6 +18,7 @@ interface Props {
 
 export const ProductGallery = ({ images, title, activeIndex }: Props) => {
   const [active, setActive] = useState(0);
+  const [thumbStart, setThumbStart] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const [zoom, setZoom] = useState({ active: false, x: 50, y: 50 });
   const trackRef = useRef<HTMLDivElement>(null);
