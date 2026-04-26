@@ -251,47 +251,30 @@ const ProductDetail = () => {
         <ProductGallery images={images} title={product.title} activeIndex={variantImageIndex ?? undefined} />
 
         <div className="flex flex-col">
-          {/* Top row: Eigenschafts-Badges links, Artikel-Nr. rechts (Casa-Moda-Stil) */}
+          {/* Top row: Badges aus Shopify-Metafield (custom.badges), Artikel-Nr. rechts */}
           {(() => {
-            // Badges aus Titel + Beschreibung + Tags + ProductType extrahieren
-            const haystack = `${product.title} ${product.description} ${product.productType} ${(product.tags ?? []).join(" ")}`;
-            const patterns: Array<{ re: RegExp; label: string }> = [
-              // Kragenformen
-              { re: /\bkent[-\s]?kragen\b/i, label: "Kent-Kragen" },
-              { re: /\bhaifisch[-\s]?kragen\b/i, label: "Haifisch-Kragen" },
-              { re: /\bbutton[-\s]?down\b/i, label: "Button-Down" },
-              { re: /\bcutaway[-\s]?kragen\b/i, label: "Cutaway-Kragen" },
-              { re: /\bstehkragen\b/i, label: "Stehkragen" },
-              { re: /\bpolokragen\b/i, label: "Polokragen" },
-              { re: /\bv[-\s]?ausschnitt\b/i, label: "V-Ausschnitt" },
-              { re: /\brundhals\b/i, label: "Rundhals" },
-              // Passformen / Fits
-              { re: /\bcomfort[-\s]?fit\b/i, label: "Comfort Fit" },
-              { re: /\bmodern[-\s]?fit\b/i, label: "Modern Fit" },
-              { re: /\bslim[-\s]?fit\b/i, label: "Slim Fit" },
-              { re: /\bregular[-\s]?fit\b/i, label: "Regular Fit" },
-              { re: /\btailored[-\s]?fit\b/i, label: "Tailored Fit" },
-              { re: /\bclassic[-\s]?fit\b/i, label: "Classic Fit" },
-              { re: /\bstraight[-\s]?fit\b/i, label: "Straight Fit" },
-              // Material/Eigenschaft
-              { re: /\bstretch\b/i, label: "Stretch" },
-              { re: /\b100\s*%\s*baumwolle\b/i, label: "100% Baumwolle" },
-              { re: /\bbügelleicht\b/i, label: "Bügelleicht" },
-              { re: /\bnon[-\s]?iron\b/i, label: "Non-Iron" },
-              { re: /\bkurzarm\b/i, label: "Kurzarm" },
-              { re: /\blangarm\b/i, label: "Langarm" },
-            ];
-            const found: string[] = [];
-            for (const { re, label } of patterns) {
-              if (re.test(haystack) && !found.includes(label)) found.push(label);
-              if (found.length >= 3) break;
+            // Metafield kann list.single_line_text (JSON-Array) oder single_line_text (kommagetrennt) sein
+            let badges: string[] = [];
+            const raw = product.badges?.value?.trim();
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                  badges = parsed.map((s) => String(s).trim()).filter(Boolean);
+                } else if (typeof parsed === "string") {
+                  badges = parsed.split(",").map((s) => s.trim()).filter(Boolean);
+                }
+              } catch {
+                // Kein JSON → als kommagetrennte Liste interpretieren
+                badges = raw.split(",").map((s) => s.trim()).filter(Boolean);
+              }
             }
             const artTag = (product.tags ?? []).find((t) => /^art:/i.test(t));
             const artNr = artTag ? artTag.replace(/^art:/i, "").trim() : product.id.split("/").pop();
             return (
               <div className="flex items-start justify-between gap-4">
                 <div className="flex flex-wrap gap-2">
-                  {found.map((t) => (
+                  {badges.map((t) => (
                     <span
                       key={t}
                       className="bg-secondary px-3 py-1 text-xs font-medium text-foreground/80"
