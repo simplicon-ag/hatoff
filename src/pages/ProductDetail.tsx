@@ -601,7 +601,7 @@ const ProductDetail = () => {
           </div>
 
           {/* Description & Details */}
-          <Accordion type="multiple" defaultValue={["details"]} className="mt-8">
+          <Accordion type="multiple" className="mt-8">
             <AccordionItem value="details">
               <AccordionTrigger className="py-5 font-display text-base">Details & Pflege</AccordionTrigger>
               <AccordionContent className="pb-6 pt-2">
