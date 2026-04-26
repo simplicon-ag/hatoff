@@ -70,6 +70,7 @@ const ProductDetail = () => {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [related, setRelated] = useState<ShopifyProduct[]>([]);
+  const [siblings, setSiblings] = useState<ShopifyProduct[]>([]);
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
   const { price: livePrice } = useLivePrice(handle);
@@ -90,6 +91,16 @@ const ProductDetail = () => {
             setRelated(items.filter((i) => i.node.handle !== p.handle).slice(0, 4));
           });
         }
+
+        // Cross-Linking: andere Produkte mit demselben Artikel-Tag (z.B. art:993106500)
+        const articleTag = p?.tags?.find((t) => /^art:/i.test(t));
+        if (articleTag) {
+          fetchProducts(10, `tag:"${articleTag}"`).then((items) => {
+            setSiblings(items.filter((i) => i.node.handle !== p.handle));
+          });
+        } else {
+          setSiblings([]);
+        }
       })
       .finally(() => setLoading(false));
   }, [handle]);
@@ -99,9 +110,59 @@ const ProductDetail = () => {
     [product, selectedVariantId],
   );
 
+  // Eindeutige Farben (erste Variant pro Farbe → repräsentatives Bild)
+  const colorOptions = useMemo(() => {
+    if (!product) return [] as Array<{ value: string; variantId: string; image: string | null; available: boolean }>;
+    const seen = new Map<string, { value: string; variantId: string; image: string | null; available: boolean }>();
+    for (const { node: v } of product.variants.edges) {
+      const value = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+      if (!value) continue;
+      const existing = seen.get(value);
+      if (!existing) {
+        seen.set(value, {
+          value,
+          variantId: v.id,
+          image: v.image?.url ?? null,
+          available: v.availableForSale,
+        });
+      } else if (!existing.available && v.availableForSale) {
+        // upgrade to available variant if previous was sold out
+        seen.set(value, { ...existing, variantId: v.id, available: true });
+      }
+    }
+    return Array.from(seen.values());
+  }, [product]);
+
+  // Bild-Index in der Galerie für die aktuelle Variante
+  const variantImageIndex = useMemo(() => {
+    if (!product || !selectedVariant) return null;
+    const imgs = product.images.edges.map((e) => e.node);
+    return findVariantImageIndex(imgs, selectedVariant);
+  }, [product, selectedVariant]);
+
   const relatedLooks = useMemo(() => {
     if (!product) return [];
     return looks.filter((l) => l.productHandles.includes(product.handle));
+  }, [product]);
+
+  // Variant-basierter Sale (wenn compareAtPrice vorhanden) — überschreibt livePrice nicht, ergänzt ihn
+  const variantOnSale = useMemo(() => {
+    if (!selectedVariant?.compareAtPrice) return false;
+    const price = parseFloat(selectedVariant.price.amount);
+    const compare = parseFloat(selectedVariant.compareAtPrice.amount);
+    return isFinite(compare) && compare > price;
+  }, [selectedVariant]);
+
+  const variantDiscount = useMemo(() => {
+    if (!variantOnSale || !selectedVariant?.compareAtPrice) return null;
+    const price = parseFloat(selectedVariant.price.amount);
+    const compare = parseFloat(selectedVariant.compareAtPrice.amount);
+    return Math.round(((compare - price) / compare) * 100);
+  }, [variantOnSale, selectedVariant]);
+
+  const isNewArrival = useMemo(() => {
+    if (!product) return false;
+    return product.tags?.some((t) => /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")));
   }, [product]);
 
   const handleAdd = async () => {
