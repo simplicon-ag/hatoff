@@ -46,6 +46,15 @@ export const SiteFooter = () => {
             <li><Link to="/groessentabellen" className="hover:text-primary">Grössentabellen</Link></li>
           </ul>
         </div>
+
+        <div className="space-y-3 text-sm md:col-span-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-6 text-xs uppercase tracking-wider text-muted-foreground/70">
+            <span className="font-display text-[11px]">Admin</span>
+            <Link to="/admin/import" className="hover:text-primary">Produkt-Import</Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/admin/looks" className="hover:text-primary">Look-Review</Link>
+          </div>
+        </div>
       </div>
       <div className="border-t border-border">
         <div className="container-editorial flex flex-col items-start justify-between gap-3 py-6 text-xs text-muted-foreground md:flex-row md:items-center">
