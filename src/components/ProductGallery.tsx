@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, X, ZoomIn } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const THUMBS_VISIBLE = 5;
 
 interface ImageNode {
   url: string;
