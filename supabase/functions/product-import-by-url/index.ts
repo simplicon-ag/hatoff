@@ -105,11 +105,25 @@ const COLOR_SLUG_WORDS = new Set([
 ]);
 
 function parseProductUrl(url: string): { slugBase: string; articleId: string; colorId: string } | null {
-  const path = url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/\/$/, "").toLowerCase();
-  const m = path.match(/^([a-z0-9-]+?)-(\d{3,6})-(\d{2,5})$/);
+  // Strip protocol+host, any locale prefix like /de/de/, /de/, /at/de/, etc., and trailing slash.
+  let path = url
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .replace(/^\/[a-z]{2}(?:\/[a-z]{2})?\//i, "/")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "")
+    .toLowerCase();
+
+  // Use only the last path segment (in case there are extra prefixes).
+  const segments = path.split("/").filter(Boolean);
+  if (segments.length === 0) return null;
+  const slug = segments[segments.length - 1];
+
+  // Match `<slug>-<articleId>-<colorId>` with looser digit ranges.
+  const m = slug.match(/^([a-z0-9-]+?)-(\d{3,8})-(\d{1,5})$/);
   if (!m) return null;
+
   let slugBase = m[1];
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     const parts = slugBase.split("-");
     if (parts.length > 1 && COLOR_SLUG_WORDS.has(parts[parts.length - 1])) {
       parts.pop();
