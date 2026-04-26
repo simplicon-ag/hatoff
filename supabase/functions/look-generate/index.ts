@@ -306,7 +306,7 @@ Regeln:
 - KEINE Accessoires (Gürtel, Schal, Krawatte, Mütze, Cap, Socken)
 - Farbharmonie: klassische Kombinationen bevorzugen
 - Vermeide Stücke aus derselben Hauptkategorie wie der Anker
-- Verschiedene Marken im Set sind willkommen
+- MARKEN-MIX ist ausdrücklich erwünscht: Kombiniere bevorzugt Stücke verschiedener Marken (z.B. Venti-Hemd + Casa-Moda-Hose + Pierre-Cardin-Sakko). Ein Look aus 3 Marken wirkt kuratierter als ein Mono-Brand-Set.
 - Wenn keine signifikant neuen Kombinationen möglich sind: leeres looks-Array zurückgeben`;
 
     const userPrompt = `ANKER-PRODUKT:
