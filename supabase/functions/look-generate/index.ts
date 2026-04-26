@@ -226,12 +226,7 @@ Deno.serve(async (req) => {
     const anchor = anchorData.product;
     const anchorCat = categorize(anchor);
 
-    if (!ANCHOR_CATS.has(anchorCat)) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: `category '${anchorCat}' is companion-only`, created: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+    // Note: anchor-category filter removed — every product can seed a look.
 
     // 2. Existing looks containing this anchor (smart-dedupe)
     const { data: existingLooks } = await supabase
