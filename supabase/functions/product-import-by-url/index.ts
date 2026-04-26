@@ -27,6 +27,9 @@ interface ScrapedProduct {
   material: string;
   article_number: string;
   care_labels: string[];
+  fit: string;            // Modern Fit / Body Fit / Comfort Fit / ""
+  is_new: boolean;        // NEU-Badge
+  features: string[];     // Bullet-Points (Hoher Baumwollanteil, Kent-Kragen, …)
   price_eur: number | null;
   compare_at_price_eur: number | null;
   on_sale: boolean;
