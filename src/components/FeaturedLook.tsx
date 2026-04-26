@@ -160,7 +160,7 @@ export const FeaturedLook = ({ look }: Props) => {
                 <Link
                   key={`${s.product.node.id}-${i}`}
                   to={href}
-                  className="group/item relative block aspect-square flex-1 overflow-hidden bg-secondary"
+                  className="group/item relative block aspect-square flex-1 overflow-hidden bg-muted/60 ring-1 ring-border/40 transition-colors hover:bg-muted"
                   title={`${s.product.node.title}${s.color ? ` · ${s.color}` : ""}`}
                 >
                   {s.image && (
@@ -168,10 +168,9 @@ export const FeaturedLook = ({ look }: Props) => {
                       src={s.image}
                       alt={s.product.node.title}
                       loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover/item:scale-110"
+                      className="absolute inset-0 h-full w-full object-contain p-3 mix-blend-multiply transition-transform duration-500 group-hover/item:scale-105"
                     />
                   )}
-                  <div className="absolute inset-0 bg-foreground/0 transition-colors duration-300 group-hover/item:bg-foreground/20" />
                 </Link>
               );
             })}
