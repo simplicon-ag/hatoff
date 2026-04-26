@@ -324,18 +324,41 @@ Stelle den ${occ.toUpperCase()}-Look zusammen.`;
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const args = JSON.parse(toolCall.function.arguments) as {
+    let args: {
       rationale: string;
       items: Array<{ handle: string; role: string; recommended_colors?: string[] }>;
     };
+    try {
+      args = JSON.parse(toolCall.function.arguments);
+    } catch (e) {
+      console.error("Failed to parse tool args:", toolCall.function.arguments);
+      return new Response(
+        JSON.stringify({ error: "AI lieferte ungültiges Format. Bitte erneut versuchen." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // 5. Validate handles against catalog
     const allowed = new Set(compactCatalog.map((p) => p.handle));
-    const validItems = args.items.filter((i) => allowed.has(i.handle));
-    if (validItems.length < 2) {
+    const requestedHandles = (args.items ?? []).map((i) => i.handle);
+    const validItems = (args.items ?? []).filter((i) => allowed.has(i.handle));
+
+    if (validItems.length === 0) {
+      console.error(
+        "AI returned 0 valid handles.",
+        "requested:", JSON.stringify(requestedHandles),
+        "catalog size:", allowed.size,
+        "catalog sample:", JSON.stringify([...allowed].slice(0, 8)),
+      );
       return new Response(
         JSON.stringify({ error: "AI lieferte keine gültige Auswahl. Bitte erneut versuchen." }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (validItems.length === 1) {
+      console.warn(
+        "AI returned only 1 valid handle. invalid:",
+        JSON.stringify(requestedHandles.filter((h) => !allowed.has(h))),
       );
     }
 
