@@ -250,78 +250,104 @@ const ProductDetail = () => {
         <ProductGallery images={images} title={product.title} activeIndex={variantImageIndex ?? undefined} />
 
         <div className="flex flex-col">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">{product.vendor}</p>
-              <div className="mt-2 flex items-center gap-2">
-                {variantOnSale && (
-                  <span className="bg-destructive px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground">
-                    Sale
-                  </span>
-                )}
-                {isNewArrival && !variantOnSale && (
-                  <span className="bg-foreground px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-background">
-                    Neu
-                  </span>
-                )}
+          {/* Top row: Eigenschafts-Tags links, Artikel-Nr. rechts (Casa-Moda-Stil) */}
+          {(() => {
+            // Erste 2–3 sinnvolle Eigenschafts-Tags extrahieren (Kragen, Passform, Fit, etc.)
+            const propTags = (product.tags ?? [])
+              .map((t) => t.replace(/^[a-z]+:/i, "").trim())
+              .filter((t) => /kragen|fit|passform|comfort|slim|regular|modern|classic|stretch|button|kent|haifisch|cutaway/i.test(t))
+              .slice(0, 3);
+            // Artikel-Nr.: erstes art:-Tag oder Fallback ID-Suffix
+            const artTag = (product.tags ?? []).find((t) => /^art:/i.test(t));
+            const artNr = artTag ? artTag.replace(/^art:/i, "").trim() : product.id.split("/").pop();
+            return (
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-wrap gap-2">
+                  {propTags.map((t) => (
+                    <span
+                      key={t}
+                      className="bg-secondary px-3 py-1 text-xs font-medium text-foreground/80"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="whitespace-nowrap text-xs text-muted-foreground">
+                    Artikel-Nr. {artNr}
+                  </p>
+                  <button
+                    onClick={handleShare}
+                    className="flex h-8 w-8 items-center justify-center border border-border text-foreground/70 hover:border-primary hover:text-primary"
+                    aria-label="Teilen"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => toast("In Wunschliste gespeichert", { position: "top-right" })}
+                    className="flex h-8 w-8 items-center justify-center border border-border text-foreground/70 hover:border-primary hover:text-primary"
+                    aria-label="Zur Wunschliste"
+                  >
+                    <Heart className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-              <h1 className="mt-2 font-display text-4xl leading-tight md:text-5xl">{product.title}</h1>
-            </div>
-            <div className="flex gap-1">
-              <button
-                onClick={handleShare}
-                className="flex h-10 w-10 items-center justify-center border border-border text-foreground/70 hover:border-primary hover:text-primary"
-                aria-label="Teilen"
-              >
-                <Share2 className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => toast("In Wunschliste gespeichert", { position: "top-right" })}
-                className="flex h-10 w-10 items-center justify-center border border-border text-foreground/70 hover:border-primary hover:text-primary"
-                aria-label="Zur Wunschliste"
-              >
-                <Heart className="h-4 w-4" />
-              </button>
-            </div>
+            );
+          })()}
+
+          {/* Status-Label (NEU / Sale) als kleiner Text */}
+          <div className="mt-5 flex items-center gap-2">
+            {variantOnSale ? (
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-destructive">Sale</p>
+            ) : isNewArrival ? (
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-foreground">Neu</p>
+            ) : (
+              <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">{product.vendor}</p>
+            )}
           </div>
 
+          {/* Titel */}
+          <h1 className="mt-2 font-display text-4xl leading-tight md:text-5xl">{product.title}</h1>
+
+          {/* Preisblock */}
           {selectedVariant && (() => {
-            // Variant-Sale (compareAtPrice) hat Vorrang vor LivePrice, weil pro Variant unterschiedlich
             const showVariantSale = variantOnSale;
             const showLiveSale = !showVariantSale && livePrice?.on_sale && formatOriginalPrice(livePrice);
             return (
-              <div className="mt-5 flex flex-wrap items-baseline gap-3">
-                {showVariantSale ? (
-                  <>
-                    <p className="text-2xl font-medium text-destructive">
-                      {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+              <div className="mt-4">
+                <div className="flex flex-wrap items-baseline gap-3">
+                  {showVariantSale ? (
+                    <>
+                      <p className="text-2xl font-medium text-destructive">
+                        {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                      </p>
+                      <p className="text-base text-foreground/50 line-through">
+                        {formatPrice(selectedVariant.compareAtPrice!.amount, selectedVariant.compareAtPrice!.currencyCode)}
+                      </p>
+                      {variantDiscount && (
+                        <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                          -{variantDiscount}%
+                        </span>
+                      )}
+                    </>
+                  ) : showLiveSale ? (
+                    <>
+                      <p className="text-2xl font-medium text-destructive">{formatLivePrice(livePrice)}</p>
+                      <p className="text-base text-foreground/50 line-through">{formatOriginalPrice(livePrice)}</p>
+                      {discountPercent(livePrice) && (
+                        <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                          -{discountPercent(livePrice)}%
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-2xl font-medium">
+                      {formatLivePrice(livePrice) ??
+                        formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
                     </p>
-                    <p className="text-lg text-foreground/50 line-through">
-                      {formatPrice(selectedVariant.compareAtPrice!.amount, selectedVariant.compareAtPrice!.currencyCode)}
-                    </p>
-                    {variantDiscount && (
-                      <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
-                        -{variantDiscount}%
-                      </span>
-                    )}
-                  </>
-                ) : showLiveSale ? (
-                  <>
-                    <p className="text-2xl font-medium text-destructive">{formatLivePrice(livePrice)}</p>
-                    <p className="text-lg text-foreground/50 line-through">{formatOriginalPrice(livePrice)}</p>
-                    {discountPercent(livePrice) && (
-                      <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
-                        -{discountPercent(livePrice)}%
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-2xl font-medium">
-                    {formatLivePrice(livePrice) ??
-                      formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
-                  </p>
-                )}
-                <span className="text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</p>
               </div>
             );
           })()}
