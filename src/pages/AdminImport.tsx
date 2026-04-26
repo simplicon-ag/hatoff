@@ -6,11 +6,28 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2, Link2, CheckCircle2 } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
+
+type SingleImportResult = {
+  success: boolean;
+  action?: "created" | "updated";
+  shopify_product_id?: string;
+  handle?: string;
+  title?: string;
+  colors_found?: number;
+  colors?: string[];
+  sizes?: string[];
+  images_uploaded?: number;
+  price_eur?: number | null;
+  material?: string;
+  article_number?: string;
+  error?: string;
+};
 
 type JobRow = {
   id: string;
@@ -56,6 +73,9 @@ export default function AdminImport() {
   const [discovering, setDiscovering] = useState(false);
   const [purging, setPurging] = useState(false);
   const [purgeProgress, setPurgeProgress] = useState<string>("");
+  const [singleUrl, setSingleUrl] = useState("");
+  const [singleBusy, setSingleBusy] = useState(false);
+  const [singleResult, setSingleResult] = useState<SingleImportResult | null>(null);
   const tickRef = useRef<number | null>(null);
 
   const fetchAll = async () => {
@@ -173,6 +193,42 @@ export default function AdminImport() {
     }
   };
 
+  const runSingleUrl = async () => {
+    const url = singleUrl.trim();
+    if (!url) {
+      toast.error("Bitte URL einfügen");
+      return;
+    }
+    if (!/casamoda\.com|venti\.com/.test(url)) {
+      toast.error("Nur casamoda.com oder venti.com URLs werden unterstützt");
+      return;
+    }
+    setSingleBusy(true);
+    setSingleResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke<SingleImportResult>(
+        "product-import-by-url",
+        { body: { url } },
+      );
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Unbekannter Fehler");
+      setSingleResult(data);
+      toast.success(
+        data.action === "created"
+          ? `Neu angelegt: ${data.title} (${data.colors_found} Farben)`
+          : `Aktualisiert: ${data.title} (${data.colors_found} Farben)`,
+      );
+      setSingleUrl("");
+      fetchAll();
+    } catch (err) {
+      const msg = (err as Error).message;
+      setSingleResult({ success: false, error: msg });
+      toast.error(`Import fehlgeschlagen: ${msg}`);
+    } finally {
+      setSingleBusy(false);
+    }
+  };
+
   const runPurgeShopify = async () => {
     const confirmText = prompt(
       "⚠️ Achtung: Löscht ALLE Produkte der Marken CASA MODA und VENTI direkt aus Shopify.\n\nTippe LÖSCHEN um zu bestätigen:",
@@ -239,6 +295,69 @@ export default function AdminImport() {
             <strong>Workflow:</strong> 1️⃣ <em>Entdecken</em> findet alle fehlenden Produkte. 2️⃣ <em>Trockenlauf</em> scrapt &amp; prüft die Daten ohne in Shopify zu schreiben. 3️⃣ Echter Import nur, wenn der Trockenlauf sauber aussieht.
           </AlertDescription>
         </Alert>
+
+        {/* Single URL import — quickest path */}
+        <Card className="p-6 space-y-4 border-primary/30 bg-primary/5">
+          <div className="space-y-1">
+            <h2 className="font-medium flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-primary" />
+              Einzelnes Produkt per URL importieren
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Füge eine Casa Moda oder Venti Produkt-URL ein. Findet automatisch alle Farb-Varianten,
+              zieht Beschreibung, Material, Pflegehinweise, Bilder und Preise und legt EIN Shopify-Produkt
+              mit allen Farben + Grössen an. Existiert das Produkt bereits, wird es aktualisiert.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              type="url"
+              value={singleUrl}
+              onChange={(e) => setSingleUrl(e.target.value)}
+              placeholder="https://www.casamoda.com/de/de/businesshemd-3760-474"
+              disabled={singleBusy}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !singleBusy) runSingleUrl();
+              }}
+              className="flex-1"
+            />
+            <Button onClick={runSingleUrl} disabled={singleBusy || !singleUrl.trim()}>
+              {singleBusy ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Lädt… (30–90s)
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Importieren
+                </>
+              )}
+            </Button>
+          </div>
+          {singleResult && singleResult.success && (
+            <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-1 text-sm">
+              <div className="flex items-center gap-2 font-medium text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" />
+                {singleResult.action === "created" ? "Neu angelegt" : "Aktualisiert"}: {singleResult.title}
+              </div>
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                <div>Handle: <span className="font-mono">{singleResult.handle}</span></div>
+                <div>Shopify-ID: <span className="font-mono">{singleResult.shopify_product_id}</span></div>
+                <div>{singleResult.colors_found} Farben: {singleResult.colors?.join(", ")}</div>
+                <div>{singleResult.sizes?.length} Grössen · {singleResult.images_uploaded} Bilder hochgeladen</div>
+                {singleResult.material && <div>Material: {singleResult.material}</div>}
+                {singleResult.article_number && <div>Artikelnr: {singleResult.article_number}</div>}
+                {singleResult.price_eur != null && <div>Preis: €{singleResult.price_eur}</div>}
+              </div>
+            </div>
+          )}
+          {singleResult && !singleResult.success && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              {singleResult.error}
+            </div>
+          )}
+        </Card>
 
         {/* Shopify purge card — destructive operation */}
         <Card className="p-6 space-y-3 border-destructive/40 bg-destructive/5">
