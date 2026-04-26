@@ -680,13 +680,6 @@ const ProductDetail = () => {
       {/* Spacer for mobile sticky bar */}
       <div className="h-20 md:hidden" />
 
-      {/* Style-Ideen: 3 KI-generierte Outfit-Bilder mit dem echten Produkt */}
-      <StyleInspirations
-        productTitle={product.title}
-        productHandle={product.handle}
-        productImageUrl={product.images.edges[0]?.node.url}
-      />
-
       {/* AI Style Generator — nur für stilfähige Hauptstücke */}
       {(() => {
         const hay = `${product.productType ?? ""} ${(product.tags ?? []).join(" ")} ${product.title}`.toLowerCase();
