@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { LookCard } from "@/components/LookCard";
-import { fetchAllProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
 import { looks } from "@/data/looks";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
