@@ -85,7 +85,14 @@ export const GlobalSearch = () => {
           p.node.title.toLowerCase().includes(q) ||
           p.node.vendor?.toLowerCase().includes(q) ||
           p.node.productType?.toLowerCase().includes(q) ||
-          p.node.tags.some((t) => t.toLowerCase().includes(q)),
+          p.node.handle.toLowerCase().includes(q) ||
+          p.node.description?.toLowerCase().includes(q) ||
+          p.node.tags.some((t) => t.toLowerCase().includes(q)) ||
+          p.node.variants.edges.some((v) =>
+            v.node.selectedOptions.some((o) =>
+              o.value.toLowerCase().includes(q),
+            ),
+          ),
       )
       .slice(0, 8);
 
