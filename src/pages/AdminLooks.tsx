@@ -48,8 +48,11 @@ export default function AdminLooks() {
       });
       if (error) throw new Error(error.message);
       const all = ((data as { looks?: Look[] })?.looks ?? []) as Look[];
-      setDrafts(all.filter((l) => l.status === "draft"));
-      setPublished(all.filter((l) => l.status === "published"));
+      const ts = (l: Look) =>
+        new Date(l.published_at ?? l.updated_at ?? l.created_at).getTime();
+      const sorted = [...all].sort((a, b) => ts(b) - ts(a));
+      setDrafts(sorted.filter((l) => l.status === "draft"));
+      setPublished(sorted.filter((l) => l.status === "published"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Looks konnten nicht geladen werden");
     } finally {
