@@ -69,6 +69,7 @@ export const GlobalSearch = () => {
   }, [open, loaded]);
 
   const q = query.trim().toLowerCase();
+  const tokens = q.split(/\s+/).filter(Boolean);
 
   const { productHits, lookHits, vendorHits, weltHits } = useMemo(() => {
     if (!q) {
@@ -79,40 +80,64 @@ export const GlobalSearch = () => {
         weltHits: [] as string[],
       };
     }
+
+    // Score each product; only keep clearly relevant hits.
+    const scoreProduct = (p: ShopifyProduct): number => {
+      const title = p.node.title.toLowerCase();
+      const titleWords = title.split(/[\s\-/]+/).filter(Boolean);
+      const vendor = (p.node.vendor ?? "").toLowerCase();
+      const type = (p.node.productType ?? "").toLowerCase();
+      const handle = p.node.handle.toLowerCase();
+      const tags = p.node.tags.map((t) => t.toLowerCase());
+      const skus = p.node.variants.edges.flatMap((v) =>
+        v.node.selectedOptions.map((o) => o.value.toLowerCase()),
+      );
+      const description = (p.node.description ?? "").toLowerCase();
+
+      // Each token must match somewhere relevant; sum the best score per token.
+      let total = 0;
+      for (const t of tokens) {
+        let best = 0;
+        if (handle === t || tags.includes(t) || skus.includes(t)) best = 100;
+        else if (handle.includes(t)) best = Math.max(best, 60);
+        else if (titleWords.includes(t)) best = Math.max(best, 80);
+        else if (title.startsWith(t)) best = Math.max(best, 50);
+        else if (title.includes(t)) best = Math.max(best, 35);
+        else if (vendor === t) best = Math.max(best, 70);
+        else if (vendor.includes(t)) best = Math.max(best, 25);
+        else if (type.includes(t)) best = Math.max(best, 20);
+        else if (tags.some((tag) => tag.includes(t))) best = Math.max(best, 15);
+        // Description is intentionally ignored to avoid noisy matches.
+        if (best === 0) return 0; // every token must match
+        total += best;
+      }
+      return total;
+    };
+
     const ph = products
-      .filter(
-        (p) =>
-          p.node.title.toLowerCase().includes(q) ||
-          p.node.vendor?.toLowerCase().includes(q) ||
-          p.node.productType?.toLowerCase().includes(q) ||
-          p.node.handle.toLowerCase().includes(q) ||
-          p.node.description?.toLowerCase().includes(q) ||
-          p.node.tags.some((t) => t.toLowerCase().includes(q)) ||
-          p.node.variants.edges.some((v) =>
-            v.node.selectedOptions.some((o) =>
-              o.value.toLowerCase().includes(q),
-            ),
-          ),
-      )
-      .slice(0, 8);
+      .map((p) => ({ p, s: scoreProduct(p) }))
+      .filter((x) => x.s >= 35)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 8)
+      .map((x) => x.p);
 
     const lh = looks
-      .filter(
-        (l) =>
-          l.title.toLowerCase().includes(q) ||
-          (l.subtitle ?? "").toLowerCase().includes(q),
-      )
+      .filter((l) => {
+        const hay = `${l.title} ${l.subtitle ?? ""}`.toLowerCase();
+        return tokens.every((t) => hay.includes(t));
+      })
       .slice(0, 5);
 
     const vendors = new Set<string>();
     const welten = new Set<string>();
     products.forEach((p) => {
-      if (p.node.vendor && p.node.vendor.toLowerCase().includes(q)) {
-        vendors.add(p.node.vendor);
+      const v = (p.node.vendor ?? "").toLowerCase();
+      if (v && tokens.every((t) => v.includes(t))) {
+        vendors.add(p.node.vendor as string);
       }
-      p.node.tags.forEach((t) => {
-        const w = tagValue(t, "welt");
-        if (w && w.toLowerCase().includes(q)) welten.add(w);
+      p.node.tags.forEach((tag) => {
+        const w = tagValue(tag, "welt");
+        if (w && tokens.every((t) => w.toLowerCase().includes(t))) welten.add(w);
       });
     });
     return {
@@ -121,7 +146,7 @@ export const GlobalSearch = () => {
       vendorHits: Array.from(vendors).slice(0, 4),
       weltHits: Array.from(welten).slice(0, 4),
     };
-  }, [q, products, looks]);
+  }, [q, tokens, products, looks]);
 
   const close = () => {
     setOpen(false);
