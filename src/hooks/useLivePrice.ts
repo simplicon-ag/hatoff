@@ -37,7 +37,7 @@ function normalizeLivePrice(price: LivePrice): LivePrice {
 async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
   const missing = handles.filter((h) => !memCache.has(h));
   if (missing.length === 0) {
-    return handles.map((h) => memCache.get(h)!).filter(Boolean);
+    return handles.map((h) => memCache.get(h)).filter(Boolean).map(normalizeLivePrice);
   }
 
   // Bereits laufende Requests für einzelne Handles wiederverwenden
@@ -50,16 +50,7 @@ async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
       });
       if (error) throw error;
       const rawPrices: LivePrice[] = data?.prices ?? [];
-      // Sales werden ausschliesslich in Shopify (Variant compareAtPrice) gepflegt.
-      // Der Brand-Scrape liefert weiterhin den CHF-Anzeigepreis, aber wir
-      // ignorieren `on_sale` / `original_price_*` aus dem Cache, damit nur
-      // manuell in Shopify gesetzte Sales sichtbar werden.
-      const prices: LivePrice[] = rawPrices.map((p) => ({
-        ...p,
-        on_sale: false,
-        original_price_chf: null,
-        original_price_eur: null,
-      }));
+      const prices = rawPrices.map(normalizeLivePrice);
       for (const p of prices) memCache.set(p.handle, p);
       return prices;
     })();
@@ -80,7 +71,7 @@ async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
   // Auf alle relevanten Inflights warten
   await Promise.all(missing.map((h) => inflight.get(h)).filter(Boolean));
 
-  return handles.map((h) => memCache.get(h)!).filter(Boolean);
+  return handles.map((h) => memCache.get(h)).filter(Boolean).map(normalizeLivePrice);
 }
 
 /**
