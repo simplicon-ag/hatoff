@@ -191,11 +191,14 @@ const ProductDetail = () => {
   }, [product]);
 
   // Bild-Index in der Galerie für die aktuelle Variante
+  // Bild-Index in der Galerie für die aktuelle Variante.
+  // Beim Initialaufruf zeigen wir IMMER das erste Bild — erst wenn der
+  // Nutzer aktiv eine andere Farbe wählt, springen wir zum Variantenbild.
   const variantImageIndex = useMemo(() => {
-    if (!product || !selectedVariant) return null;
+    if (!product || !selectedVariant || !userPickedVariant) return null;
     const imgs = product.images.edges.map((e) => e.node);
     return findVariantImageIndex(imgs, selectedVariant);
-  }, [product, selectedVariant]);
+  }, [product, selectedVariant, userPickedVariant]);
 
   const relatedLooks = useMemo(() => {
     if (!product) return [];
