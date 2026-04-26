@@ -165,13 +165,20 @@ const ProductDetail = () => {
     return looks.filter((l) => l.productHandles.includes(product.handle));
   }, [product]);
 
-  // Variant-basierter Sale (wenn compareAtPrice vorhanden) — überschreibt livePrice nicht, ergänzt ihn
+  // Sale wird nur angezeigt, wenn das Produkt den Shopify-Tag `sale` trägt
+  // UND die gewählte Variante einen `compareAtPrice` > `price` hat.
+  const hasSaleTag = useMemo(
+    () => (product?.tags ?? []).some((t) => t.toLowerCase() === "sale"),
+    [product?.tags],
+  );
+
   const variantOnSale = useMemo(() => {
+    if (!hasSaleTag) return false;
     if (!selectedVariant?.compareAtPrice) return false;
     const price = parseFloat(selectedVariant.price.amount);
     const compare = parseFloat(selectedVariant.compareAtPrice.amount);
     return isFinite(compare) && compare > price;
-  }, [selectedVariant]);
+  }, [hasSaleTag, selectedVariant]);
 
   const variantDiscount = useMemo(() => {
     if (!variantOnSale || !selectedVariant?.compareAtPrice) return null;
