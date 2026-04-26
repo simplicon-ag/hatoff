@@ -53,6 +53,15 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
   const originalPrice = variantSale?.original;
   const discount = variantSale?.discount;
 
+  // Neuheit: Tag `neu` / `new` / `neuheit` (case-insensitive, ignoriert Präfixe wie `art:`)
+  const isNew = useMemo(
+    () =>
+      (p.tags ?? []).some((t) =>
+        /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")),
+      ),
+    [p.tags],
+  );
+
   const colorOption = p.options.find((o) => /farbe|color|colour/i.test(o.name));
 
   // Alle Varianten dieser Farbe (oder alle Varianten, wenn keine Farbfokussierung)
@@ -165,6 +174,12 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
         {soldOut && (
           <span className="absolute left-3 top-3 bg-foreground/90 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-background">
             Ausverkauft
+          </span>
+        )}
+
+        {!soldOut && !onSale && isNew && (
+          <span className="absolute left-3 top-3 bg-foreground px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-background">
+            Neu
           </span>
         )}
 
