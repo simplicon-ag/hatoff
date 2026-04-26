@@ -436,7 +436,7 @@ const ProductDetail = () => {
                           title={c.value}
                           aria-label={c.value}
                           className={cn(
-                            "relative h-14 w-14 overflow-hidden border-2 bg-secondary transition",
+                            "relative h-14 w-14 overflow-hidden border-2 bg-white transition",
                             active ? "border-primary ring-1 ring-primary/40" : "border-transparent hover:border-border",
                             !c.available && "opacity-40",
                           )}
