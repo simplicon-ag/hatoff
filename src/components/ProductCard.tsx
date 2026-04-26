@@ -124,6 +124,11 @@ export const ProductCard = ({ product, priority }: Props) => {
         ) : (
           <p className="text-sm text-foreground/80">{displayPrice}</p>
         )}
+        {colorCount > 1 && (
+          <p className="pt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            +{colorCount} {colorCount === 2 ? "Farbe" : "Farben"}
+          </p>
+        )}
       </div>
     </Link>
   );
