@@ -1,42 +1,78 @@
-## Ausgangslage
+# Startseite einladender & catchyer machen
 
-- **`look-generate`** (Edge Function) ist bereits fertig: bekommt einen `productHandle`, prüft ob es ein "Anker"-Produkt ist (Hemd / Hose / Jacke / Pullover / Sakko), schaut welche Looks dazu schon existieren, und erstellt 0–2 NEUE Draft-Looks inkl. KI-generiertem Hero-Bild.
-- **Bulk-Import** (`product-import-run`) ruft `look-generate` automatisch nach jedem neuen Produkt auf ✅
-- **Einzel-URL-Import** (`product-import-by-url`) ruft `look-generate` aktuell **nicht** auf ❌
-- In **`/admin/looks`** gibt es nur einen globalen "Backfill"-Button (langsam, alle Produkte) — keinen gezielten Trigger pro Handle.
+Die aktuelle Seite ist sehr clean und editorial — was schön ist, aber etwas distanziert wirkt. Hier sind die Verbesserungen, die den grössten emotionalen Effekt haben, ohne den ruhigen HATOFF-Stil zu verlieren.
 
-Drafts landen in der „Drafts"-Tab von `/admin/looks` und müssen dort freigegeben werden, bevor sie öffentlich erscheinen.
+## 1. Hero aufladen — mehr Persönlichkeit & Vertrauen
+**Aktuell:** Statisches Bild + Headline + zwei Buttons.
 
-## Was wird umgesetzt
+**Neu:**
+- **Mini-Trust-Bar direkt unter dem Hero-CTA** (klein, in Off-White): „⭐ 4.9 · Gratis Versand & Retoure · Versand aus der Schweiz"
+- **Animierter Eyebrow-Tag** mit dezentem Pulse: „🔥 Neue Frühlings-Looks live"
+- **Sekundärer „Wie funktioniert HATOFF?"-Link** (Smooth-Scroll zur Erklärsektion) — senkt Einstiegshürde für Neue.
+- Subtile **Ken-Burns-Animation** (langsamer Zoom) auf dem Hero-Bild für mehr Lebendigkeit.
 
-### 1. Auto-Trigger beim Einzel-URL-Import
-In `supabase/functions/product-import-by-url/index.ts` nach erfolgreichem Create/Update einen **Fire-and-Forget-Call** an `look-generate` mit dem Shopify-Handle hängen — analog zu `product-import-run`. Nicht blockierend, damit der Import-Response schnell bleibt. Im Erfolgs-Response ein Feld `look_generation_triggered: true` zurückgeben.
+## 2. Neue Sektion: „So funktioniert HATOFF" (3 Schritte)
+Kurz nach dem Hero, vor den Style-Welten — beantwortet die unausgesprochene Frage „Was ist das eigentlich?".
 
-### 2. UI-Feedback in `AdminImport.tsx`
-Nach Single-URL-Import zusätzlich anzeigen: *„Look-Vorschläge werden im Hintergrund generiert. In ~30 Sek. unter /admin/looks prüfen."* mit direktem Link in den Drafts-Tab.
+3 Spalten mit Icons:
+1. **Look entdecken** — Kuratiert für jeden Anlass
+2. **Mit einem Tap kombinieren** — Ganzes Outfit in den Warenkorb
+3. **Stilvoll tragen** — Schweizer Versand, kostenlose Retoure
 
-### 3. Manueller Trigger in `/admin/looks`
-Im **Manual-Tab** ein neues Eingabefeld + Button:
-- **„Looks für ein einzelnes Produkt generieren"**
-- Input: Produkt-Handle (z.B. `casa-moda-freizeithemd-kurzarm-14843`)
-- Button ruft `look-generate` mit diesem Handle auf, mit Option `force: true` (für Re-Generierung trotz vorhandener Looks)
-- Toast-Feedback inkl. Anzahl erzeugter Drafts (Response-Feld `created`)
+Hilft besonders Erstbesuchern, das Konzept sofort zu verstehen → höhere Conversion.
 
-### 4. „Looks generieren"-Button auf Produktdetailseite (Admin-Komfort)
-Optional, aber wertvoll: Auf `/product/:handle` einen **dezenten Admin-Knopf** ergänzen (nur sichtbar, wenn URL `?admin=1` enthält oder via lokalem Flag), der das gleiche `look-generate`-Edge-Function aufruft. So kannst du beim Stöbern direkt für einzelne Bestandsprodukte Looks anstoßen, ohne die Handle abtippen zu müssen.
+## 3. Style-Welten emotionaler
+**Aktuell:** Grid mit kleinen Bildern + Titel.
 
-## Nicht-Ziele
-- Wir ändern die Look-Generierungs-Logik selbst nicht (Anker-Kategorien, KI-Prompt, Hero-Bild bleiben wie sie sind).
-- Auto-Publishing: Looks bleiben **Drafts** und müssen wie bisher in `/admin/looks` freigegeben werden — das verhindert qualitativ schlechte oder doppelte Looks im Live-Shop.
+**Neu:**
+- **Hover-Reveal:** Statt nur Skalierung erscheint beim Hover ein „Entdecken →"-CTA mit Anzahl Looks („12 Looks").
+- **Erste Karte größer** (asymmetrisches Editorial-Grid, z.B. md:col-span-2) — wie bei Kinfolk/COS.
+- Titel-Typografie etwas grösser & dramatischer.
 
-## Ergebnis nach Umsetzung
+## 4. Featured Looks: Storytelling-Layer
+**Aktuell:** Drei Look-Karten gleichwertig.
 
-| Szenario | Was passiert |
-|---|---|
-| Bulk-Import läuft | Looks werden automatisch generiert (wie bisher) ✅ |
-| Einzel-URL-Import via Admin | Looks werden **automatisch** im Hintergrund generiert (neu) ✅ |
-| Bestehendes Produkt, Looks fehlen | Handle in `/admin/looks` → Manual-Tab eingeben → Button (neu) ✅ |
-| Bestehendes Produkt auf Detailseite | „Looks generieren"-Admin-Button (neu, optional) ✅ |
-| Backfill für alle | Bestehender Button weiterhin verfügbar ✅ |
+**Neu:**
+- **„Look der Woche"** als Hero-Karte (groß, links) + 2 kleinere rechts daneben — schafft Hierarchie & Spannung.
+- **Anlass-Badge** auf jedem Look („Für's Büro" / „Date Night" / „Weekend") — macht's persönlich relevant.
+- Subtiler **„↓ Style-Story lesen"-Hint** unter dem Look — verbindet zum Magazin.
 
-Alle generierten Looks landen als **Drafts** und werden erst nach deiner Freigabe veröffentlicht.
+## 5. Neue Sektion: Social Proof / Customer Looks
+Zwischen Brand Strip und Neuheiten — eine **Wall-of-Style** aus 6-8 quadratischen Bildern (Kunden im Look, eigene Editorials, oder Detail-Shots).
+
+- Headline: „So tragen sie HATOFF" / „Aus der Community"
+- Senkt Kaufhürde durch echte Menschen statt nur Studio-Bilder.
+- Kann initial mit kuratierten Look-Detailbildern befüllt werden, später mit echtem UGC.
+
+## 6. Sale-Sektion catchyer
+**Aktuell:** Sehr dezent in Destructive-Tone.
+
+**Neu:**
+- **Live Countdown-Element** (z.B. „Aktion endet in 2 Tagen 14:32:08") — falls Sale befristet ist, sonst „Solange Vorrat reicht"
+- **Rabatt-Badge auf jeder Sale-Karte** („−40%") — visuell deutlich sichtbar.
+- Stärkerer Akzent-Background (warmes Sand statt Destructive-Tint), dafür Rabatt-Sticker in Terracotta — bleibt im Brand.
+
+## 7. Magazin-Teaser persönlicher
+- **Autoren-Name & Avatar** unter jedem Artikel („Von Marco · Style Editor")
+- **Kategorie-Chip** oben („Styling-Guide" / „Brand Story")
+- Erstes Magazin-Item größer (asymmetrisch).
+
+## 8. Mikro-Polish über die ganze Seite
+- **Scroll-triggered Fade-Ins** für jede Sektion (Intersection Observer + `animate-fade-in`).
+- **Sticky CTA-Bar mobile** unten („Looks entdecken") — verschwindet bei Scroll nach unten.
+- **Newsletter-Inline-Form im Footer-Bereich** mit konkretem Hook („+10% auf deine erste Bestellung").
+- Headlines bekommen leichte **Akzent-Highlights** (Terracotta-unterstrichene Wörter, z.B. „Finde deinen ~~Look~~").
+
+## Reihenfolge nach Impact
+Falls du nicht alles auf einmal willst, schlage ich diese Priorität vor:
+1. **Hero-Aufladung + „So funktioniert"-Sektion** (größter Conversion-Hebel für neue Besucher)
+2. **Featured Looks Hierarchie + Anlass-Badges** (emotionalere Produktpräsentation)
+3. **Social Proof Wall** (Vertrauensaufbau)
+4. **Sale catchyer + Mikro-Polish**
+
+## Was ich brauche
+- ✅ Soll ich **alles zusammen** umsetzen, oder lieber **schrittweise** (z.B. erst Punkt 1+2, dann Rest)?
+- Gibt's bereits **echte Kundenfotos / UGC** für die Social-Proof-Wall, oder starten wir mit kuratierten Editorials?
+- **Sale-Countdown:** Hast du befristete Aktionen, oder soll's ein „solange Vorrat reicht"-Hinweis sein?
+
+Sobald ich grünes Licht habe, lege ich los.
