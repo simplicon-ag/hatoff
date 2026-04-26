@@ -429,8 +429,7 @@ const ProductDetail = () => {
                             <img
                               src={c.image}
                               alt={c.value}
-                              className="h-full w-full object-cover"
-                              style={{ objectPosition: "center 22%" }}
+                              className="h-full w-full object-contain"
                             />
                           ) : (
                             <span className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-wider text-muted-foreground">
