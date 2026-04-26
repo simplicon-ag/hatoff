@@ -24,9 +24,34 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
   const price = p.priceRange.minVariantPrice;
   const { price: livePrice } = useLivePrice(p.handle);
   const displayPrice = formatLivePrice(livePrice) ?? formatPrice(price.amount, price.currencyCode);
-  const originalPrice = formatOriginalPrice(livePrice);
-  const discount = discountPercent(livePrice);
-  const onSale = !!livePrice?.on_sale && originalPrice;
+
+  // Sale-Logik: nur wenn das Produkt explizit den Tag `sale` trägt UND ein
+  // compareAtPrice an der ersten Variante hinterlegt ist. Damit pflegst du
+  // Sales ausschliesslich über den Shopify-Tag (Set/Unset = Sale an/aus).
+  const hasSaleTag = useMemo(
+    () => (p.tags ?? []).some((t) => t.toLowerCase() === "sale"),
+    [p.tags],
+  );
+  const variantSale = useMemo(() => {
+    if (!hasSaleTag) return null;
+    const variant = p.variants.edges
+      .map((e) => e.node)
+      .find((v) => {
+        const cmp = v.compareAtPrice?.amount;
+        if (!cmp) return false;
+        return parseFloat(cmp) > parseFloat(v.price.amount);
+      });
+    if (!variant?.compareAtPrice) return null;
+    const compare = parseFloat(variant.compareAtPrice.amount);
+    const current = parseFloat(variant.price.amount);
+    return {
+      original: formatPrice(variant.compareAtPrice.amount, variant.compareAtPrice.currencyCode),
+      discount: Math.round(((compare - current) / compare) * 100),
+    };
+  }, [hasSaleTag, p.variants.edges]);
+  const onSale = !!variantSale;
+  const originalPrice = variantSale?.original;
+  const discount = variantSale?.discount;
 
   const colorOption = p.options.find((o) => /farbe|color|colour/i.test(o.name));
 
