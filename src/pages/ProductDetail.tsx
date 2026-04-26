@@ -288,17 +288,7 @@ const ProductDetail = () => {
       </div>
 
       <section className="container-editorial grid gap-10 py-8 md:grid-cols-[1.1fr_1fr] md:gap-16 md:py-12 md:items-start">
-        <div className="space-y-10 md:space-y-14">
-          <ProductGallery images={images} title={product.title} activeIndex={variantImageIndex ?? undefined} />
-
-          {/* Produktinformationen direkt unter dem Bild */}
-          <div className="border-t border-border pt-8 md:pt-10">
-            <h2 className="font-display text-2xl md:text-3xl">Produktinformationen</h2>
-            <div className="mt-6 md:mt-8">
-              <ProductDescription description={product.description} descriptionHtml={product.descriptionHtml} />
-            </div>
-          </div>
-        </div>
+        <ProductGallery images={images} title={product.title} activeIndex={variantImageIndex ?? undefined} />
 
         <div className="flex flex-col">
           {/* Top row: Badges aus Shopify-Metafield (custom.badges), Artikel-Nr. rechts */}
