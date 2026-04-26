@@ -95,6 +95,7 @@ export type Database = {
           shopify_product_id: string | null
           source_url: string
           status: string
+          update_mode: boolean
           updated_at: string
         }
         Insert: {
@@ -108,6 +109,7 @@ export type Database = {
           shopify_product_id?: string | null
           source_url: string
           status?: string
+          update_mode?: boolean
           updated_at?: string
         }
         Update: {
@@ -121,6 +123,7 @@ export type Database = {
           shopify_product_id?: string | null
           source_url?: string
           status?: string
+          update_mode?: boolean
           updated_at?: string
         }
         Relationships: []
