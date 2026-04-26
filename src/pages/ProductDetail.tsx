@@ -98,6 +98,7 @@ const ProductDetail = () => {
     if (!handle) return;
     setLoading(true);
     setQuantity(1);
+    setUserPickedVariant(false);
     window.scrollTo({ top: 0, behavior: "instant" });
     fetchProductByHandle(handle)
       .then((p: Product | null) => {
