@@ -145,35 +145,37 @@ export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ descripti
   }
 
   return (
-    <div ref={ref} className="space-y-7">
+    <div ref={ref} className="space-y-8">
       {intro && (
-        <p className="whitespace-pre-line text-[15px] leading-[1.7] text-foreground/85">
+        <p className="whitespace-pre-line text-[15px] leading-[1.7] text-foreground/80">
           {intro}
         </p>
       )}
 
       {pairs.length > 0 && (
-        <div className="space-y-5 border-t border-border pt-5">
+        <dl className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2">
           {pairs.map((p) => (
-            <div key={p.label} className="grid gap-2 sm:grid-cols-[120px_1fr] sm:gap-6">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            <div key={p.label} className="bg-background p-5">
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 {p.label}
-              </p>
-              {p.values.length > 1 ? (
-                <ul className="space-y-1.5 text-sm leading-relaxed text-foreground/85">
-                  {p.values.map((v, i) => (
-                    <li key={i} className="flex gap-2.5">
-                      <span aria-hidden className="mt-[0.55em] inline-block h-1 w-1 shrink-0 rounded-full bg-primary" />
-                      <span>{v}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm leading-relaxed text-foreground/85">{p.values[0]}</p>
-              )}
+              </dt>
+              <dd className="mt-2.5">
+                {p.values.length > 1 ? (
+                  <ul className="space-y-1.5 text-sm leading-relaxed text-foreground/85">
+                    {p.values.map((v, i) => (
+                      <li key={i} className="flex gap-2.5">
+                        <span aria-hidden className="mt-[0.55em] inline-block h-1 w-1 shrink-0 rounded-full bg-primary" />
+                        <span>{v}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm leading-relaxed text-foreground/90">{p.values[0]}</p>
+                )}
+              </dd>
             </div>
           ))}
-        </div>
+        </dl>
       )}
     </div>
   );
