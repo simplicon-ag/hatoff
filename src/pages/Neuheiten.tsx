@@ -12,10 +12,37 @@ const HERO_COUNT = 3;
 const GRID_COUNT = 18;
 const LOOKS_COUNT = 3;
 
+type CategoryId =
+  | "alle"
+  | "freizeithemden"
+  | "polos-tshirts"
+  | "strick-sweat"
+  | "jacken-westen"
+  | "hosen"
+  | "accessoires";
+
+const CATEGORIES: Array<{ id: CategoryId; label: string; match: RegExp }> = [
+  { id: "freizeithemden", label: "Freizeithemden", match: /(freizeithemd|hemd|shirt(?!.*t-?shirt)|bluse)/i },
+  { id: "polos-tshirts", label: "Polos & T-Shirts", match: /(polo|t-?shirt|longsleeve)/i },
+  { id: "strick-sweat", label: "Strick & Sweat", match: /(strick|pullover|pulli|sweat|sweater|cardigan|hoodie|kapuzen)/i },
+  { id: "jacken-westen", label: "Jacken & Westen", match: /(jacke|mantel|weste|blazer|sakko|parka|gilet|anorak)/i },
+  { id: "hosen", label: "Hosen", match: /(hose|chino|jeans|bermuda|short|trouser|pant)/i },
+  { id: "accessoires", label: "Accessoires", match: /(g[üu]rtel|krawatte|schal|tuch|m[üu]tze|cap|hut|socke|sock|tasche|geldb[öo]rse|portemonnaie|einstecktuch|fliege|tie|belt|accessoir)/i },
+];
+
+function detectCategory(p: ShopifyProduct): CategoryId | null {
+  const hay = `${p.node.productType ?? ""} ${(p.node.tags ?? []).join(" ")} ${p.node.title}`.toLowerCase();
+  for (const cat of CATEGORIES) {
+    if (cat.match.test(hay)) return cat.id;
+  }
+  return null;
+}
+
 const Neuheiten = () => {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeBrand, setActiveBrand] = useState<string>("Alle");
+  const [activeCategory, setActiveCategory] = useState<CategoryId>("alle");
 
   useEffect(() => {
     fetchAllProducts()
@@ -43,13 +70,26 @@ const Neuheiten = () => {
     return Array.from(set.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [newest]);
 
-  const filtered = useMemo(
-    () =>
-      activeBrand === "Alle"
-        ? newest
-        : newest.filter((p) => (p.node.vendor || "Sonstige") === activeBrand),
-    [newest, activeBrand],
-  );
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<CategoryId, number>();
+    newest.forEach((p) => {
+      const cat = detectCategory(p);
+      if (cat) counts.set(cat, (counts.get(cat) ?? 0) + 1);
+    });
+    return counts;
+  }, [newest]);
+
+  const filtered = useMemo(() => {
+    let list = newest;
+    if (activeBrand !== "Alle") {
+      list = list.filter((p) => (p.node.vendor || "Sonstige") === activeBrand);
+    }
+    if (activeCategory !== "alle") {
+      list = list.filter((p) => detectCategory(p) === activeCategory);
+    }
+    return list;
+  }, [newest, activeBrand, activeCategory]);
+
 
   const heroPicks = filtered.slice(0, HERO_COUNT);
   const gridPicks = filtered.slice(HERO_COUNT, HERO_COUNT + GRID_COUNT);
