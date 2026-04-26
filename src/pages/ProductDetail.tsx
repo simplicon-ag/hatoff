@@ -132,8 +132,19 @@ const ProductDetail = () => {
   );
 
   // Eindeutige Farben (erste Variant pro Farbe → repräsentatives Bild)
+  // Für die Swatch-Vorschau nehmen wir bevorzugt das DETAILBILD (Bild direkt nach
+  // dem Hauptbild der Variante in der Galerie). So bekommen wir den Kragen-/
+  // Stoff-Detailshot statt des Ganzkörper-Hemds.
   const colorOptions = useMemo(() => {
     if (!product) return [] as Array<{ value: string; variantId: string; image: string | null; available: boolean }>;
+    const galleryImgs = product.images.edges.map((e) => e.node);
+    const detailImageFor = (variantImageUrl: string | null | undefined): string | null => {
+      if (!variantImageUrl) return null;
+      const idx = galleryImgs.findIndex((g) => g.url === variantImageUrl);
+      if (idx < 0) return variantImageUrl;
+      // Nimm nächstes Bild als Detail; falls es das letzte ist, behalte das Variantenbild
+      return galleryImgs[idx + 1]?.url ?? variantImageUrl;
+    };
     const seen = new Map<string, { value: string; variantId: string; image: string | null; available: boolean }>();
     for (const { node: v } of product.variants.edges) {
       const value = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
@@ -143,12 +154,17 @@ const ProductDetail = () => {
         seen.set(value, {
           value,
           variantId: v.id,
-          image: v.image?.url ?? null,
+          image: detailImageFor(v.image?.url) ?? v.image?.url ?? null,
           available: v.availableForSale,
         });
       } else if (!existing.available && v.availableForSale) {
         // upgrade to available variant if previous was sold out
-        seen.set(value, { ...existing, variantId: v.id, available: true });
+        seen.set(value, {
+          ...existing,
+          variantId: v.id,
+          image: detailImageFor(v.image?.url) ?? existing.image,
+          available: true,
+        });
       }
     }
     return Array.from(seen.values());
