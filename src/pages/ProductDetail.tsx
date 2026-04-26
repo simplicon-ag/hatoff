@@ -9,7 +9,7 @@ import { ProductDescription } from "@/components/ProductDescription";
 import { TrustBadges } from "@/components/TrustBadges";
 import { ProductCard } from "@/components/ProductCard";
 import { AiStyleGenerator } from "@/components/AiStyleGenerator";
-import { StyleInspirations } from "@/components/StyleInspirations";
+
 import { YouMightAlsoLike } from "@/components/YouMightAlsoLike";
 import { ClubMemberCta } from "@/components/ClubMemberCta";
 import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
@@ -679,13 +679,6 @@ const ProductDetail = () => {
       </div>
       {/* Spacer for mobile sticky bar */}
       <div className="h-20 md:hidden" />
-
-      {/* Style-Ideen: 3 KI-generierte Outfit-Bilder mit dem echten Produkt */}
-      <StyleInspirations
-        productTitle={product.title}
-        productHandle={product.handle}
-        productImageUrl={product.images.edges[0]?.node.url}
-      />
 
       {/* AI Style Generator — nur für stilfähige Hauptstücke */}
       {(() => {
