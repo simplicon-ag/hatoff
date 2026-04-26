@@ -716,6 +716,7 @@ async function processRow(
   }
 
   // 6) Save aggregated scrape data
+  const aggregatedImages = colors.flatMap((c) => c.scraped.image_urls).slice(0, 6);
   await supabase.from("product_import_log").update({
     status: action === "created" ? "created" : "skipped",
     shopify_product_id: productId,
@@ -726,14 +727,58 @@ async function processRow(
       colors: colors.map((c) => ({ colorName: c.colorName, colorId: c.colorId })),
       sizes: base.sizes,
       price_eur: base.price_eur,
-      image_urls: colors.flatMap((c) => c.scraped.image_urls).slice(0, 6),
+      image_urls: aggregatedImages,
       material: base.material,
       article_number: base.article_number,
     },
     updated_at: new Date().toISOString(),
   }).eq("id", row.id);
 
+  // 7) Pre-generate style inspirations in background (fire-and-forget).
+  //    Uses the product handle + first scraped image. The style-inspirations
+  //    function caches results, so when a visitor opens the product page
+  //    the 3 outfit images are already ready.
+  if (handle && aggregatedImages[0]) {
+    triggerStyleInspirations(handle, aggregatedImages[0], supabase).catch((e) => {
+      console.warn(`[worker] style-inspirations trigger failed for ${handle}:`, e);
+    });
+  }
+
   return { ok: true, action, productId, title: baseTitle, colorsCount: colors.length };
+}
+
+async function triggerStyleInspirations(
+  productHandle: string,
+  sourceImageUrl: string,
+  supabase: ReturnType<typeof createClient>,
+): Promise<void> {
+  // Skip if already cached for all 3 slots
+  const { data: cached } = await supabase
+    .from("style_inspiration_cache")
+    .select("slot")
+    .eq("product_handle", productHandle);
+  if ((cached?.length ?? 0) >= 3) {
+    console.log(`[worker] style-inspirations already cached for ${productHandle}`);
+    return;
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  console.log(`[worker] pre-generating style-inspirations for ${productHandle}`);
+
+  // Fire-and-forget POST. We don't await the response body — generation
+  // takes 10–30s and we don't want to block the import worker.
+  fetch(`${supabaseUrl}/functions/v1/style-inspirations`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    body: JSON.stringify({ productHandle, sourceImageUrl }),
+  })
+    .then((r) => r.text().then((t) => console.log(`[worker] style-inspirations ${productHandle} → ${r.status}`, t.slice(0, 120))))
+    .catch((e) => console.warn(`[worker] style-inspirations fetch error for ${productHandle}:`, e));
 }
 
 // ============================================================
