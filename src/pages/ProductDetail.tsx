@@ -228,7 +228,7 @@ const ProductDetail = () => {
       </div>
 
       <section className="container-editorial grid gap-10 py-8 md:grid-cols-[1.1fr_1fr] md:gap-16 md:py-12">
-        <ProductGallery images={images} title={product.title} />
+        <ProductGallery images={images} title={product.title} activeIndex={variantImageIndex ?? undefined} />
 
         <div className="flex flex-col">
           <div className="flex items-start justify-between gap-4">
