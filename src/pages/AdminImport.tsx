@@ -24,8 +24,16 @@ type SingleImportResult = {
   sizes?: string[];
   images_uploaded?: number;
   price_eur?: number | null;
+  compare_at_price_eur?: number | null;
   material?: string;
   article_number?: string;
+  fit?: string;
+  is_new?: boolean;
+  features_count?: number;
+  care_count?: number;
+  description_length?: number;
+  missing_fields?: string[];
+  shopify_admin_url?: string;
   error?: string;
 };
 
@@ -336,20 +344,65 @@ export default function AdminImport() {
             </Button>
           </div>
           {singleResult && singleResult.success && (
-            <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-1 text-sm">
+            <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-4 space-y-3 text-sm">
               <div className="flex items-center gap-2 font-medium text-emerald-700">
                 <CheckCircle2 className="h-4 w-4" />
                 {singleResult.action === "created" ? "Neu angelegt" : "Aktualisiert"}: {singleResult.title}
               </div>
-              <div className="text-xs text-muted-foreground space-y-0.5">
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
                 <div>Handle: <span className="font-mono">{singleResult.handle}</span></div>
                 <div>Shopify-ID: <span className="font-mono">{singleResult.shopify_product_id}</span></div>
-                <div>{singleResult.colors_found} Farben: {singleResult.colors?.join(", ")}</div>
-                <div>{singleResult.sizes?.length} Grössen · {singleResult.images_uploaded} Bilder hochgeladen</div>
-                {singleResult.material && <div>Material: {singleResult.material}</div>}
-                {singleResult.article_number && <div>Artikelnr: {singleResult.article_number}</div>}
-                {singleResult.price_eur != null && <div>Preis: €{singleResult.price_eur}</div>}
+                <div>{singleResult.colors_found} Farben: <span className="text-foreground">{singleResult.colors?.join(", ")}</span></div>
+                <div>{singleResult.sizes?.length} Grössen · {singleResult.images_uploaded} Bilder</div>
+                {singleResult.price_eur != null && (
+                  <div>
+                    Preis: <span className="text-foreground">€{singleResult.price_eur}</span>
+                    {singleResult.compare_at_price_eur && (
+                      <span className="line-through ml-2">€{singleResult.compare_at_price_eur}</span>
+                    )}
+                  </div>
+                )}
+                {singleResult.fit && <div>Passform: <span className="text-foreground">{singleResult.fit}</span></div>}
+                {singleResult.is_new && <div>Badge: <span className="text-foreground">NEU</span></div>}
+                {singleResult.article_number && <div>Artikelnr: <span className="font-mono">{singleResult.article_number}</span></div>}
+                {singleResult.material && <div>Material: <span className="text-foreground">{singleResult.material}</span></div>}
+                {(singleResult.description_length ?? 0) > 0 && (
+                  <div>Beschreibung: <span className="text-foreground">{singleResult.description_length} Zeichen</span></div>
+                )}
+                {(singleResult.features_count ?? 0) > 0 && (
+                  <div>Features: <span className="text-foreground">{singleResult.features_count} Bullets</span></div>
+                )}
+                {(singleResult.care_count ?? 0) > 0 && (
+                  <div>Pflege: <span className="text-foreground">{singleResult.care_count} Symbole</span></div>
+                )}
               </div>
+
+              {singleResult.missing_fields && singleResult.missing_fields.length > 0 && (
+                <div className="border-t border-emerald-500/30 pt-3 space-y-1">
+                  <p className="text-xs font-medium text-amber-700">
+                    ⚠ Konnte nicht von der Webseite geholt werden — bitte in Shopify nachpflegen:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {singleResult.missing_fields.map((f) => (
+                      <Badge key={f} variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/40 text-xs">
+                        {f}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {singleResult.shopify_admin_url && (
+                <a
+                  href={singleResult.shopify_admin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-xs text-primary hover:underline"
+                >
+                  → In Shopify Admin öffnen
+                </a>
+              )}
             </div>
           )}
           {singleResult && !singleResult.success && (

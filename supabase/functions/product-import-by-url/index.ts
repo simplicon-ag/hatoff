@@ -27,6 +27,9 @@ interface ScrapedProduct {
   material: string;
   article_number: string;
   care_labels: string[];
+  fit: string;            // Modern Fit / Body Fit / Comfort Fit / ""
+  is_new: boolean;        // NEU-Badge
+  features: string[];     // Bullet-Points (Hoher Baumwollanteil, Kent-Kragen, …)
   price_eur: number | null;
   compare_at_price_eur: number | null;
   on_sale: boolean;
@@ -228,10 +231,34 @@ async function firecrawlScrape(
   }
 }
 
+/** Build a clean colour-aware title from the URL slug as a robust fallback.
+ *  /de/de/sommerjacke-beige-126410120-600 → "Sommerjacke Beige" */
+function titleFromSlug(sourceUrl: string): string {
+  const slug = sourceUrl
+    .replace(/^https?:\/\/[^/]+\/de\/de\//i, "")
+    .replace(/-\d+-\d+\/?$/, "");
+  return slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** Detect fit from the URL slug or title (Modern Fit / Body Fit / Comfort Fit). */
+function extractFit(sourceUrl: string, title: string): string {
+  const haystack = (sourceUrl + " " + title).toLowerCase();
+  if (/body[- ]?fit/.test(haystack)) return "Body Fit";
+  if (/modern[- ]?fit/.test(haystack)) return "Modern Fit";
+  if (/comfort[- ]?fit/.test(haystack)) return "Comfort Fit";
+  if (/regular[- ]?fit/.test(haystack)) return "Regular Fit";
+  if (/slim[- ]?fit/.test(haystack)) return "Slim Fit";
+  return "";
+}
+
 function extractFromHtml(html: string, brand: string, sourceUrl: string): ScrapedProduct {
   const ids = parseProductIds(sourceUrl);
+  const slugTitle = titleFromSlug(sourceUrl);
 
-  // Title
+  // 1) Title — prefer H1, then OG, then <title>, fallback to URL slug
   let title = "";
   const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
   if (h1Match) {
@@ -246,23 +273,19 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (t) {
       const cleaned = cleanTitle(t[1]);
-      if (cleaned && !/loyalty|wallet|warenkorb|cart|404/i.test(cleaned)) {
-        title = cleaned;
-      }
+      if (cleaned && !/loyalty|wallet|warenkorb|cart|404/i.test(cleaned)) title = cleaned;
     }
   }
-  if (!title) {
-    const slug = sourceUrl.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
-    title = slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-  }
+  if (!title) title = slugTitle;
 
-  // Description, material, article number, care labels
+  // 2) Description / material / article number / care labels — try multiple patterns
   let description = "";
-  let descriptionHtml = "";
   let material = "";
   let articleNumber = "";
   const careLabels: string[] = [];
+  const features: string[] = [];
 
+  // Marketing copy: <div class="article-detail-text"><p>…</p>
   const marketingMatch = html.match(
     /<(?:div|section)[^>]*class="[^"]*article-detail-text[^"]*"[^>]*>([\s\S]*?)<\/(?:div|section)>/i,
   );
@@ -274,17 +297,36 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
       if (text.length > 40) description = text;
     }
   }
+  // Fallback: meta description (often empty on Casa Moda)
   if (!description) {
     const metaDesc = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
-    if (metaDesc) description = decode(metaDesc[1]);
+    if (metaDesc) {
+      const t = decode(metaDesc[1]).trim();
+      if (t.length > 40) description = t;
+    }
   }
 
+  // Material — tries: <strong>Material</strong><br>X, "Material: X", or "X % Y" pattern
   const matMatch = html.match(/<strong[^>]*>\s*Material\s*<\/strong>\s*<br\s*\/?>\s*([^<]+)/i);
   if (matMatch) material = decode(matMatch[1]).replace(/\s+/g, " ").trim();
+  if (!material) {
+    const m2 = html.match(/Material[\s:]*<[^>]+>\s*([^<]{5,200})/i);
+    if (m2) material = decode(m2[1]).replace(/\s+/g, " ").trim();
+  }
 
+  // Article number — explicit "Artikelnummer" label, or fallback to URL ID
   const artMatch = html.match(/<strong[^>]*>\s*Artikelnummer\s*<\/strong>\s*<br\s*\/?>\s*([^<]+)/i);
   if (artMatch) articleNumber = decode(artMatch[1]).replace(/\s+/g, " ").trim();
+  if (!articleNumber) {
+    const a2 = html.match(/Artikel(?:nr|nummer)[\s:.\-]*<[^>]*>\s*([0-9]{6,})/i);
+    if (a2) articleNumber = a2[1].trim();
+  }
+  if (!articleNumber && ids) {
+    // Final fallback: use the article ID from the URL itself (e.g. 126410120)
+    articleNumber = ids.articleId;
+  }
 
+  // Care icons — alt text from <img class="care-icon" alt="…">
   const careRegex = /<img[^>]*class="[^"]*care-icon[^"]*"[^>]*alt="([^"]+)"/gi;
   let careMatch: RegExpExecArray | null;
   const seenCare = new Set<string>();
@@ -296,9 +338,42 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     }
   }
 
+  // Bullet features — list items inside the product details column
+  // Try several common containers: .article-features, .product-features, .features-list, .article-detail ul
+  const featureContainers = [
+    /<(?:ul|div)[^>]*class="[^"]*article-features[^"]*"[^>]*>([\s\S]{0,2000}?)<\/(?:ul|div)>/i,
+    /<(?:ul|div)[^>]*class="[^"]*product-features[^"]*"[^>]*>([\s\S]{0,2000}?)<\/(?:ul|div)>/i,
+    /<(?:ul|div)[^>]*class="[^"]*features?[- ]list[^"]*"[^>]*>([\s\S]{0,2000}?)<\/(?:ul|div)>/i,
+  ];
+  for (const re of featureContainers) {
+    const m = html.match(re);
+    if (!m) continue;
+    const liMatches = m[1].match(/<li[^>]*>([\s\S]*?)<\/li>/gi) ?? [];
+    for (const li of liMatches) {
+      const txt = decode(li.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+      if (txt && txt.length < 200) features.push(txt);
+    }
+    if (features.length > 0) break;
+  }
+
+  // 3) Badges (NEU / Sale)
+  let isNew = false;
+  if (/class="[^"]*\b(?:badge|label|tag)[^"]*"[^>]*>\s*NEU\s*</i.test(html)) isNew = true;
+  if (/<span[^>]*>\s*NEU\s*<\/span>/i.test(html) && !/Newsletter/.test(html.slice(0, html.indexOf("NEU") + 50))) {
+    isNew = true;
+  }
+
+  // 4) Fit detection
+  const fit = extractFit(sourceUrl, title);
+
+  // 5) Build rich body_html for Shopify
   const parts: string[] = [];
   if (description) parts.push(`<p>${description}</p>`);
+  if (features.length > 0) {
+    parts.push(`<ul>${features.map((f) => `<li>${f}</li>`).join("")}</ul>`);
+  }
   if (material) parts.push(`<p><strong>Material:</strong> ${material}</p>`);
+  if (fit) parts.push(`<p><strong>Passform:</strong> ${fit}</p>`);
   if (careLabels.length > 0) {
     parts.push(
       `<p><strong>Pflegehinweise:</strong></p><ul>${
@@ -307,9 +382,9 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     );
   }
   if (articleNumber) parts.push(`<p><small>Artikelnummer: ${articleNumber}</small></p>`);
-  descriptionHtml = parts.join("\n");
+  const descriptionHtml = parts.join("\n");
 
-  // Price
+  // 6) Price
   let price_eur: number | null = null;
   let compare_at_price_eur: number | null = null;
   const articlePriceBlocks = html.match(
@@ -344,7 +419,7 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   }
   const on_sale = compare_at_price_eur !== null;
 
-  // Images
+  // 7) Images
   const imgUrls = new Set<string>();
   if (ids) {
     const { articleId, colorId } = ids;
@@ -364,9 +439,9 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     for (const [, url] of sortedImgs) imgUrls.add(url);
   }
 
-  // Product type heuristic
+  // 8) Product type heuristic
   let product_type: string | null = null;
-  const t = title.toLowerCase();
+  const t = (title + " " + slugTitle).toLowerCase();
   if (/sakko|anzug/.test(t)) product_type = "Sakko";
   else if (/hemd/.test(t)) product_type = "Hemd";
   else if (/hose|chino|jeans|bermuda/.test(t)) product_type = "Hose";
@@ -380,6 +455,13 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     ? BRAND_DEFAULT_SIZES[product_type] ?? ["S", "M", "L", "XL", "XXL"]
     : ["S", "M", "L", "XL", "XXL"];
 
+  // 9) Tags — brand, type, fit, NEU
+  const tags = [brand];
+  if (product_type) tags.push(product_type.toLowerCase());
+  if (fit) tags.push(fit.toLowerCase().replace(/\s+/g, "-"));
+  if (isNew) tags.push("neu");
+  if (on_sale) tags.push("sale");
+
   return {
     title,
     description,
@@ -387,6 +469,9 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     material,
     article_number: articleNumber,
     care_labels: careLabels,
+    fit,
+    is_new: isNew,
+    features,
     price_eur,
     compare_at_price_eur,
     on_sale,
@@ -394,7 +479,7 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     sizes,
     product_type,
     vendor: brand === "casa-moda" ? "Casa Moda" : "Venti",
-    tags: [brand, ...(product_type ? [product_type.toLowerCase()] : [])],
+    tags,
   };
 }
 
@@ -664,7 +749,14 @@ Deno.serve(async (req) => {
         console.warn(`[by-url] incomplete data for ${cu.url}`);
         continue;
       }
-      const colorName = extractColorFromTitle(sc.title) || `Farbe ${cu.colorId}`;
+      // Colour name: prefer title, fall back to URL slug, then to colorId.
+      let colorName = extractColorFromTitle(sc.title) || "";
+      if (!colorName) {
+        const slug = cu.url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
+        const slugColor = extractColorFromTitle(" " + slug.replace(/-/g, " "));
+        if (slugColor) colorName = slugColor.replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+      if (!colorName) colorName = `Farbe ${cu.colorId}`;
       colors.push({ colorName, colorId: cu.colorId, scraped: sc });
     }
 
@@ -797,6 +889,14 @@ Deno.serve(async (req) => {
       error_message: action === "updated" ? "Bestehendes Produkt aktualisiert" : null,
     });
 
+    // Compute which fields couldn't be scraped (so the admin can fill them in Shopify).
+    const missing: string[] = [];
+    if (!base.description) missing.push("Beschreibung");
+    if (!base.material) missing.push("Material");
+    if (base.care_labels.length === 0) missing.push("Pflegehinweise");
+    if (base.features.length === 0) missing.push("Bullet-Features");
+    if (!base.fit) missing.push("Passform");
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -809,8 +909,16 @@ Deno.serve(async (req) => {
         sizes: base.sizes,
         images_uploaded: imagesUploaded,
         price_eur: base.price_eur,
+        compare_at_price_eur: base.compare_at_price_eur,
         material: base.material,
         article_number: base.article_number,
+        fit: base.fit,
+        is_new: base.is_new,
+        features_count: base.features.length,
+        care_count: base.care_labels.length,
+        description_length: base.description.length,
+        missing_fields: missing,
+        shopify_admin_url: `https://${SHOPIFY_DOMAIN.replace(".myshopify.com","")}.myshopify.com/admin/products/${productId}`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
