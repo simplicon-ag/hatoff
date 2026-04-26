@@ -163,7 +163,10 @@ export async function fetchProductByHandle(handle: string) {
 }
 
 export async function fetchProductsByHandles(handles: string[]): Promise<ShopifyProduct[]> {
-  const results = await Promise.all(handles.map((h) => fetchProductByHandle(h)));
+  // Handles können einen Farb-Suffix tragen (z.B. "casa-moda-pullover-14504#color=Dunkelblau"),
+  // der nicht zum Shopify-Handle gehört. Beim Fetch entfernen, damit das Produkt geladen wird.
+  const cleaned = handles.map((h) => h.split("#")[0]);
+  const results = await Promise.all(cleaned.map((h) => fetchProductByHandle(h)));
   return results
     .filter(Boolean)
     .map((node) => ({ node }) as ShopifyProduct);
