@@ -514,7 +514,10 @@ const ProductDetail = () => {
                         return (
                           <button
                             key={value}
-                            onClick={() => setSelectedVariantId(info.variantId)}
+                            onClick={() => {
+                              setUserPickedVariant(true);
+                              setSelectedVariantId(info.variantId);
+                            }}
                             disabled={!info.available}
                             className={cn(
                               "min-w-12 border px-4 py-2 text-sm transition",
