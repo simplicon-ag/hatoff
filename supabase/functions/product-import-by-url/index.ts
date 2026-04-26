@@ -520,10 +520,10 @@ async function shopifyFetch(
 async function findShopifyProductByHandle(
   handle: string,
   adminToken: string,
-): Promise<string | null> {
+): Promise<{ id: string; title: string; handle: string } | null> {
   try {
     const res = await shopifyFetch(
-      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?handle=${encodeURIComponent(handle)}&fields=id,handle&limit=1`,
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?handle=${encodeURIComponent(handle)}&fields=id,handle,title&limit=1`,
       { method: "GET", adminToken },
     );
     if (!res.ok) {
@@ -532,7 +532,39 @@ async function findShopifyProductByHandle(
     }
     const json = await res.json();
     const p = json?.products?.[0];
-    return p?.id ? String(p.id) : null;
+    return p?.id ? { id: String(p.id), title: String(p.title ?? ""), handle: String(p.handle ?? "") } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Search Shopify by article-number tag (art:123456789). Catches duplicates whose
+ *  handle differs (e.g. slight slug variations) but the same article ID is tagged. */
+async function findShopifyProductByArticleId(
+  articleId: string,
+  adminToken: string,
+): Promise<{ id: string; title: string; handle: string } | null> {
+  try {
+    const tag = `art:${articleId}`;
+    // Use REST search via tags filter — the products endpoint supports `?tag=`
+    const res = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?tag=${encodeURIComponent(tag)}&fields=id,handle,title,tags&limit=5`,
+      { method: "GET", adminToken },
+    );
+    if (!res.ok) {
+      await res.text().catch(() => "");
+      return null;
+    }
+    const json = await res.json();
+    const products: Array<{ id: number; handle: string; title: string; tags: string }> = json?.products ?? [];
+    // Defensive: confirm the tag is actually present (tag= filter should already do this)
+    for (const p of products) {
+      const tags = String(p.tags ?? "").split(",").map((t) => t.trim().toLowerCase());
+      if (tags.includes(tag.toLowerCase())) {
+        return { id: String(p.id), title: String(p.title ?? ""), handle: String(p.handle ?? "") };
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -690,6 +722,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const rawUrl = String(body.url ?? "").trim();
+    const force = Boolean(body.force);
     if (!rawUrl) {
       return new Response(
         JSON.stringify({ success: false, error: "url required" }),
@@ -722,6 +755,39 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    // ============================================================
+    // EARLY DUPLICATE CHECK — runs BEFORE Firecrawl to save credits.
+    // Looks up by (1) handle, then (2) article-number tag `art:<id>`.
+    // If found and `force` is not set → abort with `already_exists`.
+    // ============================================================
+    const existingByHandle = await findShopifyProductByHandle(handle, adminToken);
+    const existingByArticle = existingByHandle
+      ? null
+      : await findShopifyProductByArticleId(parsed.articleId, adminToken);
+    const existing = existingByHandle ?? existingByArticle;
+
+    if (existing && !force) {
+      const adminUrl = `https://${SHOPIFY_DOMAIN.replace(".myshopify.com","")}.myshopify.com/admin/products/${existing.id}`;
+      console.log(`[by-url] duplicate found id=${existing.id} handle=${existing.handle} — aborting`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          already_exists: true,
+          matched_by: existingByHandle ? "handle" : "article_number",
+          shopify_product_id: existing.id,
+          handle: existing.handle,
+          title: existing.title,
+          article_number: parsed.articleId,
+          shopify_admin_url: adminUrl,
+          error:
+            `Produkt existiert bereits in Shopify (${existingByHandle ? "Handle-Match" : "Artikelnummer-Match"}): ` +
+            `"${existing.title}". Mit "force: true" kann es überschrieben werden.`,
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
     if (!firecrawlKey) {
       return new Response(
@@ -730,7 +796,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[by-url] start brand=${brand} handle=${handle}`);
+    console.log(`[by-url] start brand=${brand} handle=${handle} force=${force} existing=${existing?.id ?? "no"}`);
 
     // 1) Find sibling colour URLs
     const colorUrls = await discoverColorUrls(sourceUrl, parsed.articleId, brand);
@@ -772,15 +838,16 @@ Deno.serve(async (req) => {
     const baseTitle = stripColorFromTitle(first.title) || first.title;
     const base: ScrapedProduct = { ...first, title: baseTitle, image_urls: [] };
 
-    // 4) Upsert: check whether the handle already exists
-    const existingId = await findShopifyProductByHandle(handle, adminToken);
+    // 4) Upsert: re-use the existence result from the early check.
+    //    With force=true we update the matched product (by handle or by article number).
+    const existingId = existing?.id ?? null;
     const payload = buildProductPayload(base, colors, handle);
 
     let productId: string;
     let action: "created" | "updated";
 
     if (existingId) {
-      console.log(`[by-url] updating existing product ${existingId}`);
+      console.log(`[by-url] updating existing product ${existingId} (force)`);
       // Strip handle from update payload (Shopify dislikes changing it on update if same)
       const updateBody = {
         product: {
