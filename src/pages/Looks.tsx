@@ -2,13 +2,15 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
 import { LookCard } from "@/components/LookCard";
-import { looks, welten } from "@/data/looks";
+import { welten } from "@/data/looks";
+import { useCuratedLooks } from "@/hooks/useCuratedLooks";
 
 const LooksPage = () => {
   const [params, setParams] = useSearchParams();
   const welt = params.get("welt");
+  const { looks } = useCuratedLooks();
 
-  const filtered = useMemo(() => (welt ? looks.filter((l) => l.welt === welt) : looks), [welt]);
+  const filtered = useMemo(() => (welt ? looks.filter((l) => l.welt === welt) : looks), [welt, looks]);
 
   return (
     <SiteLayout>

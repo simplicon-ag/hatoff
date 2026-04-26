@@ -5,7 +5,8 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { FeaturedLook } from "@/components/FeaturedLook";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
-import { looks, magazinArtikel, marken, welten } from "@/data/looks";
+import { magazinArtikel, marken, welten } from "@/data/looks";
+import { useCuratedLooks } from "@/hooks/useCuratedLooks";
 import { fetchProducts, fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
 import { supabase } from "@/integrations/supabase/client";
 import heroImg from "@/assets/hero.jpg";
@@ -44,6 +45,7 @@ const Index = () => {
     })().catch((e) => console.error("sale highlights", e));
   }, []);
 
+  const { looks } = useCuratedLooks();
   const featuredLooks = looks.slice(0, 3);
 
   return (
