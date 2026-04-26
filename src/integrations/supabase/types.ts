@@ -200,6 +200,36 @@ export type Database = {
         }
         Relationships: []
       }
+      style_inspiration_cache: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          product_handle: string
+          slot: string
+          source_image_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          product_handle: string
+          slot: string
+          source_image_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          product_handle?: string
+          slot?: string
+          source_image_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
