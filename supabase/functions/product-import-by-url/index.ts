@@ -838,15 +838,16 @@ Deno.serve(async (req) => {
     const baseTitle = stripColorFromTitle(first.title) || first.title;
     const base: ScrapedProduct = { ...first, title: baseTitle, image_urls: [] };
 
-    // 4) Upsert: check whether the handle already exists
-    const existingId = await findShopifyProductByHandle(handle, adminToken);
+    // 4) Upsert: re-use the existence result from the early check.
+    //    With force=true we update the matched product (by handle or by article number).
+    const existingId = existing?.id ?? null;
     const payload = buildProductPayload(base, colors, handle);
 
     let productId: string;
     let action: "created" | "updated";
 
     if (existingId) {
-      console.log(`[by-url] updating existing product ${existingId}`);
+      console.log(`[by-url] updating existing product ${existingId} (force)`);
       // Strip handle from update payload (Shopify dislikes changing it on update if same)
       const updateBody = {
         product: {
