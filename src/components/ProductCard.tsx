@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, ShoppingBag } from "lucide-react";
 import type { ShopifyProduct } from "@/lib/shopify";
@@ -11,13 +11,16 @@ import { cn } from "@/lib/utils";
 interface Props {
   product: ShopifyProduct;
   priority?: boolean;
+  /**
+   * Wenn gesetzt, rendert die Karte das Produkt fokussiert auf diese Farbe:
+   * Bild, Titel-Suffix und Quick-Add-Variant beziehen sich auf diese Farbe.
+   * Wird genutzt, um Mehrfarb-Produkte als mehrere Karten in der Liste darzustellen.
+   */
+  initialColor?: string;
 }
 
-export const ProductCard = ({ product, priority }: Props) => {
+export const ProductCard = ({ product, priority, initialColor }: Props) => {
   const p = product.node;
-  const images = p.images.edges;
-  const primary = images[0]?.node;
-  const secondary = images[1]?.node;
   const price = p.priceRange.minVariantPrice;
   const { price: livePrice } = useLivePrice(p.handle);
   const displayPrice = formatLivePrice(livePrice) ?? formatPrice(price.amount, price.currencyCode);
@@ -25,24 +28,65 @@ export const ProductCard = ({ product, priority }: Props) => {
   const discount = discountPercent(livePrice);
   const onSale = !!livePrice?.on_sale && originalPrice;
 
-  const firstAvailable = p.variants.edges.find((e) => e.node.availableForSale)?.node;
+  const colorOption = p.options.find((o) => /farbe|color|colour/i.test(o.name));
+
+  // Alle Varianten dieser Farbe (oder alle Varianten, wenn keine Farbfokussierung)
+  const variantsForColor = useMemo(() => {
+    if (!initialColor) return p.variants.edges.map((e) => e.node);
+    return p.variants.edges
+      .map((e) => e.node)
+      .filter((v) =>
+        v.selectedOptions.some(
+          (o) => /farbe|color|colour/i.test(o.name) && o.value === initialColor,
+        ),
+      );
+  }, [p.variants.edges, initialColor]);
+
+  // Bild für die ausgewählte Farbe: erst Variant-Bild, sonst Galerie-Fallback
+  const colorImage = useMemo(() => {
+    if (!initialColor) return null;
+    const withImg = variantsForColor.find((v) => v.image?.url);
+    return withImg?.image ?? null;
+  }, [initialColor, variantsForColor]);
+
+  const images = p.images.edges;
+  const primary = colorImage ?? images[0]?.node ?? null;
+  const secondary = colorImage ? null : images[1]?.node ?? null;
+
+  const firstAvailable =
+    variantsForColor.find((v) => v.availableForSale) ??
+    p.variants.edges.find((e) => e.node.availableForSale)?.node;
   const soldOut = !firstAvailable;
 
-  const colorOption = p.options.find((o) => /farbe|color|colour/i.test(o.name));
-  const colorCount = colorOption?.values.length ?? 0;
+  // Anzahl unterschiedlicher Grössen für diese Farbe → bestimmt, ob noch Auswahl nötig
+  const sizeCountForColor = useMemo(() => {
+    const sizes = new Set<string>();
+    variantsForColor.forEach((v) => {
+      v.selectedOptions.forEach((o) => {
+        if (/gr(ö|oe|o)sse|size/i.test(o.name)) sizes.add(o.value);
+      });
+    });
+    return sizes.size;
+  }, [variantsForColor]);
 
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
   const [adding, setAdding] = useState(false);
 
+  const detailHref = initialColor
+    ? `/product/${p.handle}?farbe=${encodeURIComponent(initialColor)}`
+    : `/product/${p.handle}`;
+
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!firstAvailable) return;
-    // If product has size/colour options and >1 variant, route to detail page
-    const needsChoice = p.variants.edges.length > 1;
+    // Wenn noch eine Grösse gewählt werden muss → zur Detailseite
+    const needsChoice = initialColor
+      ? sizeCountForColor > 1
+      : p.variants.edges.length > 1;
     if (needsChoice) {
-      window.location.href = `/product/${p.handle}`;
+      window.location.href = detailHref;
       return;
     }
     setAdding(true);
@@ -60,8 +104,12 @@ export const ProductCard = ({ product, priority }: Props) => {
     toast.success("Zum Warenkorb hinzugefügt", { description: p.title, position: "top-right" });
   };
 
+  // "+N Farben" nur anzeigen, wenn KEINE Farb-Expansion (initialColor) aktiv ist
+  const colorCount = colorOption?.values.length ?? 0;
+  const showColorHint = !initialColor && colorCount > 1;
+
   return (
-    <Link to={`/product/${p.handle}`} className="group block">
+    <Link to={detailHref} className="group block">
       <div className="relative aspect-[4/5] overflow-hidden bg-secondary">
         {primary ? (
           <>
@@ -109,13 +157,22 @@ export const ProductCard = ({ product, priority }: Props) => {
             aria-label="Schnell zum Warenkorb hinzufügen"
           >
             {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShoppingBag className="h-3.5 w-3.5" />}
-            {p.variants.edges.length > 1 ? "Optionen wählen" : "In den Warenkorb"}
+            {(initialColor ? sizeCountForColor > 1 : p.variants.edges.length > 1)
+              ? "Optionen wählen"
+              : "In den Warenkorb"}
           </button>
         )}
       </div>
       <div className="mt-4 space-y-1">
         <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
-        <h3 className="font-display text-lg leading-tight">{p.title}</h3>
+        <h3 className="font-display text-lg leading-tight">
+          {p.title}
+          {initialColor && (
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              · {initialColor}
+            </span>
+          )}
+        </h3>
         {onSale ? (
           <p className="flex items-baseline gap-2 text-sm">
             <span className="font-medium text-destructive">{displayPrice}</span>
@@ -124,7 +181,7 @@ export const ProductCard = ({ product, priority }: Props) => {
         ) : (
           <p className="text-sm text-foreground/80">{displayPrice}</p>
         )}
-        {colorCount > 1 && (
+        {showColorHint && (
           <p className="pt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             +{colorCount} {colorCount === 2 ? "Farbe" : "Farben"}
           </p>
