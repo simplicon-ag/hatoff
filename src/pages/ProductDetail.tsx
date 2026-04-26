@@ -65,6 +65,16 @@ function findVariantImageIndex(
   return null;
 }
 
+function shopifySizedImage(url: string, width: number) {
+  try {
+    const sized = new URL(url);
+    sized.searchParams.set("width", String(width));
+    return sized.toString();
+  } catch {
+    return url;
+  }
+}
+
 const ProductDetail = () => {
   const { handle } = useParams<{ handle: string }>();
   const [searchParams] = useSearchParams();
