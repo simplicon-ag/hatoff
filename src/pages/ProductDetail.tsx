@@ -266,31 +266,46 @@ const ProductDetail = () => {
             </div>
           </div>
 
-          {selectedVariant && (
-            <div className="mt-5 flex flex-wrap items-baseline gap-3">
-              {livePrice?.on_sale && formatOriginalPrice(livePrice) ? (
-                <>
-                  <p className="text-2xl font-medium text-destructive">
-                    {formatLivePrice(livePrice)}
+          {selectedVariant && (() => {
+            // Variant-Sale (compareAtPrice) hat Vorrang vor LivePrice, weil pro Variant unterschiedlich
+            const showVariantSale = variantOnSale;
+            const showLiveSale = !showVariantSale && livePrice?.on_sale && formatOriginalPrice(livePrice);
+            return (
+              <div className="mt-5 flex flex-wrap items-baseline gap-3">
+                {showVariantSale ? (
+                  <>
+                    <p className="text-2xl font-medium text-destructive">
+                      {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                    </p>
+                    <p className="text-lg text-foreground/50 line-through">
+                      {formatPrice(selectedVariant.compareAtPrice!.amount, selectedVariant.compareAtPrice!.currencyCode)}
+                    </p>
+                    {variantDiscount && (
+                      <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                        -{variantDiscount}%
+                      </span>
+                    )}
+                  </>
+                ) : showLiveSale ? (
+                  <>
+                    <p className="text-2xl font-medium text-destructive">{formatLivePrice(livePrice)}</p>
+                    <p className="text-lg text-foreground/50 line-through">{formatOriginalPrice(livePrice)}</p>
+                    {discountPercent(livePrice) && (
+                      <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                        -{discountPercent(livePrice)}%
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-2xl font-medium">
+                    {formatLivePrice(livePrice) ??
+                      formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
                   </p>
-                  <p className="text-lg text-foreground/50 line-through">
-                    {formatOriginalPrice(livePrice)}
-                  </p>
-                  {discountPercent(livePrice) && (
-                    <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
-                      -{discountPercent(livePrice)}%
-                    </span>
-                  )}
-                </>
-              ) : (
-                <p className="text-2xl font-medium">
-                  {formatLivePrice(livePrice) ??
-                    formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
-                </p>
-              )}
-              <span className="text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</span>
-            </div>
-          )}
+                )}
+                <span className="text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</span>
+              </div>
+            );
+          })()}
 
           {/* Stock indicator */}
           <div className="mt-4 flex items-center gap-2 text-sm">
