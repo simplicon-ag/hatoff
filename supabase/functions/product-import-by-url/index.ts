@@ -991,7 +991,7 @@ Deno.serve(async (req) => {
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const delays = [8000, 20000, 40000]; // 8s, dann +20s, dann +40s
       console.log(`[by-url] scheduling look-generate retries for ${handle}`);
-      (async () => {
+      const retryTask = (async () => {
         for (let attempt = 0; attempt < delays.length; attempt++) {
           await new Promise((r) => setTimeout(r, delays[attempt]));
           try {
