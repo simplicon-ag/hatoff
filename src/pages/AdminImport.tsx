@@ -250,7 +250,7 @@ export default function AdminImport() {
     }
   };
 
-  const runSingleUrl = async () => {
+  const runSingleUrl = async (force = false) => {
     const url = singleUrl.trim();
     if (!url) {
       toast.error("Bitte URL einfügen");
@@ -265,8 +265,24 @@ export default function AdminImport() {
     try {
       const { data, error } = await supabase.functions.invoke<SingleImportResult>(
         "product-import-by-url",
-        { body: { url } },
+        { body: { url, force } },
       );
+      // Edge function returns 409 with structured body for duplicates; supabase-js
+      // surfaces non-2xx as `error`, but `data` may still be populated. Prefer data.
+      const payload: SingleImportResult | null =
+        (data as SingleImportResult | null) ??
+        (error && typeof (error as { context?: unknown }).context === "object"
+          ? null
+          : null);
+
+      if (payload?.already_exists) {
+        setSingleResult(payload);
+        toast.warning(
+          `Existiert bereits: "${payload.title}" (${payload.matched_by === "handle" ? "Handle-Match" : "Artikelnummer-Match"})`,
+        );
+        return;
+      }
+
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "Unbekannter Fehler");
       setSingleResult(data);
