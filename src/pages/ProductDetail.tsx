@@ -601,50 +601,53 @@ const ProductDetail = () => {
             <TrustBadges />
           </div>
 
-          {/* Description & Details */}
-          <Accordion type="multiple" className="mt-8">
-            <AccordionItem value="details">
-              <AccordionTrigger className="py-5 font-display text-base">Details & Pflege</AccordionTrigger>
-              <AccordionContent className="pb-6 pt-2">
-                <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[120px_1fr]">
-                  <dt className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Marke</dt>
-                  <dd className="text-sm text-foreground/85">{product.vendor}</dd>
-                  {product.productType && (
-                    <>
-                      <dt className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Kategorie</dt>
-                      <dd className="text-sm text-foreground/85">{product.productType}</dd>
-                    </>
-                  )}
-                </dl>
-                {product.tags?.length > 0 && (
-                  <div className="mt-5 border-t border-border pt-5">
-                    <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Tags</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {product.tags.map((t) => (
-                        <span
-                          key={t}
-                          className="inline-flex bg-secondary px-2.5 py-1 text-xs text-foreground/75"
-                        >
-                          {t.replace(/^[a-z]+:/i, "")}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="ship">
-              <AccordionTrigger className="py-5 font-display text-base">Versand & Rückgabe</AccordionTrigger>
-              <AccordionContent className="pb-6 pt-2">
-                <ul className="space-y-2.5 text-[15px] leading-relaxed text-foreground/85">
-                  <li className="flex gap-3"><span className="text-primary">·</span> Versand innerhalb der Schweiz in 3–5 Werktagen.</li>
-                  <li className="flex gap-3"><span className="text-primary">·</span> Kostenloser Versand ab CHF 200.</li>
-                  <li className="flex gap-3"><span className="text-primary">·</span> 30 Tage Rückgaberecht — unkomplizierte Retoure.</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
         </div>
+      </section>
+
+      {/* Details & Versand — volle Breite unter den Produktinformationen */}
+      <section className="container-editorial border-t border-border py-10 md:py-14">
+        <Accordion type="multiple" className="mx-auto max-w-5xl">
+          <AccordionItem value="details">
+            <AccordionTrigger className="py-5 font-display text-base">Details & Pflege</AccordionTrigger>
+            <AccordionContent className="pb-6 pt-2">
+              <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-[160px_1fr]">
+                <dt className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Marke</dt>
+                <dd className="text-sm text-foreground/85">{product.vendor}</dd>
+                {product.productType && (
+                  <>
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Kategorie</dt>
+                    <dd className="text-sm text-foreground/85">{product.productType}</dd>
+                  </>
+                )}
+              </dl>
+              {product.tags?.length > 0 && (
+                <div className="mt-5 border-t border-border pt-5">
+                  <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Tags</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {product.tags.map((t) => (
+                      <span
+                        key={t}
+                        className="inline-flex bg-secondary px-2.5 py-1 text-xs text-foreground/75"
+                      >
+                        {t.replace(/^[a-z]+:/i, "")}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="ship">
+            <AccordionTrigger className="py-5 font-display text-base">Versand & Rückgabe</AccordionTrigger>
+            <AccordionContent className="pb-6 pt-2">
+              <ul className="space-y-2.5 text-[15px] leading-relaxed text-foreground/85">
+                <li className="flex gap-3"><span className="text-primary">·</span> Versand innerhalb der Schweiz in 3–5 Werktagen.</li>
+                <li className="flex gap-3"><span className="text-primary">·</span> Kostenloser Versand ab CHF 200.</li>
+                <li className="flex gap-3"><span className="text-primary">·</span> 30 Tage Rückgaberecht — unkomplizierte Retoure.</li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </section>
 
 
