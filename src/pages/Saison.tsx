@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { fetchAllProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
 import {
   filterProductsForSaisonWithBrandData,
   saisons,
