@@ -111,8 +111,47 @@ const Neuheiten = () => {
         </p>
       </section>
 
-      {/* Brand filter */}
+      {/* Kategorie-Filter (Box-Style) */}
       <section className="container-editorial mt-10">
+        <p className="mb-3 text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+          Kategorie
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => setActiveCategory("alle")}
+            className={`border px-5 py-2.5 text-sm transition ${
+              activeCategory === "alle"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background hover:border-primary"
+            }`}
+          >
+            Alle <span className="ml-1.5 text-xs opacity-70">{newest.length}</span>
+          </button>
+          {CATEGORIES.map((cat) => {
+            const count = categoryCounts.get(cat.id) ?? 0;
+            if (count === 0) return null;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`border px-5 py-2.5 text-sm transition ${
+                  activeCategory === cat.id
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background hover:border-primary"
+                }`}
+              >
+                {cat.label} <span className="ml-1.5 text-xs opacity-70">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Brand filter */}
+      <section className="container-editorial mt-6">
+        <p className="mb-3 text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+          Marke
+        </p>
         <div className="flex flex-wrap gap-2 border-b border-border pb-6">
           <button
             onClick={() => setActiveBrand("Alle")}
@@ -139,6 +178,7 @@ const Neuheiten = () => {
           ))}
         </div>
       </section>
+
 
       {loading ? (
         <section className="container-editorial py-24 text-center text-muted-foreground">
