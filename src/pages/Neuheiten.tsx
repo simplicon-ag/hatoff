@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { LookCard } from "@/components/LookCard";
-import { fetchAllProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
 import { looks } from "@/data/looks";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
@@ -158,8 +158,12 @@ const Neuheiten = () => {
                 Weitere Neuheiten
               </p>
               <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-                {gridPicks.map((p) => (
-                  <ProductCard key={p.node.id} product={p} />
+                {expandProductsByColor(gridPicks).map((p) => (
+                  <ProductCard
+                    key={`${p.node.id}-${p.initialColor ?? "default"}`}
+                    product={p}
+                    initialColor={p.initialColor}
+                  />
                 ))}
               </div>
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
-import { fetchAllProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
@@ -140,8 +140,13 @@ const Sale = () => {
           </div>
         ) : (
           <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-            {onSaleProducts.map((p, i) => (
-              <ProductCard key={p.node.id} product={p} priority={i < 6} />
+            {expandProductsByColor(onSaleProducts).map((p, i) => (
+              <ProductCard
+                key={`${p.node.id}-${p.initialColor ?? "default"}`}
+                product={p}
+                initialColor={p.initialColor}
+                priority={i < 6}
+              />
             ))}
           </div>
         )}

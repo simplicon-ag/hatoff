@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Loader2, Minus, Plus, Heart, Share2 } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,8 @@ function findVariantImageIndex(
 
 const ProductDetail = () => {
   const { handle } = useParams<{ handle: string }>();
+  const [searchParams] = useSearchParams();
+  const colorParam = searchParams.get("farbe");
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -83,8 +85,25 @@ const ProductDetail = () => {
     fetchProductByHandle(handle)
       .then((p: Product | null) => {
         setProduct(p);
-        const firstAvailable = p?.variants.edges.find((e) => e.node.availableForSale)?.node;
-        setSelectedVariantId(firstAvailable?.id ?? p?.variants.edges[0]?.node.id ?? null);
+        // Wenn ?farbe= in URL → erste verfügbare Variante dieser Farbe vorwählen
+        let initial: Variant | undefined;
+        if (colorParam && p) {
+          initial = p.variants.edges
+            .map((e) => e.node)
+            .find(
+              (v) =>
+                v.availableForSale &&
+                v.selectedOptions.some(
+                  (o) =>
+                    (o.name === "Farbe" || o.name === "Color") &&
+                    o.value === colorParam,
+                ),
+            );
+        }
+        if (!initial) {
+          initial = p?.variants.edges.find((e) => e.node.availableForSale)?.node;
+        }
+        setSelectedVariantId(initial?.id ?? p?.variants.edges[0]?.node.id ?? null);
 
         if (p?.vendor) {
           fetchProducts(8, `vendor:"${p.vendor}"`).then((items) => {
@@ -103,7 +122,7 @@ const ProductDetail = () => {
         }
       })
       .finally(() => setLoading(false));
-  }, [handle]);
+  }, [handle, colorParam]);
 
   const selectedVariant = useMemo(
     () => product?.variants.edges.find((e) => e.node.id === selectedVariantId)?.node,

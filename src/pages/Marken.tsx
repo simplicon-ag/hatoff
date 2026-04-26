@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { marken } from "@/data/looks";
-import { fetchProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
 
 const MarkenIndex = () => (
   <SiteLayout>
@@ -56,7 +56,13 @@ const MarkenDetail = () => {
           <p className="py-12 text-center text-muted-foreground">Bald: Stücke von {marke.name}</p>
         ) : (
           <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {products.map((p) => <ProductCard key={p.node.id} product={p} />)}
+            {expandProductsByColor(products).map((p) => (
+              <ProductCard
+                key={`${p.node.id}-${p.initialColor ?? "default"}`}
+                product={p}
+                initialColor={p.initialColor}
+              />
+            ))}
           </div>
         )}
       </section>
