@@ -141,10 +141,7 @@ const Neuheiten = () => {
           <p className="text-muted-foreground">Keine Neuheiten für diese Auswahl.</p>
           <Button
             variant="link"
-            onClick={() => {
-              setActiveBrand("Alle");
-              setActiveCategory("alle");
-            }}
+            onClick={() => setActiveCategory("alle")}
             className="mt-2"
           >
             Filter zurücksetzen
