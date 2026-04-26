@@ -450,10 +450,12 @@ const ProductDetail = () => {
                                 return col === c.value && sz === currentSize;
                               });
                               if (match) {
+                                setUserPickedVariant(true);
                                 setSelectedVariantId(match.node.id);
                                 return;
                               }
                             }
+                            setUserPickedVariant(true);
                             setSelectedVariantId(c.variantId);
                           }}
                           disabled={!c.available}
