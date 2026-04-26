@@ -722,6 +722,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const rawUrl = String(body.url ?? "").trim();
+    const force = Boolean(body.force);
     if (!rawUrl) {
       return new Response(
         JSON.stringify({ success: false, error: "url required" }),
@@ -754,6 +755,39 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    // ============================================================
+    // EARLY DUPLICATE CHECK — runs BEFORE Firecrawl to save credits.
+    // Looks up by (1) handle, then (2) article-number tag `art:<id>`.
+    // If found and `force` is not set → abort with `already_exists`.
+    // ============================================================
+    const existingByHandle = await findShopifyProductByHandle(handle, adminToken);
+    const existingByArticle = existingByHandle
+      ? null
+      : await findShopifyProductByArticleId(parsed.articleId, adminToken);
+    const existing = existingByHandle ?? existingByArticle;
+
+    if (existing && !force) {
+      const adminUrl = `https://${SHOPIFY_DOMAIN.replace(".myshopify.com","")}.myshopify.com/admin/products/${existing.id}`;
+      console.log(`[by-url] duplicate found id=${existing.id} handle=${existing.handle} — aborting`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          already_exists: true,
+          matched_by: existingByHandle ? "handle" : "article_number",
+          shopify_product_id: existing.id,
+          handle: existing.handle,
+          title: existing.title,
+          article_number: parsed.articleId,
+          shopify_admin_url: adminUrl,
+          error:
+            `Produkt existiert bereits in Shopify (${existingByHandle ? "Handle-Match" : "Artikelnummer-Match"}): ` +
+            `"${existing.title}". Mit "force: true" kann es überschrieben werden.`,
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
     if (!firecrawlKey) {
       return new Response(
@@ -762,7 +796,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[by-url] start brand=${brand} handle=${handle}`);
+    console.log(`[by-url] start brand=${brand} handle=${handle} force=${force} existing=${existing?.id ?? "no"}`);
 
     // 1) Find sibling colour URLs
     const colorUrls = await discoverColorUrls(sourceUrl, parsed.articleId, brand);
