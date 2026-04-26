@@ -18,6 +18,17 @@ export interface LivePrice {
 const memCache = new Map<string, LivePrice>();
 const inflight = new Map<string, Promise<LivePrice | null>>();
 
+function normalizeLivePrice(price: LivePrice): LivePrice {
+  return {
+    ...price,
+    // Sales werden ausschliesslich in Shopify (Variant compareAtPrice) gepflegt.
+    // Der Brand-Scrape liefert weiterhin den CHF-Anzeigepreis, aber nie Sale-Status.
+    on_sale: false,
+    original_price_chf: null,
+    original_price_eur: null,
+  };
+}
+
 /**
  * Lädt Live-Preise für eine Liste von Handles vom product-price Edge-Endpoint.
  * - Liest erst den DB-Cache (über die Edge-Function selbst — die fragt zuerst die Tabelle)
