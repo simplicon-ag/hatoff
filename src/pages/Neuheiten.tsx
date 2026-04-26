@@ -41,7 +41,6 @@ function detectCategory(p: ShopifyProduct): CategoryId | null {
 const Neuheiten = () => {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeBrand, setActiveBrand] = useState<string>("Alle");
   const [activeCategory, setActiveCategory] = useState<CategoryId>("alle");
 
   useEffect(() => {
@@ -61,15 +60,6 @@ const Neuheiten = () => {
     return [...onlyNew].sort((a, b) => b.node.id.localeCompare(a.node.id));
   }, [products]);
 
-  const brands = useMemo(() => {
-    const set = new Map<string, number>();
-    newest.forEach((p) => {
-      const v = p.node.vendor || "Sonstige";
-      set.set(v, (set.get(v) ?? 0) + 1);
-    });
-    return Array.from(set.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [newest]);
-
   const categoryCounts = useMemo(() => {
     const counts = new Map<CategoryId, number>();
     newest.forEach((p) => {
@@ -80,15 +70,9 @@ const Neuheiten = () => {
   }, [newest]);
 
   const filtered = useMemo(() => {
-    let list = newest;
-    if (activeBrand !== "Alle") {
-      list = list.filter((p) => (p.node.vendor || "Sonstige") === activeBrand);
-    }
-    if (activeCategory !== "alle") {
-      list = list.filter((p) => detectCategory(p) === activeCategory);
-    }
-    return list;
-  }, [newest, activeBrand, activeCategory]);
+    if (activeCategory === "alle") return newest;
+    return newest.filter((p) => detectCategory(p) === activeCategory);
+  }, [newest, activeCategory]);
 
 
   const heroPicks = filtered.slice(0, HERO_COUNT);
