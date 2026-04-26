@@ -3,6 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Logo } from "./Logo";
 import { CartDrawer } from "./CartDrawer";
+import { GlobalSearch } from "./GlobalSearch";
 
 const navItems = [
   { to: "/looks", label: "Looks" },
@@ -54,7 +55,8 @@ export const SiteHeader = () => {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
+          <GlobalSearch />
           <CartDrawer />
           <button
             className="inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-secondary md:hidden"
