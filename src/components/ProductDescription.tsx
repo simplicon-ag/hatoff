@@ -7,6 +7,7 @@ interface Props {
 // Keywords that mark structured product info inside Shopify's flowing description
 const KEYS = [
   "Material",
+  "Pflegehinweise",
   "Pflege",
   "Passform",
   "Farbe",
@@ -16,6 +17,7 @@ const KEYS = [
   "Verschluss",
   "Futter",
   "Eigenschaften",
+  "Artikelnummer",
 ] as const;
 
 interface Pair {
