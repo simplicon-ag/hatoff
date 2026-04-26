@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
+import { searchProducts } from "@/lib/product-search";
 import {
   Select,
   SelectContent,
@@ -139,13 +140,9 @@ const Shop = () => {
     let list = products;
 
     if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.node.title.toLowerCase().includes(q) ||
-          p.node.vendor?.toLowerCase().includes(q) ||
-          p.node.productType?.toLowerCase().includes(q),
-      );
+      // Zentrale Suchlogik: durchsucht Titel, Marke, Typ, Tags (inkl. art:),
+      // Variantenoptionen, Beschreibung (plain + HTML) und Artikelnummern.
+      list = searchProducts(list, search);
     }
 
     if (selectedVendors.size > 0) {
