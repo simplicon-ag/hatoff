@@ -28,6 +28,9 @@ export const ProductCard = ({ product, priority }: Props) => {
   const firstAvailable = p.variants.edges.find((e) => e.node.availableForSale)?.node;
   const soldOut = !firstAvailable;
 
+  const colorOption = p.options.find((o) => /farbe|color|colour/i.test(o.name));
+  const colorCount = colorOption?.values.length ?? 0;
+
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
   const [adding, setAdding] = useState(false);
@@ -120,6 +123,11 @@ export const ProductCard = ({ product, priority }: Props) => {
           </p>
         ) : (
           <p className="text-sm text-foreground/80">{displayPrice}</p>
+        )}
+        {colorCount > 1 && (
+          <p className="pt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            +{colorCount} {colorCount === 2 ? "Farbe" : "Farben"}
+          </p>
         )}
       </div>
     </Link>
