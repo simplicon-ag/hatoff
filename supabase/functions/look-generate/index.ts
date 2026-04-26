@@ -198,13 +198,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { productHandle, force } = await req.json();
+    const { productHandle, force, maxExisting } = await req.json();
     if (!productHandle || typeof productHandle !== "string") {
       return new Response(JSON.stringify({ error: "productHandle required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    // Default: skip when 2+ looks exist. Caller may pass higher value to allow more variants.
+    const limit = typeof maxExisting === "number" && maxExisting >= 0 ? maxExisting : 2;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
@@ -235,9 +237,9 @@ Deno.serve(async (req) => {
       .contains("product_handles", [anchor.handle]);
 
     const existingForAnchor = existingLooks ?? [];
-    if (!force && existingForAnchor.length >= 2) {
+    if (!force && existingForAnchor.length >= limit) {
       return new Response(
-        JSON.stringify({ skipped: true, reason: "already has 2+ looks", created: 0 }),
+        JSON.stringify({ skipped: true, reason: `already has ${limit}+ looks`, created: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

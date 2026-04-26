@@ -36,6 +36,8 @@ export default function AdminLooks() {
   // Backfill
   const [backfilling, setBackfilling] = useState(false);
   const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0 });
+  const [backfillCreated, setBackfillCreated] = useState(0);
+  const [maxPerAnchor, setMaxPerAnchor] = useState(4);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -151,11 +153,14 @@ export default function AdminLooks() {
     }
   };
 
-  const runBackfill = async () => {
-    if (!confirm("Looks für ALLE Produkte ohne Anker-Look generieren? Das kann mehrere Minuten dauern und verbraucht AI-Credits.")) return;
+  const runBackfill = async (mode: "missing" | "all") => {
+    const label = mode === "all"
+      ? `Looks für ALLE Produkte (bis zu ${maxPerAnchor} pro Produkt) generieren? Das dauert lange und verbraucht viele AI-Credits.`
+      : "Looks nur für Produkte OHNE Anker-Look generieren?";
+    if (!confirm(label)) return;
     setBackfilling(true);
+    setBackfillCreated(0);
     try {
-      // Fetch all product handles via existing import_log
       const { data: logRows } = await supabase
         .from("product_import_log")
         .select("handle, status")
@@ -163,23 +168,32 @@ export default function AdminLooks() {
         .not("handle", "is", null);
       const allHandles = Array.from(new Set((logRows ?? []).map((r) => r.handle as string).filter(Boolean)));
 
-      const { data: existing } = await supabase
-        .from("curated_looks")
-        .select("anchor_handle");
-      const haveAnchor = new Set((existing ?? []).map((r) => r.anchor_handle).filter(Boolean));
-      const todo = allHandles.filter((h) => !haveAnchor.has(h));
+      let todo = allHandles;
+      if (mode === "missing") {
+        const { data: existing } = await supabase
+          .from("curated_looks")
+          .select("anchor_handle");
+        const haveAnchor = new Set((existing ?? []).map((r) => r.anchor_handle).filter(Boolean));
+        todo = allHandles.filter((h) => !haveAnchor.has(h));
+      }
 
       setBackfillProgress({ done: 0, total: todo.length });
+      let createdTotal = 0;
       for (let i = 0; i < todo.length; i++) {
         try {
-          await supabase.functions.invoke("look-generate", { body: { productHandle: todo[i] } });
+          const { data } = await supabase.functions.invoke("look-generate", {
+            body: { productHandle: todo[i], maxExisting: maxPerAnchor },
+          });
+          const c = (data as { created?: number })?.created ?? 0;
+          createdTotal += c;
+          setBackfillCreated(createdTotal);
         } catch (e) {
           console.warn("backfill failed for", todo[i], e);
         }
         setBackfillProgress({ done: i + 1, total: todo.length });
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 1500));
       }
-      toast.success(`Backfill fertig — ${todo.length} Produkte verarbeitet`);
+      toast.success(`Backfill fertig — ${createdTotal} neue Drafts aus ${todo.length} Produkten`);
       refresh();
     } finally {
       setBackfilling(false);
@@ -197,13 +211,29 @@ export default function AdminLooks() {
               KI-Vorschläge prüfen, freigeben oder selbst Looks anlegen.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Max. Looks pro Produkt</Label>
+              <Input
+                type="number"
+                min={1}
+                max={8}
+                value={maxPerAnchor}
+                onChange={(e) => setMaxPerAnchor(Math.max(1, Math.min(8, Number(e.target.value) || 2)))}
+                className="w-24"
+                disabled={backfilling}
+              />
+            </div>
             <Button variant="outline" onClick={refresh} disabled={loading}>
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Neu laden
             </Button>
-            <Button onClick={runBackfill} disabled={backfilling}>
+            <Button variant="outline" onClick={() => runBackfill("missing")} disabled={backfilling}>
               <Sparkles className="mr-2 h-4 w-4" />
-              {backfilling ? `Generiere… ${backfillProgress.done}/${backfillProgress.total}` : "Backfill: alle Bestandsprodukte"}
+              {backfilling ? `${backfillProgress.done}/${backfillProgress.total} • +${backfillCreated}` : "Nur fehlende"}
+            </Button>
+            <Button onClick={() => runBackfill("all")} disabled={backfilling}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {backfilling ? `${backfillProgress.done}/${backfillProgress.total} • +${backfillCreated} Drafts` : "Mehr generieren (alle)"}
             </Button>
           </div>
         </div>
