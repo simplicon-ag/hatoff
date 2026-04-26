@@ -243,36 +243,38 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    console.log("[discover] fetching Casa Moda URLs...");
-    const cmUrls = await discoverBrandUrls(
-      "casa-moda",
-      "https://www.casamoda.com",
-      CASAMODA_SLUGS,
-      CASAMODA_PRODUCT_RE,
-    );
-    console.log(`[discover] Casa Moda: ${cmUrls.length} URLs`);
+    const body = await req.json().catch(() => ({}));
+    // include_existing=true → bestehende Shopify-Handles werden NICHT übersprungen,
+    // sondern als update_mode=true einsortiert (Worker macht Update statt Create).
+    const includeExisting = Boolean(body.include_existing ?? false);
 
-    console.log("[discover] fetching Venti URLs...");
-    const vtUrls = await discoverBrandUrls(
-      "venti",
-      "https://www.venti.com",
-      VENTI_SLUGS,
-      VENTI_PRODUCT_RE,
-    );
-    console.log(`[discover] Venti: ${vtUrls.length} URLs`);
+    console.log("[discover] fetching Casa Moda URLs (categories + sitemap)...");
+    const [cmCats, cmSitemap] = await Promise.all([
+      discoverBrandUrls("casa-moda", "https://www.casamoda.com", CASAMODA_SLUGS, CASAMODA_PRODUCT_RE),
+      fetchSitemapUrls("casa-moda", "https://www.casamoda.com/sitemap.xml", CASAMODA_PRODUCT_RE),
+    ]);
+    const cmUrls = Array.from(new Set([...cmCats, ...cmSitemap]));
+    console.log(`[discover] Casa Moda: ${cmUrls.length} URLs (cats=${cmCats.length}, sitemap=${cmSitemap.length})`);
+
+    console.log("[discover] fetching Venti URLs (categories + sitemap)...");
+    const [vtCats, vtSitemap] = await Promise.all([
+      discoverBrandUrls("venti", "https://www.venti.com", VENTI_SLUGS, VENTI_PRODUCT_RE),
+      fetchSitemapUrls("venti", "https://www.venti.com/sitemap.xml", VENTI_PRODUCT_RE),
+    ]);
+    const vtUrls = Array.from(new Set([...vtCats, ...vtSitemap]));
+    console.log(`[discover] Venti: ${vtUrls.length} URLs (cats=${vtCats.length}, sitemap=${vtSitemap.length})`);
 
     console.log("[discover] fetching existing Shopify handles...");
     const existing = await fetchAllShopifyHandles();
     console.log(`[discover] Shopify already has ${existing.size} handles`);
 
-    // ---- Group every URL by base handle (brand + slug + articleId) ----
-    // Each group becomes ONE Shopify product with multiple colour variants.
     type Group = {
       brand: string;
       handle: string;
       slugBase: string;
       articleId: string;
       color_urls: Array<{ url: string; colorId: string }>;
+      update_mode: boolean;
     };
     const groups = new Map<string, Group>();
 
@@ -280,7 +282,8 @@ Deno.serve(async (req) => {
       const parsed = parseProductUrl(url);
       if (!parsed) return;
       const handle = buildBaseHandle(brand, parsed.slugBase, parsed.articleId);
-      if (existing.has(handle)) return;
+      const isExisting = existing.has(handle);
+      if (isExisting && !includeExisting) return;
       let g = groups.get(handle);
       if (!g) {
         g = {
@@ -289,6 +292,7 @@ Deno.serve(async (req) => {
           slugBase: parsed.slugBase,
           articleId: parsed.articleId,
           color_urls: [],
+          update_mode: isExisting,
         };
         groups.set(handle, g);
       }
@@ -300,37 +304,32 @@ Deno.serve(async (req) => {
     for (const url of cmUrls) addUrl("casa-moda", url);
     for (const url of vtUrls) addUrl("venti", url);
 
+    const newCount = Array.from(groups.values()).filter((g) => !g.update_mode).length;
+    const updateCount = Array.from(groups.values()).filter((g) => g.update_mode).length;
     console.log(
-      `[discover] ${groups.size} grouped products (from ${cmUrls.length + vtUrls.length} URLs)`,
+      `[discover] ${groups.size} grouped products (new=${newCount}, update=${updateCount}, from ${cmUrls.length + vtUrls.length} URLs)`,
     );
 
-    // Fresh discovery is source-of-truth for the next import run.
-    // Shopify was purged manually, so old `created` rows are stale and must not
-    // block Casa Moda handles from being queued again.
-    await supabase
-      .from("product_import_log")
-      .delete()
-      .not("id", "is", null);
+    // Fresh discovery is source of truth — wipe previous log
+    await supabase.from("product_import_log").delete().not("id", "is", null);
 
-    const toInsert = Array.from(groups.values())
-      .map((g) => ({
-        brand: g.brand,
-        source_url: g.color_urls[0].url,
-        handle: g.handle,
-        status: "pending" as const,
-        scraped_data: {
-          color_urls: g.color_urls,
-          article_id: g.articleId,
-          slug_base: g.slugBase,
-        },
-      }));
+    const toInsert = Array.from(groups.values()).map((g) => ({
+      brand: g.brand,
+      source_url: g.color_urls[0].url,
+      handle: g.handle,
+      status: "pending" as const,
+      update_mode: g.update_mode,
+      scraped_data: {
+        color_urls: g.color_urls,
+        article_id: g.articleId,
+        slug_base: g.slugBase,
+      },
+    }));
 
     let inserted = 0;
     for (let i = 0; i < toInsert.length; i += 200) {
       const chunk = toInsert.slice(i, i + 200);
-      const { error } = await supabase
-        .from("product_import_log")
-        .insert(chunk);
+      const { error } = await supabase.from("product_import_log").insert(chunk);
       if (error) {
         console.error("[discover] insert error:", error.message);
         continue;
