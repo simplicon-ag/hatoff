@@ -18,17 +18,19 @@ export interface ShopifyProduct {
       minVariantPrice: { amount: string; currencyCode: string };
     };
     images: { edges: Array<{ node: { url: string; altText: string | null } }> };
-    variants: {
-      edges: Array<{
-        node: {
-          id: string;
-          title: string;
-          price: { amount: string; currencyCode: string };
-          availableForSale: boolean;
-          selectedOptions: Array<{ name: string; value: string }>;
-        };
-      }>;
-    };
+          variants: {
+    edges: Array<{
+      node: {
+        id: string;
+        title: string;
+        price: { amount: string; currencyCode: string };
+        compareAtPrice?: { amount: string; currencyCode: string } | null;
+        availableForSale: boolean;
+        selectedOptions: Array<{ name: string; value: string }>;
+        image?: { url: string; altText: string | null } | null;
+      };
+    }>;
+  };
     options: Array<{ name: string; values: string[] }>;
   };
 }
