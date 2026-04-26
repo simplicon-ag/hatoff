@@ -93,7 +93,7 @@ export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ descripti
   }
 
   return (
-    <div className="space-y-7">
+    <div ref={ref} className="space-y-7">
       {intro && (
         <p className="whitespace-pre-line text-[15px] leading-[1.7] text-foreground/85">
           {intro}
@@ -125,4 +125,6 @@ export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ descripti
       )}
     </div>
   );
-};
+});
+
+ProductDescription.displayName = "ProductDescription";
