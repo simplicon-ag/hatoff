@@ -4,7 +4,7 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { LookCard } from "@/components/LookCard";
 import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
-import { looks } from "@/data/looks";
+import { useCuratedLooks } from "@/hooks/useCuratedLooks";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 
@@ -81,7 +81,8 @@ const Neuheiten = () => {
 
   const heroPicks = filtered.slice(0, HERO_COUNT);
   const gridPicks = filtered.slice(HERO_COUNT, HERO_COUNT + GRID_COUNT);
-  const featuredLooks = looks.slice(0, LOOKS_COUNT);
+  const { looks: allLooks } = useCuratedLooks();
+  const featuredLooks = allLooks.slice(0, LOOKS_COUNT);
 
   return (
     <SiteLayout>
