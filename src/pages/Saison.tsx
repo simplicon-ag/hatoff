@@ -207,8 +207,13 @@ const Saison = () => {
           </div>
         ) : (
           <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((p, i) => (
-              <ProductCard key={p.node.id} product={p} priority={i < 3} />
+            {expandProductsByColor(filtered).map((p, i) => (
+              <ProductCard
+                key={`${p.node.id}-${p.initialColor ?? "default"}`}
+                product={p}
+                initialColor={p.initialColor}
+                priority={i < 3}
+              />
             ))}
           </div>
         )}
