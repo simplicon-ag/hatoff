@@ -73,6 +73,9 @@ export default function AdminImport() {
   const [discovering, setDiscovering] = useState(false);
   const [purging, setPurging] = useState(false);
   const [purgeProgress, setPurgeProgress] = useState<string>("");
+  const [singleUrl, setSingleUrl] = useState("");
+  const [singleBusy, setSingleBusy] = useState(false);
+  const [singleResult, setSingleResult] = useState<SingleImportResult | null>(null);
   const tickRef = useRef<number | null>(null);
 
   const fetchAll = async () => {
