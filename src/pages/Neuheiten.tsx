@@ -50,12 +50,16 @@ const Neuheiten = () => {
   }, []);
 
   // Nur Produkte mit Tag `neu` / `new` / `neuheit` (Präfixe wie `art:` ignorieren)
+  // UND ohne `sale`-Tag — Sale-Artikel gehören in den Sale-Bereich, nicht zu Neuheiten.
   const newest = useMemo(() => {
-    const onlyNew = products.filter((p) =>
-      (p.node.tags ?? []).some((t) =>
+    const onlyNew = products.filter((p) => {
+      const tags = p.node.tags ?? [];
+      const isNew = tags.some((t) =>
         /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")),
-      ),
-    );
+      );
+      const isSale = tags.some((t) => t.toLowerCase() === "sale");
+      return isNew && !isSale;
+    });
     // Sortierung: Shopify-GIDs sind monoton steigend → höchste ID = neuestes Produkt
     return [...onlyNew].sort((a, b) => b.node.id.localeCompare(a.node.id));
   }, [products]);
