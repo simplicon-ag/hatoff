@@ -193,6 +193,42 @@ export default function AdminImport() {
     }
   };
 
+  const runSingleUrl = async () => {
+    const url = singleUrl.trim();
+    if (!url) {
+      toast.error("Bitte URL einfügen");
+      return;
+    }
+    if (!/casamoda\.com|venti\.com/.test(url)) {
+      toast.error("Nur casamoda.com oder venti.com URLs werden unterstützt");
+      return;
+    }
+    setSingleBusy(true);
+    setSingleResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke<SingleImportResult>(
+        "product-import-by-url",
+        { body: { url } },
+      );
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Unbekannter Fehler");
+      setSingleResult(data);
+      toast.success(
+        data.action === "created"
+          ? `Neu angelegt: ${data.title} (${data.colors_found} Farben)`
+          : `Aktualisiert: ${data.title} (${data.colors_found} Farben)`,
+      );
+      setSingleUrl("");
+      fetchAll();
+    } catch (err) {
+      const msg = (err as Error).message;
+      setSingleResult({ success: false, error: msg });
+      toast.error(`Import fehlgeschlagen: ${msg}`);
+    } finally {
+      setSingleBusy(false);
+    }
+  };
+
   const runPurgeShopify = async () => {
     const confirmText = prompt(
       "⚠️ Achtung: Löscht ALLE Produkte der Marken CASA MODA und VENTI direkt aus Shopify.\n\nTippe LÖSCHEN um zu bestätigen:",
