@@ -211,13 +211,29 @@ export default function AdminLooks() {
               KI-Vorschläge prüfen, freigeben oder selbst Looks anlegen.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Max. Looks pro Produkt</Label>
+              <Input
+                type="number"
+                min={1}
+                max={8}
+                value={maxPerAnchor}
+                onChange={(e) => setMaxPerAnchor(Math.max(1, Math.min(8, Number(e.target.value) || 2)))}
+                className="w-24"
+                disabled={backfilling}
+              />
+            </div>
             <Button variant="outline" onClick={refresh} disabled={loading}>
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Neu laden
             </Button>
-            <Button onClick={runBackfill} disabled={backfilling}>
+            <Button variant="outline" onClick={() => runBackfill("missing")} disabled={backfilling}>
               <Sparkles className="mr-2 h-4 w-4" />
-              {backfilling ? `Generiere… ${backfillProgress.done}/${backfillProgress.total}` : "Backfill: alle Bestandsprodukte"}
+              {backfilling ? `${backfillProgress.done}/${backfillProgress.total} • +${backfillCreated}` : "Nur fehlende"}
+            </Button>
+            <Button onClick={() => runBackfill("all")} disabled={backfilling}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {backfilling ? `${backfillProgress.done}/${backfillProgress.total} • +${backfillCreated} Drafts` : "Mehr generieren (alle)"}
             </Button>
           </div>
         </div>
