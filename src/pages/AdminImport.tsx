@@ -572,7 +572,7 @@ export default function AdminImport() {
               )}
             </div>
           )}
-          {singleResult && !singleResult.success && (
+          {singleResult && !singleResult.success && !singleResult.already_exists && (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
               {singleResult.error}
             </div>
