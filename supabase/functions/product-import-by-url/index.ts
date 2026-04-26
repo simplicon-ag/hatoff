@@ -755,8 +755,12 @@ Deno.serve(async (req) => {
 
     const parsed = parseProductUrl(sourceUrl);
     if (!parsed) {
+      console.warn(`[by-url] URL parse failed for: ${sourceUrl}`);
       return new Response(
-        JSON.stringify({ success: false, error: "URL-Format unbekannt — erwarte z.B. /de/de/businesshemd-3760-474" }),
+        JSON.stringify({
+          success: false,
+          error: `URL-Format unbekannt — erwarte z.B. https://www.casamoda.com/de/de/businesshemd-3760-474. Erhalten: ${sourceUrl}`,
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
