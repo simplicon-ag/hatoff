@@ -42,6 +42,7 @@ interface Product {
   images: { edges: Array<{ node: { url: string; altText: string | null } }> };
   variants: { edges: Array<{ node: Variant }> };
   options: Array<{ name: string; values: string[] }>;
+  badges?: { value: string; type: string } | null;
 }
 
 /** Find an image index that best matches the chosen variant — uses variant.image.url first, then altText/colour-name fallback. */
