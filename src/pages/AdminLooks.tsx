@@ -153,11 +153,14 @@ export default function AdminLooks() {
     }
   };
 
-  const runBackfill = async () => {
-    if (!confirm("Looks für ALLE Produkte ohne Anker-Look generieren? Das kann mehrere Minuten dauern und verbraucht AI-Credits.")) return;
+  const runBackfill = async (mode: "missing" | "all") => {
+    const label = mode === "all"
+      ? `Looks für ALLE Produkte (bis zu ${maxPerAnchor} pro Produkt) generieren? Das dauert lange und verbraucht viele AI-Credits.`
+      : "Looks nur für Produkte OHNE Anker-Look generieren?";
+    if (!confirm(label)) return;
     setBackfilling(true);
+    setBackfillCreated(0);
     try {
-      // Fetch all product handles via existing import_log
       const { data: logRows } = await supabase
         .from("product_import_log")
         .select("handle, status")
@@ -165,23 +168,32 @@ export default function AdminLooks() {
         .not("handle", "is", null);
       const allHandles = Array.from(new Set((logRows ?? []).map((r) => r.handle as string).filter(Boolean)));
 
-      const { data: existing } = await supabase
-        .from("curated_looks")
-        .select("anchor_handle");
-      const haveAnchor = new Set((existing ?? []).map((r) => r.anchor_handle).filter(Boolean));
-      const todo = allHandles.filter((h) => !haveAnchor.has(h));
+      let todo = allHandles;
+      if (mode === "missing") {
+        const { data: existing } = await supabase
+          .from("curated_looks")
+          .select("anchor_handle");
+        const haveAnchor = new Set((existing ?? []).map((r) => r.anchor_handle).filter(Boolean));
+        todo = allHandles.filter((h) => !haveAnchor.has(h));
+      }
 
       setBackfillProgress({ done: 0, total: todo.length });
+      let createdTotal = 0;
       for (let i = 0; i < todo.length; i++) {
         try {
-          await supabase.functions.invoke("look-generate", { body: { productHandle: todo[i] } });
+          const { data } = await supabase.functions.invoke("look-generate", {
+            body: { productHandle: todo[i], maxExisting: maxPerAnchor },
+          });
+          const c = (data as { created?: number })?.created ?? 0;
+          createdTotal += c;
+          setBackfillCreated(createdTotal);
         } catch (e) {
           console.warn("backfill failed for", todo[i], e);
         }
         setBackfillProgress({ done: i + 1, total: todo.length });
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 1500));
       }
-      toast.success(`Backfill fertig — ${todo.length} Produkte verarbeitet`);
+      toast.success(`Backfill fertig — ${createdTotal} neue Drafts aus ${todo.length} Produkten`);
       refresh();
     } finally {
       setBackfilling(false);
