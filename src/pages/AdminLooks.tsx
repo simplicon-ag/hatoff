@@ -125,10 +125,25 @@ export default function AdminLooks() {
     } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); }
   };
 
+  const extractHandle = (input: string): string => {
+    const trimmed = input.trim();
+    if (!trimmed) return "";
+    // Try to parse as URL and pull /products/<handle>
+    try {
+      const url = new URL(trimmed);
+      const match = url.pathname.match(/\/products\/([^/?#]+)/i);
+      if (match) return match[1];
+    } catch {
+      // not a URL, fall through
+    }
+    // Already a handle
+    return trimmed.replace(/^\/+|\/+$/g, "");
+  };
+
   const generateForHandle = async () => {
-    const h = singleHandle.trim();
+    const h = extractHandle(singleHandle);
     if (!h) {
-      toast.error("Bitte einen Produkt-Handle eingeben");
+      toast.error("Bitte einen Produkt-Handle oder eine Shopify-URL eingeben");
       return;
     }
     setSingleBusy(true);
@@ -140,7 +155,7 @@ export default function AdminLooks() {
       const created = (data as { created?: number; reason?: string })?.created ?? 0;
       const reason = (data as { reason?: string })?.reason;
       if (created > 0) {
-        toast.success(`${created} neue Look-Draft(s) für "${h}" erstellt`);
+        toast.success(`${created} neue Look-Draft(s) für "${h}" erstellt — passende Begleitstücke aus dem Katalog kombiniert`);
         setSingleHandle("");
         refresh();
       } else {
@@ -326,16 +341,17 @@ export default function AdminLooks() {
             <Card className="mt-6 max-w-2xl p-6">
               <h2 className="font-display text-2xl">KI-Looks für ein Produkt generieren</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Trage den Produkt-Handle ein (z.&nbsp;B. <code className="rounded bg-muted px-1 text-xs">casa-moda-freizeithemd-kurzarm-14843</code>).
-                Die KI schlägt 1–2 neue Look-Drafts vor und erstellt automatisch Hero-Bilder. Drafts erscheinen oben im Tab „Drafts".
+                Füge entweder den Produkt-Handle oder die komplette Shopify-URL ein. Die KI durchsucht den
+                gesamten Katalog nach passenden Begleitstücken (auch markenübergreifend) und erstellt 1–2
+                neue Look-Drafts inkl. Hero-Bild. Drafts erscheinen oben im Tab „Drafts".
               </p>
               <div className="mt-6 space-y-4">
                 <div>
-                  <Label>Produkt-Handle</Label>
+                  <Label>Produkt-Handle oder Shopify-URL</Label>
                   <Input
                     value={singleHandle}
                     onChange={(e) => setSingleHandle(e.target.value)}
-                    placeholder="casa-moda-freizeithemd-kurzarm-14843"
+                    placeholder="https://hatoff.myshopify.com/products/casa-moda-freizeithemd-... oder einfach den Handle"
                     onKeyDown={(e) => { if (e.key === "Enter" && !singleBusy) generateForHandle(); }}
                   />
                 </div>
@@ -347,7 +363,8 @@ export default function AdminLooks() {
                   )}
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Dauert ca. 30–60&nbsp;Sek. (KI-Vorschlag + Hero-Bild). Nur Anker-Produkte (Hemd, Hose, Jacke, Pullover, Sakko) erzeugen Looks.
+                  Dauert ca. 30–60&nbsp;Sek. Das Produkt selbst muss vorher importiert sein
+                  (sonst kennt die KI es nicht). Force-Modus aktiv: ignoriert das 2-Looks-Limit.
                 </p>
               </div>
             </Card>
