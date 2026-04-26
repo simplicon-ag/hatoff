@@ -36,6 +36,7 @@ type SingleImportResult = {
   description_length?: number;
   missing_fields?: string[];
   shopify_admin_url?: string;
+  look_generation_triggered?: boolean;
   error?: string;
 };
 
@@ -557,6 +558,17 @@ export default function AdminImport() {
                       </Badge>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {singleResult.look_generation_triggered && (
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+                  <p className="font-medium text-primary">✨ Look-Vorschläge werden im Hintergrund generiert</p>
+                  <p className="mt-1 text-muted-foreground">
+                    In ca. 30–60&nbsp;Sek. unter{" "}
+                    <a href="/admin/looks" className="text-primary underline hover:no-underline">/admin/looks</a>{" "}
+                    im Tab „Drafts" prüfen und freigeben.
+                  </p>
                 </div>
               )}
 

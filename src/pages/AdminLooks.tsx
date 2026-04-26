@@ -29,6 +29,10 @@ export default function AdminLooks() {
   const [manualHandles, setManualHandles] = useState("");
   const [manualStory, setManualStory] = useState("");
 
+  // Single-handle look generation
+  const [singleHandle, setSingleHandle] = useState("");
+  const [singleBusy, setSingleBusy] = useState(false);
+
   // Backfill
   const [backfilling, setBackfilling] = useState(false);
   const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0 });
@@ -115,6 +119,34 @@ export default function AdminLooks() {
       setManualTitle(""); setManualSubtitle(""); setManualHandles(""); setManualStory("");
       refresh();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); }
+  };
+
+  const generateForHandle = async () => {
+    const h = singleHandle.trim();
+    if (!h) {
+      toast.error("Bitte einen Produkt-Handle eingeben");
+      return;
+    }
+    setSingleBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("look-generate", {
+        body: { productHandle: h, force: true },
+      });
+      if (error) throw new Error(error.message);
+      const created = (data as { created?: number; reason?: string })?.created ?? 0;
+      const reason = (data as { reason?: string })?.reason;
+      if (created > 0) {
+        toast.success(`${created} neue Look-Draft(s) für "${h}" erstellt`);
+        setSingleHandle("");
+        refresh();
+      } else {
+        toast.warning(`Keine neuen Looks erzeugt${reason ? `: ${reason}` : ""}`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Look-Generierung fehlgeschlagen");
+    } finally {
+      setSingleBusy(false);
+    }
   };
 
   const runBackfill = async () => {
@@ -256,6 +288,35 @@ export default function AdminLooks() {
                   <Textarea value={manualStory} onChange={(e) => setManualStory(e.target.value)} rows={4} />
                 </div>
                 <Button onClick={createManual}><Plus className="mr-2 h-4 w-4" />Look anlegen</Button>
+              </div>
+            </Card>
+
+            <Card className="mt-6 max-w-2xl p-6">
+              <h2 className="font-display text-2xl">KI-Looks für ein Produkt generieren</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Trage den Produkt-Handle ein (z.&nbsp;B. <code className="rounded bg-muted px-1 text-xs">casa-moda-freizeithemd-kurzarm-14843</code>).
+                Die KI schlägt 1–2 neue Look-Drafts vor und erstellt automatisch Hero-Bilder. Drafts erscheinen oben im Tab „Drafts".
+              </p>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <Label>Produkt-Handle</Label>
+                  <Input
+                    value={singleHandle}
+                    onChange={(e) => setSingleHandle(e.target.value)}
+                    placeholder="casa-moda-freizeithemd-kurzarm-14843"
+                    onKeyDown={(e) => { if (e.key === "Enter" && !singleBusy) generateForHandle(); }}
+                  />
+                </div>
+                <Button onClick={generateForHandle} disabled={singleBusy || !singleHandle.trim()}>
+                  {singleBusy ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generiere…</>
+                  ) : (
+                    <><Sparkles className="mr-2 h-4 w-4" />Looks generieren lassen</>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Dauert ca. 30–60&nbsp;Sek. (KI-Vorschlag + Hero-Bild). Nur Anker-Produkte (Hemd, Hose, Jacke, Pullover, Sakko) erzeugen Looks.
+                </p>
               </div>
             </Card>
           </TabsContent>
