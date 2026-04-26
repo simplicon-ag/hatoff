@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
@@ -31,6 +32,7 @@ const tagValue = (tag: string, prefix: string) =>
     : null;
 
 const Shop = () => {
+  const [searchParams] = useSearchParams();
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortKey>("featured");
@@ -50,6 +52,17 @@ const Shop = () => {
       .then(setProducts)
       .finally(() => setLoading(false));
   }, []);
+
+  // Apply URL params (from global search suggestions)
+  useEffect(() => {
+    const q = searchParams.get("q");
+    const marke = searchParams.get("marke");
+    const welt = searchParams.get("welt");
+    if (q) setSearch(q);
+    if (marke) setSelectedVendors(new Set([marke]));
+    if (welt) setSelectedWelten(new Set([welt]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Compute derived facets from product data
   const facets = useMemo(() => {
