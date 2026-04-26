@@ -520,10 +520,10 @@ async function shopifyFetch(
 async function findShopifyProductByHandle(
   handle: string,
   adminToken: string,
-): Promise<string | null> {
+): Promise<{ id: string; title: string; handle: string } | null> {
   try {
     const res = await shopifyFetch(
-      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?handle=${encodeURIComponent(handle)}&fields=id,handle&limit=1`,
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?handle=${encodeURIComponent(handle)}&fields=id,handle,title&limit=1`,
       { method: "GET", adminToken },
     );
     if (!res.ok) {
@@ -532,7 +532,39 @@ async function findShopifyProductByHandle(
     }
     const json = await res.json();
     const p = json?.products?.[0];
-    return p?.id ? String(p.id) : null;
+    return p?.id ? { id: String(p.id), title: String(p.title ?? ""), handle: String(p.handle ?? "") } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Search Shopify by article-number tag (art:123456789). Catches duplicates whose
+ *  handle differs (e.g. slight slug variations) but the same article ID is tagged. */
+async function findShopifyProductByArticleId(
+  articleId: string,
+  adminToken: string,
+): Promise<{ id: string; title: string; handle: string } | null> {
+  try {
+    const tag = `art:${articleId}`;
+    // Use REST search via tags filter — the products endpoint supports `?tag=`
+    const res = await shopifyFetch(
+      `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?tag=${encodeURIComponent(tag)}&fields=id,handle,title,tags&limit=5`,
+      { method: "GET", adminToken },
+    );
+    if (!res.ok) {
+      await res.text().catch(() => "");
+      return null;
+    }
+    const json = await res.json();
+    const products: Array<{ id: number; handle: string; title: string; tags: string }> = json?.products ?? [];
+    // Defensive: confirm the tag is actually present (tag= filter should already do this)
+    for (const p of products) {
+      const tags = String(p.tags ?? "").split(",").map((t) => t.trim().toLowerCase());
+      if (tags.includes(tag.toLowerCase())) {
+        return { id: String(p.id), title: String(p.title ?? ""), handle: String(p.handle ?? "") };
+      }
+    }
+    return null;
   } catch {
     return null;
   }
