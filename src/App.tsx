@@ -20,6 +20,11 @@ import Groessen from "./pages/Groessen.tsx";
 import Saison from "./pages/Saison.tsx";
 import AdminImport from "./pages/AdminImport.tsx";
 import AdminLooks from "./pages/AdminLooks.tsx";
+import Club from "./pages/Club.tsx";
+import ClubAccount from "./pages/ClubAccount.tsx";
+import Auth from "./pages/Auth.tsx";
+import ResetPassword from "./pages/ResetPassword.tsx";
+import { RequireAuth } from "./components/club/RequireAuth.tsx";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +66,10 @@ const App = () => (
               <Route path="/saison/:slug" element={<Saison />} />
               <Route path="/admin/import" element={<AdminImport />} />
               <Route path="/admin/looks" element={<AdminLooks />} />
+              <Route path="/club" element={<Club />} />
+              <Route path="/club/mein-konto" element={<RequireAuth><ClubAccount /></RequireAuth>} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </SizeAdvisorProvider>
