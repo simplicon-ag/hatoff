@@ -25,8 +25,10 @@ interface Variant {
   id: string;
   title: string;
   price: { amount: string; currencyCode: string };
+  compareAtPrice?: { amount: string; currencyCode: string } | null;
   availableForSale: boolean;
   selectedOptions: Array<{ name: string; value: string }>;
+  image?: { url: string; altText: string | null } | null;
 }
 
 interface Product {
@@ -40,6 +42,25 @@ interface Product {
   images: { edges: Array<{ node: { url: string; altText: string | null } }> };
   variants: { edges: Array<{ node: Variant }> };
   options: Array<{ name: string; values: string[] }>;
+}
+
+/** Find an image index that best matches the chosen variant — uses variant.image.url first, then altText/colour-name fallback. */
+function findVariantImageIndex(
+  images: Array<{ url: string; altText: string | null }>,
+  variant: Variant | undefined,
+): number | null {
+  if (!variant) return null;
+  if (variant.image?.url) {
+    const idx = images.findIndex((i) => i.url === variant.image!.url);
+    if (idx >= 0) return idx;
+  }
+  // Fallback: match by colour name in altText
+  const colour = variant.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+  if (colour) {
+    const idx = images.findIndex((i) => (i.altText ?? "").toLowerCase().includes(colour.toLowerCase()));
+    if (idx >= 0) return idx;
+  }
+  return null;
 }
 
 const ProductDetail = () => {
