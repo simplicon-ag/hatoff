@@ -388,11 +388,7 @@ const ProductDetail = () => {
                     )}
                   </p>
                   {!isColor ? (
-                    <SizeAdvisorTrigger
-                      product={product.title}
-                      brand={product.vendor}
-                      label="Größenberater"
-                    />
+                    <SizeAdvisorTrigger product={product} label="Größenberater" />
                   ) : null}
                 </div>
 
