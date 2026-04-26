@@ -234,6 +234,18 @@ const ProductDetail = () => {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">{product.vendor}</p>
+              <div className="mt-2 flex items-center gap-2">
+                {variantOnSale && (
+                  <span className="bg-destructive px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground">
+                    Sale
+                  </span>
+                )}
+                {isNewArrival && !variantOnSale && (
+                  <span className="bg-foreground px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-background">
+                    Neu
+                  </span>
+                )}
+              </div>
               <h1 className="mt-2 font-display text-4xl leading-tight md:text-5xl">{product.title}</h1>
             </div>
             <div className="flex gap-1">
