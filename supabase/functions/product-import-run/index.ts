@@ -744,7 +744,35 @@ async function processRow(
     });
   }
 
+  // 8) Trigger automatic look (set) generation in background.
+  //    The look-generate function decides itself whether the product is a
+  //    valid anchor (Hemd/Hose/Jacke/Pullover/Sakko) and whether new looks
+  //    are needed (smart-dedupe). All produced looks are saved as drafts
+  //    awaiting admin review.
+  if (handle) {
+    triggerLookGeneration(handle).catch((e) => {
+      console.warn(`[worker] look-generate trigger failed for ${handle}:`, e);
+    });
+  }
+
   return { ok: true, action, productId, title: baseTitle, colorsCount: colors.length };
+}
+
+async function triggerLookGeneration(productHandle: string): Promise<void> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  console.log(`[worker] triggering look-generate for ${productHandle}`);
+  fetch(`${supabaseUrl}/functions/v1/look-generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    body: JSON.stringify({ productHandle }),
+  })
+    .then((r) => r.text().then((t) => console.log(`[worker] look-generate ${productHandle} → ${r.status}`, t.slice(0, 160))))
+    .catch((e) => console.warn(`[worker] look-generate fetch error for ${productHandle}:`, e));
 }
 
 async function triggerStyleInspirations(
