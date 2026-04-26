@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2, Link2, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2, Link2, CheckCircle2, Rocket } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 
 type SingleImportResult = {
@@ -76,9 +76,11 @@ export default function AdminImport() {
   const [job, setJob] = useState<JobRow | null>(null);
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [dryRun, setDryRun] = useState(true);
+  const [dryRun, setDryRun] = useState(false);
+  const [includeExisting, setIncludeExisting] = useState(true);
   const [busy, setBusy] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [fullCrawlBusy, setFullCrawlBusy] = useState(false);
   const [purging, setPurging] = useState(false);
   const [purgeProgress, setPurgeProgress] = useState<string>("");
   const [singleUrl, setSingleUrl] = useState("");
@@ -147,14 +149,59 @@ export default function AdminImport() {
   const runDiscover = async () => {
     setDiscovering(true);
     try {
-      const { data, error } = await supabase.functions.invoke("product-import-discover");
+      const { data, error } = await supabase.functions.invoke("product-import-discover", {
+        body: { include_existing: includeExisting },
+      });
       if (error) throw error;
-      toast.success(`Entdeckung fertig: ${data?.inserted ?? 0} gruppierte Produkte (Farben werden zu Varianten)`);
+      const newC = data?.new_count ?? 0;
+      const updC = data?.update_count ?? 0;
+      toast.success(`Entdeckung fertig: ${newC} neu, ${updC} Updates`);
       fetchAll();
     } catch (err) {
       toast.error(`Entdeckung fehlgeschlagen: ${(err as Error).message}`);
     } finally {
       setDiscovering(false);
+    }
+  };
+
+  /** One-click full crawl: discover → start. Cron worker takes over from there. */
+  const runFullCrawl = async () => {
+    if (!confirm(
+      `Voll-Import startet jetzt:\n\n` +
+      `1. Scannt casamoda.com + venti.com komplett (Kategorien + Sitemap)\n` +
+      `2. Legt neue Produkte in Shopify an\n` +
+      `${includeExisting ? "3. Aktualisiert bestehende Produkte (Bilder/Preis/Beschreibung)\n" : ""}` +
+      `\nDauer: ca. 2–4 Stunden. Du kannst die Seite zumachen, der Worker läuft im Hintergrund weiter.\n\nWeiter?`,
+    )) return;
+
+    setFullCrawlBusy(true);
+    try {
+      toast.info("Schritt 1/2: Entdecke Produkte auf casamoda.com + venti.com…");
+      const { data: discData, error: discErr } = await supabase.functions.invoke(
+        "product-import-discover",
+        { body: { include_existing: includeExisting } },
+      );
+      if (discErr) throw discErr;
+      const newC = discData?.new_count ?? 0;
+      const updC = discData?.update_count ?? 0;
+      const total = discData?.inserted ?? 0;
+      if (total === 0) {
+        toast.warning("Keine Produkte gefunden. Crawl wird nicht gestartet.");
+        return;
+      }
+      toast.success(`${total} Produkte entdeckt (${newC} neu, ${updC} Update)`);
+
+      toast.info("Schritt 2/2: Worker startet…");
+      const { error: startErr } = await supabase.functions.invoke("product-import-control", {
+        body: { action: "start", dry_run: false },
+      });
+      if (startErr) throw startErr;
+      toast.success(`Voll-Import läuft! ${total} Produkte werden im Hintergrund verarbeitet.`);
+      fetchAll();
+    } catch (err) {
+      toast.error(`Voll-Import fehlgeschlagen: ${(err as Error).message}`);
+    } finally {
+      setFullCrawlBusy(false);
     }
   };
 
@@ -297,10 +344,71 @@ export default function AdminImport() {
           </p>
         </header>
 
+        {/* HERO: One-click full crawl */}
+        <Card className="p-6 space-y-4 border-2 border-primary bg-gradient-to-br from-primary/10 to-primary/5">
+          <div className="flex items-start gap-4">
+            <div className="rounded-full bg-primary/15 p-3 shrink-0">
+              <Rocket className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <h2 className="text-xl font-serif">Voll-Import: alles holen</h2>
+              <p className="text-sm text-muted-foreground">
+                Scannt <strong>casamoda.com</strong> + <strong>venti.com</strong> komplett (Kategorien + Sitemap),
+                holt Bilder, Beschreibung, Material, Pflege, Preis und Farben — und legt jedes Produkt in Shopify an
+                oder aktualisiert es. Worker läuft autonom im Hintergrund (~2–4h für ~800 Produkte).
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <Switch
+                  id="include-existing"
+                  checked={includeExisting}
+                  onCheckedChange={setIncludeExisting}
+                  disabled={fullCrawlBusy || isRunning}
+                />
+                <Label htmlFor="include-existing" className="text-sm cursor-pointer">
+                  Bestehende Produkte aktualisieren (Bilder/Preis/Beschreibung neu ziehen)
+                </Label>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 shrink-0">
+              {!isRunning ? (
+                <Button
+                  size="lg"
+                  onClick={runFullCrawl}
+                  disabled={fullCrawlBusy || isRunning}
+                  className="min-w-[180px]"
+                >
+                  {fullCrawlBusy ? (
+                    <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Startet…</>
+                  ) : (
+                    <><Rocket className="h-5 w-5 mr-2" /> Voll-Import starten</>
+                  )}
+                </Button>
+              ) : (
+                <Button size="lg" variant="destructive" onClick={runStop} disabled={busy} className="min-w-[180px]">
+                  <Square className="h-5 w-5 mr-2" /> Stoppen
+                </Button>
+              )}
+            </div>
+          </div>
+          {(isRunning || isStopping) && (
+            <div className="border-t pt-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{job?.processed ?? 0} / {job?.total ?? 0} Produkte</span>
+                <span className="text-muted-foreground">{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              {job?.message && (
+                <p className="text-xs text-muted-foreground italic truncate">→ {job.message}</p>
+              )}
+            </div>
+          )}
+        </Card>
+
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Workflow:</strong> 1️⃣ <em>Entdecken</em> findet alle fehlenden Produkte. 2️⃣ <em>Trockenlauf</em> scrapt &amp; prüft die Daten ohne in Shopify zu schreiben. 3️⃣ Echter Import nur, wenn der Trockenlauf sauber aussieht.
+            <strong>Hinweis:</strong> Der Cron-Worker stösst sich alle 60 Sekunden selbst an, solange ein Job läuft.
+            Du kannst die Seite zumachen — der Import läuft im Hintergrund weiter und ist beim Wiederöffnen sichtbar.
           </AlertDescription>
         </Alert>
 
