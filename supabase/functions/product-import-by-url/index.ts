@@ -983,22 +983,44 @@ Deno.serve(async (req) => {
     if (!base.fit) missing.push("Passform");
 
     // 7) Fire-and-forget: Looks für dieses Produkt generieren lassen
-    //    (läuft asynchron im Hintergrund, blockiert Response nicht)
+    //    Mit Retry, weil Shopify Storefront-API neue Produkte erst nach
+    //    einigen Sekunden indexiert (look-generate würde sonst 404 liefern).
     let lookGenerationTriggered = false;
     try {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      console.log(`[by-url] triggering look-generate for ${handle}`);
-      fetch(`${supabaseUrl}/functions/v1/look-generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceKey}`,
-        },
-        body: JSON.stringify({ productHandle: handle }),
-      })
-        .then((r) => r.text().then((t) => console.log(`[by-url] look-generate ${handle} → ${r.status}`, t.slice(0, 160))))
-        .catch((e) => console.warn(`[by-url] look-generate fetch error for ${handle}:`, e));
+      const delays = [8000, 20000, 40000]; // 8s, dann +20s, dann +40s
+      console.log(`[by-url] scheduling look-generate retries for ${handle}`);
+      const retryTask = (async () => {
+        for (let attempt = 0; attempt < delays.length; attempt++) {
+          await new Promise((r) => setTimeout(r, delays[attempt]));
+          try {
+            const r = await fetch(`${supabaseUrl}/functions/v1/look-generate`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({ productHandle: handle }),
+            });
+            const t = await r.text();
+            console.log(`[by-url] look-generate ${handle} attempt ${attempt + 1} → ${r.status}`, t.slice(0, 160));
+            if (r.status !== 404) return; // Erfolg oder anderer Fehler — nicht erneut versuchen
+            console.log(`[by-url] ${handle} not yet indexed by Shopify, retrying…`);
+          } catch (e) {
+            console.warn(`[by-url] look-generate fetch error for ${handle} attempt ${attempt + 1}:`, e);
+          }
+        }
+        console.warn(`[by-url] look-generate gave up for ${handle} after ${delays.length} attempts`);
+      })();
+      // Keep the background task alive after the response is sent
+      try {
+        // @ts-ignore — EdgeRuntime is provided by Supabase Edge Functions
+        if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(retryTask);
+        }
+      } catch { /* noop */ }
       lookGenerationTriggered = true;
     } catch (e) {
       console.warn(`[by-url] look-generate trigger failed for ${handle}:`, e);
