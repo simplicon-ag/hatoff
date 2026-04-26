@@ -115,18 +115,24 @@ function parseProductUrl(url: string): { slugBase: string; articleId: string; co
   const path = url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/\/$/, "").toLowerCase();
   const m = path.match(/^([a-z0-9-]+?)-(\d{3,6})-(\d{2,5})$/);
   if (!m) return null;
-  // Strip trailing colour-name token from the slug (best-effort, but the
-  // articleId is what really groups variants — slug is just for display).
-  const COLOR_WORDS = new Set([
-    "blau","hellblau","mittelblau","dunkelblau","marine","navy",
-    "rot","mittelrot","dunkelrot","weinrot",
-    "weiss","weiß","ecru","creme","champagner","champagner-beige",
-    "schwarz","tiefschwarz","anthrazit","grau","hellgrau","dunkelgrau","silber",
-    "beige","sand","khaki","camel","braun","mittelbraun","dunkelbraun","cognac",
-    "gruen","grün","mittelgruen","dunkelgruen","oliv","olive","mint",
-    "gelb","senf","ocker","orange","rost",
-    "rosa","pink","altrosa","lila","violett","tuerkis","türkis","petrol",
-    "graues","mittel","dunkel","hell",
+  // Strip trailing colour-name token from the slug. The articleId is what
+  // really groups variants — slug is just for display, but we need a
+  // colour-neutral handle so all colours of the same article share one
+  // Shopify product.
+  const COLOR_BASES = [
+    "blau","marine","navy","rot","weiss","weiß","ecru","creme","champagner",
+    "schwarz","anthrazit","grau","silber","beige","sand","khaki","camel",
+    "braun","cognac","gruen","grün","oliv","olive","mint","gelb","senf",
+    "ocker","orange","rost","rosa","pink","altrosa","lila","violett",
+    "tuerkis","türkis","petrol","weinrot",
+  ];
+  const PREFIXES = ["hell","mittel","dunkel","tief","alt","graues"];
+  // Single-token colour words = prefix+base combos + plain bases + standalone modifiers
+  const COLOR_WORDS = new Set<string>([
+    ...COLOR_BASES,
+    ...PREFIXES.flatMap((p) => COLOR_BASES.map((b) => p + b)),
+    "champagner-beige", // handled separately as 2-token
+    "hell","mittel","dunkel","tief","alt", // bare modifiers (consumed in 2nd pass)
   ]);
   let slugBase = m[1];
   // Strip up to 2 trailing colour words ("graues-mittelblau", "champagner-beige")
