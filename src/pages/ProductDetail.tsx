@@ -594,17 +594,15 @@ const ProductDetail = () => {
         </div>
       </section>
 
-      {/* Produktinformationen — volle Breite */}
-      <section className="container-editorial border-t border-border py-12 md:py-16">
-        <h2 className="font-display text-2xl md:text-3xl">Produktinformationen</h2>
-        <div className="mt-6 md:mt-8">
-          <ProductDescription description={product.description} descriptionHtml={product.descriptionHtml} />
-        </div>
-      </section>
-
-      {/* Details & Versand — volle Breite unter den Produktinformationen */}
+      {/* Produktinformationen, Details & Versand — alle als Accordions, volle Breite */}
       <section className="container-editorial border-t border-border py-10 md:py-14">
-        <Accordion type="multiple" className="mx-auto max-w-5xl">
+        <Accordion type="multiple" defaultValue={["info"]} className="mx-auto max-w-5xl">
+          <AccordionItem value="info">
+            <AccordionTrigger className="py-5 font-display text-base">Produktinformationen</AccordionTrigger>
+            <AccordionContent className="pb-6 pt-2">
+              <ProductDescription description={product.description} descriptionHtml={product.descriptionHtml} />
+            </AccordionContent>
+          </AccordionItem>
           <AccordionItem value="details">
             <AccordionTrigger className="py-5 font-display text-base">Details & Pflege</AccordionTrigger>
             <AccordionContent className="pb-6 pt-2">
