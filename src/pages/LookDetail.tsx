@@ -6,6 +6,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { LookSetBuilder } from "@/components/LookSetBuilder";
 import { useCuratedLooks } from "@/hooks/useCuratedLooks";
 import { fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
+import { splitHandlesAndColors } from "@/lib/lookHandles";
 
 const LookDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -25,12 +26,17 @@ const LookDetail = () => {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { handles: cleanHandles, recommendedColors } = look
+    ? splitHandlesAndColors(look.productHandles)
+    : { handles: [] as string[], recommendedColors: {} as Record<string, string[]> };
+
   useEffect(() => {
     if (!look) return;
     setLoading(true);
-    fetchProductsByHandles(look.productHandles)
+    fetchProductsByHandles(cleanHandles)
       .then(setProducts)
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [look]);
 
   if (!look) {
@@ -133,7 +139,11 @@ const LookDetail = () => {
               Produkte konnten nicht geladen werden.
             </div>
           ) : (
-            <LookSetBuilder products={products} lookTitle={look.title} />
+            <LookSetBuilder
+              products={products}
+              lookTitle={look.title}
+              recommendedColors={recommendedColors}
+            />
           )}
         </div>
       </section>
