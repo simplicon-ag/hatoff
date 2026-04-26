@@ -41,14 +41,12 @@ interface State {
 }
 
 /**
- * Returns merged list of:
- *   - DB looks with status='published' (newest first)
- *   - + statically curated looks from src/data/looks.ts
- *
- * DB-Slugs win over static slugs in case of collision.
+ * Returns DB looks with status='published' (newest first).
+ * Falls back to the statically curated looks ONLY if the DB query fails
+ * (so the page never appears empty due to a transient error).
  */
 export function useCuratedLooks(): State {
-  const [state, setState] = useState<State>({ looks: staticLooks, loading: true });
+  const [state, setState] = useState<State>({ looks: [], loading: true });
 
   useEffect(() => {
     let active = true;
@@ -65,9 +63,7 @@ export function useCuratedLooks(): State {
         return;
       }
       const dbLooks = (data ?? []).map((r) => dbToCurated(r as DbLookRow));
-      const dbSlugs = new Set(dbLooks.map((l) => l.slug));
-      const merged = [...dbLooks, ...staticLooks.filter((l) => !dbSlugs.has(l.slug))];
-      setState({ looks: merged, loading: false });
+      setState({ looks: dbLooks, loading: false });
     })();
     return () => { active = false; };
   }, []);
