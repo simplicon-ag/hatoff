@@ -44,6 +44,60 @@ export type Database = {
         }
         Relationships: []
       }
+      curated_looks: {
+        Row: {
+          anchor_handle: string | null
+          anlaesse: string[]
+          created_at: string
+          hero_image_url: string | null
+          highlights: string[]
+          id: string
+          product_handles: string[]
+          published_at: string | null
+          slug: string
+          status: string
+          story: string | null
+          subtitle: string | null
+          title: string
+          updated_at: string
+          welt: string | null
+        }
+        Insert: {
+          anchor_handle?: string | null
+          anlaesse?: string[]
+          created_at?: string
+          hero_image_url?: string | null
+          highlights?: string[]
+          id?: string
+          product_handles?: string[]
+          published_at?: string | null
+          slug: string
+          status?: string
+          story?: string | null
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+          welt?: string | null
+        }
+        Update: {
+          anchor_handle?: string | null
+          anlaesse?: string[]
+          created_at?: string
+          hero_image_url?: string | null
+          highlights?: string[]
+          id?: string
+          product_handles?: string[]
+          published_at?: string | null
+          slug?: string
+          status?: string
+          story?: string | null
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          welt?: string | null
+        }
+        Relationships: []
+      }
       product_import_job: {
         Row: {
           created_count: number

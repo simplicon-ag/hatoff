@@ -4,11 +4,12 @@ import { Loader2, Check, ArrowRight } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { LookSetBuilder } from "@/components/LookSetBuilder";
-import { looks } from "@/data/looks";
+import { useCuratedLooks } from "@/hooks/useCuratedLooks";
 import { fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
 
 const LookDetail = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { looks } = useCuratedLooks();
   const look = looks.find((l) => l.slug === slug);
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
