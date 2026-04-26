@@ -441,7 +441,7 @@ const ProductDetail = () => {
                           title={c.value}
                           aria-label={c.value}
                           className={cn(
-                            "relative h-14 w-14 overflow-hidden border-2 bg-white transition",
+                            "relative h-20 w-20 overflow-hidden border-2 bg-white transition sm:h-24 sm:w-24",
                             active ? "border-primary ring-1 ring-primary/40" : "border-transparent hover:border-border",
                             !c.available && "opacity-40",
                           )}
@@ -450,7 +450,8 @@ const ProductDetail = () => {
                             <img
                               src={c.image}
                               alt={c.value}
-                              className="h-full w-full object-cover mix-blend-multiply"
+                              loading="eager"
+                              className="h-full w-full object-cover mix-blend-multiply [image-rendering:auto]"
                             />
                           ) : (
                             <span className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-wider text-muted-foreground">
