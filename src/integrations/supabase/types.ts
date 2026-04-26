@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      club_points_ledger: {
+        Row: {
+          created_at: string
+          id: string
+          meta: Json
+          points: number
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meta?: Json
+          points: number
+          reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meta?: Json
+          points?: number
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       curated_looks: {
         Row: {
           anchor_handle: string | null
@@ -227,6 +254,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          birthday: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          birthday?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          birthday?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       size_guide_cache: {
         Row: {
           brand: string
@@ -289,7 +343,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      add_club_points: {
+        Args: { _meta?: Json; _points: number; _reason: string }
+        Returns: number
+      }
+      get_my_points: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never

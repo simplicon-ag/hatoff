@@ -1,78 +1,133 @@
-# Startseite einladender & catchyer machen
 
-Die aktuelle Seite ist sehr clean und editorial — was schön ist, aber etwas distanziert wirkt. Hier sind die Verbesserungen, die den grössten emotionalen Effekt haben, ohne den ruhigen HATOFF-Stil zu verlieren.
+# HATOFF Club – Mitgliederbereich mit Punkten & Stufen
 
-## 1. Hero aufladen — mehr Persönlichkeit & Vertrauen
-**Aktuell:** Statisches Bild + Headline + zwei Buttons.
+Ziel: Eigene `/club` Seite mit Login, persönlichem Dashboard, echtem Punktestand in der Datenbank und 3 Stufen mit Rabatt-Vorteilen.
 
-**Neu:**
-- **Mini-Trust-Bar direkt unter dem Hero-CTA** (klein, in Off-White): „⭐ 4.9 · Gratis Versand & Retoure · Versand aus der Schweiz"
-- **Animierter Eyebrow-Tag** mit dezentem Pulse: „🔥 Neue Frühlings-Looks live"
-- **Sekundärer „Wie funktioniert HATOFF?"-Link** (Smooth-Scroll zur Erklärsektion) — senkt Einstiegshürde für Neue.
-- Subtile **Ken-Burns-Animation** (langsamer Zoom) auf dem Hero-Bild für mehr Lebendigkeit.
+---
 
-## 2. Neue Sektion: „So funktioniert HATOFF" (3 Schritte)
-Kurz nach dem Hero, vor den Style-Welten — beantwortet die unausgesprochene Frage „Was ist das eigentlich?".
+## 1. Stufen-Konzept (fix verdrahtet im Code)
 
-3 Spalten mit Icons:
-1. **Look entdecken** — Kuratiert für jeden Anlass
-2. **Mit einem Tap kombinieren** — Ganzes Outfit in den Warenkorb
-3. **Stilvoll tragen** — Schweizer Versand, kostenlose Retoure
+| Stufe   | ab Punkten | Rabatt | Vorteile                                           |
+|---------|------------|--------|----------------------------------------------------|
+| Bronze  | 0          | 5 %    | Willkommen, Gratis Versand ab 100 CHF              |
+| Silber  | 500        | 10 %   | Gratis Versand & Retoure, Early Access (24 h)      |
+| Gold    | 1500       | 15 %   | Stil-Concierge, Geburtstags-Geschenk, Preview-Sale |
 
-Hilft besonders Erstbesuchern, das Konzept sofort zu verstehen → höhere Conversion.
+Punkte-Logik (Konzept im UI erklärt):  
+**1 CHF Umsatz = 1 Punkt** · 100 Bonus-Punkte für Anmeldung · Punkte verfallen nicht im ersten Jahr.
 
-## 3. Style-Welten emotionaler
-**Aktuell:** Grid mit kleinen Bildern + Titel.
+> Hinweis: Punkte werden in dieser Version **manuell oder per interner Funktion** gutgeschrieben (kein automatisches Mapping aus Shopify-Bestellungen, weil es noch keine Bestellhistorie pro Nutzer in der App gibt). Dafür gibt es ein einfaches RPC, das Punkte hinzufügt – später kann das von einer Bestell-Webhook-Funktion aufgerufen werden.
 
-**Neu:**
-- **Hover-Reveal:** Statt nur Skalierung erscheint beim Hover ein „Entdecken →"-CTA mit Anzahl Looks („12 Looks").
-- **Erste Karte größer** (asymmetrisches Editorial-Grid, z.B. md:col-span-2) — wie bei Kinfolk/COS.
-- Titel-Typografie etwas grösser & dramatischer.
+---
 
-## 4. Featured Looks: Storytelling-Layer
-**Aktuell:** Drei Look-Karten gleichwertig.
+## 2. Authentifizierung (Lovable Cloud)
 
-**Neu:**
-- **„Look der Woche"** als Hero-Karte (groß, links) + 2 kleinere rechts daneben — schafft Hierarchie & Spannung.
-- **Anlass-Badge** auf jedem Look („Für's Büro" / „Date Night" / „Weekend") — macht's persönlich relevant.
-- Subtiler **„↓ Style-Story lesen"-Hint** unter dem Look — verbindet zum Magazin.
+- **Email + Passwort** und **Google Sign-In** (Standard-Defaults)
+- Neue Seite `/auth` mit Tabs *Anmelden / Registrieren*
+- Passwort vergessen + `/reset-password` Seite
+- `onAuthStateChange` Listener vor `getSession()` (Best Practice)
+- Auto-Confirm Email **aus** (User muss bestätigen)
 
-## 5. Neue Sektion: Social Proof / Customer Looks
-Zwischen Brand Strip und Neuheiten — eine **Wall-of-Style** aus 6-8 quadratischen Bildern (Kunden im Look, eigene Editorials, oder Detail-Shots).
+---
 
-- Headline: „So tragen sie HATOFF" / „Aus der Community"
-- Senkt Kaufhürde durch echte Menschen statt nur Studio-Bilder.
-- Kann initial mit kuratierten Look-Detailbildern befüllt werden, später mit echtem UGC.
+## 3. Datenbank (neue Tabellen)
 
-## 6. Sale-Sektion catchyer
-**Aktuell:** Sehr dezent in Destructive-Tone.
+### `profiles`
+- `id` uuid PK = `auth.users.id`
+- `display_name` text
+- `avatar_url` text
+- `birthday` date (für Gold-Geburtstagsgeschenk, optional)
+- `created_at`, `updated_at` timestamptz
+- RLS: Jeder User liest/aktualisiert nur seinen eigenen Eintrag
+- Trigger `on_auth_user_created` legt automatisch ein Profil + 100 Willkommens-Punkte an
 
-**Neu:**
-- **Live Countdown-Element** (z.B. „Aktion endet in 2 Tagen 14:32:08") — falls Sale befristet ist, sonst „Solange Vorrat reicht"
-- **Rabatt-Badge auf jeder Sale-Karte** („−40%") — visuell deutlich sichtbar.
-- Stärkerer Akzent-Background (warmes Sand statt Destructive-Tint), dafür Rabatt-Sticker in Terracotta — bleibt im Brand.
+### `club_points_ledger` (Transaktions-Log)
+- `id` uuid PK
+- `user_id` uuid → `auth.users.id` ON DELETE CASCADE, **NOT NULL**
+- `points` int (positiv = Gutschrift, negativ = Einlösung)
+- `reason` text (z. B. `welcome_bonus`, `purchase`, `birthday`, `manual`)
+- `meta` jsonb (Bestell-Ref etc.)
+- `created_at` timestamptz
+- RLS: User darf nur **eigene** Zeilen lesen (kein Insert/Update/Delete für Clients)
 
-## 7. Magazin-Teaser persönlicher
-- **Autoren-Name & Avatar** unter jedem Artikel („Von Marco · Style Editor")
-- **Kategorie-Chip** oben („Styling-Guide" / „Brand Story")
-- Erstes Magazin-Item größer (asymmetrisch).
+### View / Funktion `get_my_points()`
+- SECURITY DEFINER, gibt aktuelle Summe für `auth.uid()` zurück
+- Wird vom Frontend für den Punktestand verwendet
 
-## 8. Mikro-Polish über die ganze Seite
-- **Scroll-triggered Fade-Ins** für jede Sektion (Intersection Observer + `animate-fade-in`).
-- **Sticky CTA-Bar mobile** unten („Looks entdecken") — verschwindet bei Scroll nach unten.
-- **Newsletter-Inline-Form im Footer-Bereich** mit konkretem Hook („+10% auf deine erste Bestellung").
-- Headlines bekommen leichte **Akzent-Highlights** (Terracotta-unterstrichene Wörter, z.B. „Finde deinen ~~Look~~").
+### RPC `add_club_points(_user_id, _points, _reason, _meta)`
+- SECURITY DEFINER, intern aufrufbar (z. B. später aus Edge Function)
+- In dieser Version aus dem Admin-Bereich oder per Demo-Button erreichbar – siehe unten
 
-## Reihenfolge nach Impact
-Falls du nicht alles auf einmal willst, schlage ich diese Priorität vor:
-1. **Hero-Aufladung + „So funktioniert"-Sektion** (größter Conversion-Hebel für neue Besucher)
-2. **Featured Looks Hierarchie + Anlass-Badges** (emotionalere Produktpräsentation)
-3. **Social Proof Wall** (Vertrauensaufbau)
-4. **Sale catchyer + Mikro-Polish**
+---
 
-## Was ich brauche
-- ✅ Soll ich **alles zusammen** umsetzen, oder lieber **schrittweise** (z.B. erst Punkt 1+2, dann Rest)?
-- Gibt's bereits **echte Kundenfotos / UGC** für die Social-Proof-Wall, oder starten wir mit kuratierten Editorials?
-- **Sale-Countdown:** Hast du befristete Aktionen, oder soll's ein „solange Vorrat reicht"-Hinweis sein?
+## 4. Neue Seiten / Routen
 
-Sobald ich grünes Licht habe, lege ich los.
+### `/club` (öffentlich – Marketing-Landing)
+Ersetzt langfristig `ClubMemberCta`. Inhalt:
+- Hero: „HATOFF Club. Stil wird belohnt."
+- 3 Stufen-Karten (Bronze/Silber/Gold) mit Rabatt + Vorteilen, im editorialen Stil (warmer Sand-BG, dezente Trennlinien – passend zum Rest der Seite)
+- „So funktioniert's" – 3 Schritte (Anmelden → Einkaufen → Punkte sammeln → Rabatte)
+- FAQ-Akkordeon (Verfall, Übertragbarkeit, Kündigung)
+- CTA wechselt je nach Auth-Status:
+  - eingeloggt → „Zum Mitgliederbereich" → `/club/mein-konto`
+  - ausgeloggt → „Kostenlos beitreten" → `/auth?redirect=/club/mein-konto`
+
+### `/club/mein-konto` (geschützt)
+Persönliches Dashboard:
+- Begrüssung mit `display_name`
+- Grosse Punkte-Anzeige + aktuelle Stufe (Badge)
+- **Progress-Bar** zur nächsten Stufe (`Progress` Komponente, schon vorhanden)
+- 3 Stufen-Karten mit visueller Markierung „Du bist hier"
+- Aktueller Rabatt-Code-Hinweis (statisch generiert: z. B. `CLUB-BRONZE-5`, später dynamisch)
+- Punkte-Historie: Liste der letzten 20 Einträge aus `club_points_ledger`
+- Einstellungen: `display_name` & `birthday` editierbar
+- Logout-Button
+
+### `/auth`
+Login + Registrierung mit Google + Email/Passwort, „Passwort vergessen" Link
+
+### `/reset-password`
+Pflicht-Seite für Passwort-Reset-Flow
+
+---
+
+## 5. Komponenten (neu)
+
+- `src/pages/Club.tsx` – öffentliche Landing
+- `src/pages/ClubAccount.tsx` – geschütztes Dashboard
+- `src/pages/Auth.tsx` – Login/Signup
+- `src/pages/ResetPassword.tsx`
+- `src/components/club/TierCard.tsx` – einzelne Stufen-Karte
+- `src/components/club/PointsBalance.tsx` – grosse Punkte-Anzeige + Progress
+- `src/components/club/PointsHistory.tsx` – Tabelle der Transaktionen
+- `src/components/club/RequireAuth.tsx` – Route-Wrapper, leitet auf `/auth` um
+- `src/hooks/useAuth.ts` – Session-State Hook (mit `onAuthStateChange`)
+- `src/hooks/useClubPoints.ts` – React Query Hook für Punktestand + Stufe
+- `src/lib/club-tiers.ts` – Stufen-Definition + Helper `tierForPoints(points)`
+
+---
+
+## 6. Anpassungen an bestehenden Dateien
+
+- **`src/App.tsx`**: neue Routen `/club`, `/club/mein-konto`, `/auth`, `/reset-password`
+- **`src/components/SiteHeader.tsx`**: „CLUB" Link existiert bereits → zeigt jetzt `/club`. Zusätzlich: kleines Personen-Icon rechts (neben Cart) – führt zu `/auth` (ausgeloggt) oder `/club/mein-konto` (eingeloggt)
+- **`src/components/ClubMemberCta.tsx`**: bleibt als Teaser auf der Startseite, der „Jetzt beitreten" Button verlinkt jetzt auf `/club` statt nur Toast zu zeigen
+- **`src/pages/Index.tsx`**: keine Logik-Änderung, nur Verlinkung über `ClubMemberCta`
+
+---
+
+## 7. Demo-Punkte vergeben
+
+Da es noch keine Bestell-Pipeline an User-IDs gibt, baue ich für die erste Version im Dashboard einen kleinen, dezenten **„Demo: 50 Punkte gutschreiben"** Button (nur sichtbar in Dev/Preview oder hinter einem Schalter). So kannst du das System direkt ausprobieren. Sobald Bestellungen pro User existieren, ersetzen wir das durch eine Edge Function, die `add_club_points` aufruft.
+
+---
+
+## 8. Was bewusst NICHT in diesem Schritt enthalten ist
+
+- Automatische Punktevergabe nach Shopify-Checkout (braucht Webhook + User-Mapping)
+- Generierung echter, einlösbarer Rabattcodes pro User in Shopify (würde Shopify Admin API + Coupon-Tabelle erfordern – als Folge-Schritt)
+- Mehrsprachigkeit / Newsletter-Kopplung
+
+---
+
+Wenn du den Plan bestätigst, baue ich alles oben genannte in einem Schritt: Migration, Auth-Seiten, Club-Seiten, Header-Update und Verknüpfung mit der bestehenden Startseiten-CTA.

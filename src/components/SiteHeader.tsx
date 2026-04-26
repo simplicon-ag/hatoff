@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, User, X } from "lucide-react";
 import { Logo } from "./Logo";
 import { CartDrawer } from "./CartDrawer";
 import { GlobalSearch } from "./GlobalSearch";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { to: "/looks", label: "Looks" },
@@ -14,6 +15,7 @@ const navItems = [
 ];
 
 export const SiteHeader = () => {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -57,6 +59,13 @@ export const SiteHeader = () => {
 
         <div className="flex items-center gap-1 md:gap-2">
           <GlobalSearch />
+          <Link
+            to={user ? "/club/mein-konto" : "/auth"}
+            aria-label={user ? "Mein Konto" : "Anmelden"}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-secondary"
+          >
+            <User className="h-5 w-5" />
+          </Link>
           <CartDrawer />
           <button
             className="inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-secondary md:hidden"
