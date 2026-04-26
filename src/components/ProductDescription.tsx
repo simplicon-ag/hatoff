@@ -41,8 +41,8 @@ function splitToBullets(label: string, value: string): string[] {
     return cleaned.split(/\s*,\s*/).filter(Boolean);
   }
 
-  // Pflege: split on commas/semicolons — items are short imperatives
-  if (label === "Pflege") {
+  // Pflege / Pflegehinweise: split on commas/semicolons — items are short imperatives
+  if (label === "Pflege" || label === "Pflegehinweise") {
     return cleaned.split(/\s*[,;]\s*/).filter(Boolean);
   }
 
