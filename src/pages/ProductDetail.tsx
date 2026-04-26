@@ -286,8 +286,18 @@ const ProductDetail = () => {
         <span className="text-foreground/70">{product.vendor}</span>
       </div>
 
-      <section className="container-editorial grid gap-10 py-8 md:grid-cols-[1.1fr_1fr] md:gap-16 md:py-12">
-        <ProductGallery images={images} title={product.title} activeIndex={variantImageIndex ?? undefined} />
+      <section className="container-editorial grid gap-10 py-8 md:grid-cols-[1.1fr_1fr] md:gap-16 md:py-12 md:items-start">
+        <div className="space-y-10 md:space-y-14">
+          <ProductGallery images={images} title={product.title} activeIndex={variantImageIndex ?? undefined} />
+
+          {/* Produktinformationen direkt unter dem Bild */}
+          <div className="border-t border-border pt-8 md:pt-10">
+            <h2 className="font-display text-2xl md:text-3xl">Produktinformationen</h2>
+            <div className="mt-6 md:mt-8">
+              <ProductDescription description={product.description} />
+            </div>
+          </div>
+        </div>
 
         <div className="flex flex-col">
           {/* Top row: Badges aus Shopify-Metafield (custom.badges), Artikel-Nr. rechts */}
@@ -636,13 +646,7 @@ const ProductDetail = () => {
         </div>
       </section>
 
-      {/* Produktinformationen — volle Breite unter dem Produkt */}
-      <section className="container-editorial border-t border-border py-14 md:py-20">
-        <h2 className="font-display text-2xl md:text-3xl">Produktinformationen</h2>
-        <div className="mt-8 md:mt-10">
-          <ProductDescription description={product.description} layout="split" />
-        </div>
-      </section>
+
 
       {/* Sticky mobile CTA */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden">
