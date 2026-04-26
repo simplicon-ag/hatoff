@@ -28,6 +28,7 @@ const weltLabel: Record<string, string> = {
   sommer: "Sommer",
   freizeit: "Alltag",
   "smart-casual": "Date Night",
+  abend: "Abend",
 };
 
 const Index = () => {
