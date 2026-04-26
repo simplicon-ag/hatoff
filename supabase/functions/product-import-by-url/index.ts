@@ -1013,6 +1013,14 @@ Deno.serve(async (req) => {
         }
         console.warn(`[by-url] look-generate gave up for ${handle} after ${delays.length} attempts`);
       })();
+      // Keep the background task alive after the response is sent
+      try {
+        // @ts-ignore — EdgeRuntime is provided by Supabase Edge Functions
+        if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(retryTask);
+        }
+      } catch { /* noop */ }
       lookGenerationTriggered = true;
     } catch (e) {
       console.warn(`[by-url] look-generate trigger failed for ${handle}:`, e);
