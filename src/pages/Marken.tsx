@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { marken } from "@/data/looks";
-import { fetchProducts, type ShopifyProduct } from "@/lib/shopify";
+import { fetchProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
 
 const MarkenIndex = () => (
   <SiteLayout>
