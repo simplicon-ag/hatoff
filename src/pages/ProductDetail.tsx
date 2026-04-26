@@ -380,16 +380,20 @@ const ProductDetail = () => {
 
             return (
               <div key={opt.name} className="mt-7">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">
                     {opt.name}
                     {isColor && currentValue && (
                       <span className="ml-2 font-normal text-muted-foreground">: {currentValue}</span>
                     )}
                   </p>
-                  {!isColor && currentValue && (
-                    <p className="text-xs text-muted-foreground">Gewählt: {currentValue}</p>
-                  )}
+                  {!isColor ? (
+                    <SizeAdvisorTrigger
+                      product={product.title}
+                      brand={product.vendor}
+                      label="Größenberater"
+                    />
+                  ) : null}
                 </div>
 
                 {isColor ? (
