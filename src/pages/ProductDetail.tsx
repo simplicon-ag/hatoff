@@ -646,13 +646,7 @@ const ProductDetail = () => {
         </div>
       </section>
 
-      {/* Produktinformationen — volle Breite unter dem Produkt */}
-      <section className="container-editorial border-t border-border py-14 md:py-20">
-        <h2 className="font-display text-2xl md:text-3xl">Produktinformationen</h2>
-        <div className="mt-8 md:mt-10">
-          <ProductDescription description={product.description} layout="split" />
-        </div>
-      </section>
+
 
       {/* Sticky mobile CTA */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden">
