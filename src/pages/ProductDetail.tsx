@@ -451,17 +451,17 @@ const ProductDetail = () => {
                           title={c.value}
                           aria-label={c.value}
                           className={cn(
-                            "relative h-20 w-20 overflow-hidden border-2 bg-white transition sm:h-24 sm:w-24",
-                            active ? "border-primary ring-1 ring-primary/40" : "border-transparent hover:border-border",
+                            "relative h-14 w-14 overflow-hidden border bg-background transition sm:h-16 sm:w-16",
+                            active ? "border-primary ring-1 ring-primary/30" : "border-border/70 hover:border-foreground/40",
                             !c.available && "opacity-40",
                           )}
                         >
                           {c.image ? (
                             <img
-                              src={c.image}
+                              src={shopifySizedImage(c.image, 240)}
                               alt={c.value}
                               loading="eager"
-                              className="h-full w-full object-cover mix-blend-multiply [image-rendering:auto]"
+                              className="h-full w-full object-cover"
                             />
                           ) : (
                             <span className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-wider text-muted-foreground">
