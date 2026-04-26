@@ -1278,7 +1278,7 @@ export const magazinArtikel = [
     slug: "hemd-modern-kombinieren",
     title: "Hemd modern kombinieren — 5 Wege, die immer funktionieren",
     teaser: "Vom Klassiker bis zum entspannten Smart-Casual: Wie ein Hemd zum vielseitigsten Stück im Schrank wird.",
-    image: "/src/assets/mag-hemd.jpg",
+    image: magHemd,
     readingTime: "4 Min",
     content: `Ein Hemd ist nie nur ein Hemd. Es ist die Basis, auf der ein ganzer Tag aufbaut — und wenn man es richtig kombiniert, übersteht es Meeting, Mittagessen und den Abend mit Freunden, ohne dass man sich umziehen müsste.
 
@@ -1298,7 +1298,7 @@ Die Regel hinter allem: Passform vor Marke, Material vor Trend. Ein Hemd, das gu
     slug: "business-ohne-steif",
     title: "Business Look ohne steif zu wirken",
     teaser: "Wie man professionell aussieht, ohne in der Anzug-Schablone zu verschwinden.",
-    image: "/src/assets/mag-business.jpg",
+    image: magBusiness,
     readingTime: "5 Min",
     content: `Der klassische Anzug verliert an Bedeutung — aber das heisst nicht, dass Stil im Büro unwichtig wird. Im Gegenteil: Wer heute professionell aussehen will, braucht ein feineres Gespür dafür, was angemessen ist und was authentisch wirkt.
 
@@ -1318,7 +1318,7 @@ Der moderne Business-Look erlaubt mehr Persönlichkeit, verlangt aber mehr Sorgf
     slug: "5-kombis-fuer-jeden-tag",
     title: "5 einfache Kombinationen für jeden Tag",
     teaser: "Mit wenigen Stücken durch die Woche — ohne morgens nachdenken zu müssen.",
-    image: "/src/assets/mag-kombis.jpg",
+    image: magKombis,
     readingTime: "3 Min",
     content: `Stil ist kein grosser Schrank, sondern ein klarer Gedanke. Mit wenigen, gut gewählten Stücken lassen sich erstaunlich viele Looks bauen, die jeden Anlass tragen.
 
