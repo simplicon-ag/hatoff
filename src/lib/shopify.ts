@@ -97,6 +97,7 @@ export const PRODUCT_BY_HANDLE_QUERY = `
         }
       }
       options { name values }
+      badges: metafield(namespace: "custom", key: "badges") { value type }
     }
   }
 `;
