@@ -158,8 +158,12 @@ const Neuheiten = () => {
                 Weitere Neuheiten
               </p>
               <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-                {gridPicks.map((p) => (
-                  <ProductCard key={p.node.id} product={p} />
+                {expandProductsByColor(gridPicks).map((p) => (
+                  <ProductCard
+                    key={`${p.node.id}-${p.initialColor ?? "default"}`}
+                    product={p}
+                    initialColor={p.initialColor}
+                  />
                 ))}
               </div>
 
