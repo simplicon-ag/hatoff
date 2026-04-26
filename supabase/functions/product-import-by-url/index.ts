@@ -889,6 +889,14 @@ Deno.serve(async (req) => {
       error_message: action === "updated" ? "Bestehendes Produkt aktualisiert" : null,
     });
 
+    // Compute which fields couldn't be scraped (so the admin can fill them in Shopify).
+    const missing: string[] = [];
+    if (!base.description) missing.push("Beschreibung");
+    if (!base.material) missing.push("Material");
+    if (base.care_labels.length === 0) missing.push("Pflegehinweise");
+    if (base.features.length === 0) missing.push("Bullet-Features");
+    if (!base.fit) missing.push("Passform");
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -901,8 +909,16 @@ Deno.serve(async (req) => {
         sizes: base.sizes,
         images_uploaded: imagesUploaded,
         price_eur: base.price_eur,
+        compare_at_price_eur: base.compare_at_price_eur,
         material: base.material,
         article_number: base.article_number,
+        fit: base.fit,
+        is_new: base.is_new,
+        features_count: base.features.length,
+        care_count: base.care_labels.length,
+        description_length: base.description.length,
+        missing_fields: missing,
+        shopify_admin_url: `https://${SHOPIFY_DOMAIN.replace(".myshopify.com","")}.myshopify.com/admin/products/${productId}`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
