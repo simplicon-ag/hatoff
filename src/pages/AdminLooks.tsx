@@ -109,9 +109,44 @@ export default function AdminLooks() {
   };
 
   const createManual = async () => {
-    const handles = manualHandles.split(",").map((h) => h.trim()).filter(Boolean);
-    if (!manualTitle || handles.length < 2) {
-      toast.error("Titel und mindestens 2 Produkt-Handles nötig");
+    const handles = manualHandles
+      .split(",")
+      .map((h) => extractHandle(h))
+      .filter(Boolean);
+
+    if (handles.length === 0) {
+      toast.error("Mindestens 1 Produkt-Handle oder Shopify-URL nötig");
+      return;
+    }
+
+    // 1 Handle → KI übernimmt Begleiter + Texte + Bild
+    if (handles.length === 1) {
+      setSingleBusy(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("look-generate", {
+          body: { productHandle: handles[0], force: true },
+        });
+        if (error) throw new Error(error.message);
+        const created = (data as { created?: number; reason?: string })?.created ?? 0;
+        const reason = (data as { reason?: string })?.reason;
+        if (created > 0) {
+          toast.success(`${created} neue Look-Draft(s) — KI hat Begleiter, Titel & Story selbst gewählt`);
+          setManualTitle(""); setManualSubtitle(""); setManualHandles(""); setManualStory("");
+          refresh();
+        } else {
+          toast.warning(`Keine neuen Looks erzeugt${reason ? `: ${reason}` : ""}`);
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "KI-Generierung fehlgeschlagen");
+      } finally {
+        setSingleBusy(false);
+      }
+      return;
+    }
+
+    // 2+ Handles → klassisches manuelles Anlegen
+    if (!manualTitle) {
+      toast.error("Titel nötig, wenn du mehrere Produkte selbst kombinierst");
       return;
     }
     try {
@@ -309,32 +344,55 @@ export default function AdminLooks() {
 
           <TabsContent value="manual" className="mt-6">
             <Card className="max-w-2xl p-6">
-              <h2 className="font-display text-2xl">Neuen Look manuell anlegen</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Wird als Draft gespeichert. Hero-Bild kannst du danach generieren lassen.</p>
+              <h2 className="font-display text-2xl">Neuen Look anlegen</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                <strong>Tipp:</strong> Gib nur <em>einen</em> Handle (oder eine Shopify-URL) ein, dann sucht die KI
+                den passenden Begleiter aus dem Katalog und schreibt Titel, Untertitel & Story selbst.
+                Bei 2+ Handles wird der Look 1:1 mit deinen Texten angelegt.
+              </p>
               <div className="mt-6 space-y-4">
                 <div>
-                  <Label>Titel</Label>
-                  <Input value={manualTitle} onChange={(e) => setManualTitle(e.target.value)} placeholder="z.B. Smart Casual am Café" />
+                  <Label>Produkt-Handles oder Shopify-URLs (komma-getrennt)</Label>
+                  <Input
+                    value={manualHandles}
+                    onChange={(e) => setManualHandles(e.target.value)}
+                    placeholder="casa-moda-t-shirt-14918   (1 Handle = KI macht den Rest)"
+                  />
                 </div>
-                <div>
-                  <Label>Untertitel</Label>
-                  <Input value={manualSubtitle} onChange={(e) => setManualSubtitle(e.target.value)} placeholder="Locker, aber nie nachlässig." />
-                </div>
-                <div>
-                  <Label>Welt</Label>
-                  <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={manualWelt} onChange={(e) => setManualWelt(e.target.value)}>
-                    {WELT_OPTIONS.map((w) => <option key={w} value={w}>{w}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <Label>Produkt-Handles (komma-getrennt, Anker zuerst)</Label>
-                  <Input value={manualHandles} onChange={(e) => setManualHandles(e.target.value)} placeholder="venti-businesshemd-..., casa-moda-chinohose-..." />
-                </div>
-                <div>
-                  <Label>Story</Label>
-                  <Textarea value={manualStory} onChange={(e) => setManualStory(e.target.value)} rows={4} />
-                </div>
-                <Button onClick={createManual}><Plus className="mr-2 h-4 w-4" />Look anlegen</Button>
+
+                <details className="rounded-md border border-border p-3 text-sm">
+                  <summary className="cursor-pointer text-muted-foreground">
+                    Optional: Titel/Story selbst vorgeben (nur bei 2+ Handles wirksam)
+                  </summary>
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <Label>Titel</Label>
+                      <Input value={manualTitle} onChange={(e) => setManualTitle(e.target.value)} placeholder="z.B. Smart Casual am Café" />
+                    </div>
+                    <div>
+                      <Label>Untertitel</Label>
+                      <Input value={manualSubtitle} onChange={(e) => setManualSubtitle(e.target.value)} placeholder="Locker, aber nie nachlässig." />
+                    </div>
+                    <div>
+                      <Label>Welt</Label>
+                      <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={manualWelt} onChange={(e) => setManualWelt(e.target.value)}>
+                        {WELT_OPTIONS.map((w) => <option key={w} value={w}>{w}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Story</Label>
+                      <Textarea value={manualStory} onChange={(e) => setManualStory(e.target.value)} rows={4} />
+                    </div>
+                  </div>
+                </details>
+
+                <Button onClick={createManual} disabled={singleBusy}>
+                  {singleBusy ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />KI generiert…</>
+                  ) : (
+                    <><Sparkles className="mr-2 h-4 w-4" />Look anlegen</>
+                  )}
+                </Button>
               </div>
             </Card>
 
