@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
+import { searchProducts } from "@/lib/product-search";
 import {
   Select,
   SelectContent,
@@ -32,11 +33,11 @@ const tagValue = (tag: string, prefix: string) =>
     : null;
 
 const Shop = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortKey>("featured");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [selectedVendors, setSelectedVendors] = useState<Set<string>>(new Set());
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [selectedWelten, setSelectedWelten] = useState<Set<string>>(new Set());
@@ -53,16 +54,31 @@ const Shop = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // Apply URL params (from global search suggestions)
+  // URL → State (z. B. nach Klick aus globaler Suche)
   useEffect(() => {
-    const q = searchParams.get("q");
+    const q = searchParams.get("q") ?? "";
     const marke = searchParams.get("marke");
     const welt = searchParams.get("welt");
-    if (q) setSearch(q);
+    setSearch((prev) => (prev === q ? prev : q));
     if (marke) setSelectedVendors(new Set([marke]));
     if (welt) setSelectedWelten(new Set([welt]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // State → URL: Suche persistent in der Adresszeile halten (debounced)
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const current = searchParams.get("q") ?? "";
+      const next = search.trim();
+      if (current === next) return;
+      const params = new URLSearchParams(searchParams);
+      if (next) params.set("q", next);
+      else params.delete("q");
+      setSearchParams(params, { replace: true });
+    }, 250);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   // Compute derived facets from product data
   const facets = useMemo(() => {
@@ -139,13 +155,9 @@ const Shop = () => {
     let list = products;
 
     if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.node.title.toLowerCase().includes(q) ||
-          p.node.vendor?.toLowerCase().includes(q) ||
-          p.node.productType?.toLowerCase().includes(q),
-      );
+      // Zentrale Suchlogik: durchsucht Titel, Marke, Typ, Tags (inkl. art:),
+      // Variantenoptionen, Beschreibung (plain + HTML) und Artikelnummern.
+      list = searchProducts(list, search);
     }
 
     if (selectedVendors.size > 0) {
