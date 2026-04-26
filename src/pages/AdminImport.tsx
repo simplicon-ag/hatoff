@@ -451,11 +451,11 @@ export default function AdminImport() {
               placeholder="https://www.casamoda.com/de/de/businesshemd-3760-474"
               disabled={singleBusy}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !singleBusy) runSingleUrl();
+                if (e.key === "Enter" && !singleBusy) runSingleUrl(false);
               }}
               className="flex-1"
             />
-            <Button onClick={runSingleUrl} disabled={singleBusy || !singleUrl.trim()}>
+            <Button onClick={() => runSingleUrl(false)} disabled={singleBusy || !singleUrl.trim()}>
               {singleBusy ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -469,6 +469,47 @@ export default function AdminImport() {
               )}
             </Button>
           </div>
+          {singleResult && singleResult.already_exists && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-4 space-y-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-amber-700">
+                <AlertTriangle className="h-4 w-4" />
+                Produkt existiert bereits in Shopify
+              </div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                <div>Titel: <span className="text-foreground">{singleResult.title}</span></div>
+                <div>Handle: <span className="font-mono">{singleResult.handle}</span></div>
+                <div>Shopify-ID: <span className="font-mono">{singleResult.shopify_product_id}</span></div>
+                <div>
+                  Erkannt über:{" "}
+                  <span className="text-foreground">
+                    {singleResult.matched_by === "handle" ? "Handle (URL)" : `Artikelnummer ${singleResult.article_number}`}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Es wurde nichts importiert. Wenn du das bestehende Produkt mit den aktuellen Daten von der Webseite überschreiben möchtest,
+                klicke auf „Trotzdem überschreiben".
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                {singleResult.shopify_admin_url && (
+                  <Button asChild variant="outline" size="sm">
+                    <a href={singleResult.shopify_admin_url} target="_blank" rel="noopener noreferrer">
+                      In Shopify Admin öffnen
+                    </a>
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => runSingleUrl(true)}
+                  disabled={singleBusy}
+                >
+                  {singleBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                  Trotzdem überschreiben
+                </Button>
+              </div>
+            </div>
+          )}
           {singleResult && singleResult.success && (
             <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-4 space-y-3 text-sm">
               <div className="flex items-center gap-2 font-medium text-emerald-700">
