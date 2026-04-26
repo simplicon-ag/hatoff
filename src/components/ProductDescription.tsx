@@ -1,5 +1,7 @@
 interface Props {
   description: string;
+  /** "default" = stacked (used in accordion). "split" = 2-column intro|features layout. */
+  layout?: "default" | "split";
 }
 
 // Keywords that mark structured product info inside Shopify's flowing description
@@ -85,11 +87,61 @@ function parseDescription(raw: string): Section {
 
 import { forwardRef } from "react";
 
-export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ description }, ref) => {
+export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ description, layout = "default" }, ref) => {
   const { intro, pairs } = parseDescription(description);
 
   if (!intro && pairs.length === 0) {
     return <p className="text-sm text-muted-foreground">Keine Beschreibung vorhanden.</p>;
+  }
+
+  // Split layout: Intro left, all bullets/features right (Casa Moda style)
+  if (layout === "split") {
+    // Flatten all bullet points across pairs into a single feature list.
+    const features: string[] = [];
+    const meta: Pair[] = [];
+    for (const p of pairs) {
+      if (p.label === "Material" || p.label === "Pflege") {
+        meta.push(p);
+      } else if (p.values.length > 1) {
+        features.push(...p.values);
+      } else {
+        features.push(`${p.label}: ${p.values[0]}`);
+      }
+    }
+
+    return (
+      <div ref={ref} className="grid gap-10 md:grid-cols-2 md:gap-16">
+        <div className="space-y-6">
+          {intro && (
+            <p className="whitespace-pre-line text-[15px] leading-[1.75] text-foreground/85">
+              {intro}
+            </p>
+          )}
+          {meta.length > 0 && (
+            <dl className="space-y-4 pt-2">
+              {meta.map((p) => (
+                <div key={p.label}>
+                  <dt className="text-sm font-semibold text-foreground">{p.label}</dt>
+                  <dd className="mt-1 text-sm text-foreground/80">
+                    {p.values.join(", ")}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+        {features.length > 0 && (
+          <ul className="space-y-3 text-[15px] leading-relaxed text-foreground/85 md:pt-1">
+            {features.map((f, i) => (
+              <li key={i} className="flex gap-3">
+                <span aria-hidden className="mt-[0.7em] inline-block h-1 w-1 shrink-0 rounded-full bg-primary" />
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
   }
 
   return (

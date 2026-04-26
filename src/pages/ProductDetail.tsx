@@ -591,13 +591,7 @@ const ProductDetail = () => {
           </div>
 
           {/* Description & Details */}
-          <Accordion type="multiple" defaultValue={["desc"]} className="mt-8">
-            <AccordionItem value="desc">
-              <AccordionTrigger className="py-5 font-display text-base">Beschreibung</AccordionTrigger>
-              <AccordionContent className="pb-6 pt-2">
-                <ProductDescription description={product.description} />
-              </AccordionContent>
-            </AccordionItem>
+          <Accordion type="multiple" defaultValue={["details"]} className="mt-8">
             <AccordionItem value="details">
               <AccordionTrigger className="py-5 font-display text-base">Details & Pflege</AccordionTrigger>
               <AccordionContent className="pb-6 pt-2">
@@ -639,6 +633,14 @@ const ProductDetail = () => {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+        </div>
+      </section>
+
+      {/* Produktinformationen — volle Breite unter dem Produkt */}
+      <section className="container-editorial border-t border-border py-14 md:py-20">
+        <h2 className="font-display text-2xl md:text-3xl">Produktinformationen</h2>
+        <div className="mt-8 md:mt-10">
+          <ProductDescription description={product.description} layout="split" />
         </div>
       </section>
 
