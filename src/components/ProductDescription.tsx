@@ -146,34 +146,46 @@ export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ descripti
     );
   }
 
+  // Footer-Werte (Artikelnummer etc.) separat anzeigen
+  const FOOTER_KEYS = new Set(["Artikelnummer"]);
+  const mainPairs = pairs.filter((p) => !FOOTER_KEYS.has(p.label));
+  const footerPairs = pairs.filter((p) => FOOTER_KEYS.has(p.label));
+
   return (
-    <div ref={ref} className="space-y-7">
+    <div ref={ref} className="space-y-5 text-[15px] leading-[1.7] text-foreground/85">
       {intro && (
-        <p className="whitespace-pre-line text-[15px] leading-[1.7] text-foreground/85">
-          {intro}
-        </p>
+        <p className="whitespace-pre-line">{intro}</p>
       )}
 
-      {pairs.length > 0 && (
-        <div className="space-y-5 border-t border-border pt-5">
-          {pairs.map((p) => (
-            <div key={p.label} className="grid gap-2 sm:grid-cols-[120px_1fr] sm:gap-6">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                {p.label}
-              </p>
-              {p.values.length > 1 ? (
-                <ul className="space-y-1.5 text-sm leading-relaxed text-foreground/85">
-                  {p.values.map((v, i) => (
-                    <li key={i} className="flex gap-2.5">
-                      <span aria-hidden className="mt-[0.55em] inline-block h-1 w-1 shrink-0 rounded-full bg-primary" />
-                      <span>{v}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm leading-relaxed text-foreground/85">{p.values[0]}</p>
-              )}
+      {mainPairs.map((p) => {
+        // Mehrere Werte → Heading + Bullet-Liste (z.B. Pflegehinweise)
+        if (p.values.length > 1) {
+          return (
+            <div key={p.label} className="space-y-2">
+              <p className="font-semibold text-foreground">{p.label}:</p>
+              <ul className="ml-5 list-disc space-y-1 marker:text-foreground/60">
+                {p.values.map((v, i) => (
+                  <li key={i}>{v}</li>
+                ))}
+              </ul>
             </div>
+          );
+        }
+        // Einzelwert → Inline-Label (z.B. Material: 100 % Polyester)
+        return (
+          <p key={p.label}>
+            <span className="font-semibold text-foreground">{p.label}:</span>{" "}
+            {p.values[0]}
+          </p>
+        );
+      })}
+
+      {footerPairs.length > 0 && (
+        <div className="pt-2 text-sm text-muted-foreground">
+          {footerPairs.map((p) => (
+            <p key={p.label}>
+              {p.label}: {p.values[0]}
+            </p>
           ))}
         </div>
       )}
