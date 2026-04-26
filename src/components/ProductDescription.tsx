@@ -41,9 +41,40 @@ function splitToBullets(label: string, value: string): string[] {
     return cleaned.split(/\s*,\s*/).filter(Boolean);
   }
 
-  // Pflege / Pflegehinweise: split on commas/semicolons — items are short imperatives
+  // Pflege / Pflegehinweise: split on commas/semicolons, OR — if no separators —
+  // heuristically split on common care-instruction phrases (Shopify often strips commas).
   if (label === "Pflege" || label === "Pflegehinweise") {
-    return cleaned.split(/\s*[,;]\s*/).filter(Boolean);
+    if (/[,;]/.test(cleaned)) {
+      return cleaned.split(/\s*[,;]\s*/).filter(Boolean);
+    }
+    // Heuristic: insert a separator before known care phrases, then split.
+    const phrases = [
+      "schonwaschgang",
+      "normalwaschgang",
+      "handwäsche",
+      "nicht waschen",
+      "nicht bleichen",
+      "bleichen",
+      "schonende trocknung",
+      "nicht im wäschetrockner",
+      "im wäschetrockner",
+      "nicht trocknen",
+      "trocknen",
+      "nicht bügeln",
+      "mäßig heiß bügeln",
+      "heiß bügeln",
+      "bügeln",
+      "nicht trockenreinigen",
+      "professionelle trockenreinigung",
+      "trockenreinigung",
+      "professionelle nassreinigung",
+      "nassreinigung",
+    ];
+    const pattern = new RegExp(`\\s+(?=(?:${phrases.join("|")}))`, "gi");
+    const parts = cleaned.split(pattern).map((s) => s.trim()).filter(Boolean);
+    // Erstes Element ggf. inkl. "normaler prozess" / "schonender prozess" am Ende
+    // wieder anhängen, falls es zu kurz ist. Sonst direkt zurückgeben.
+    return parts.length > 1 ? parts : [cleaned];
   }
 
   // Single-value attributes
