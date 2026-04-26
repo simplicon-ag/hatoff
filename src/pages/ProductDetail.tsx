@@ -15,7 +15,7 @@ import {
   formatPrice,
   type ShopifyProduct,
 } from "@/lib/shopify";
-import { useLivePrice, formatLivePrice, formatOriginalPrice, discountPercent } from "@/hooks/useLivePrice";
+import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { looks } from "@/data/looks";
 import { toast } from "sonner";
@@ -165,13 +165,20 @@ const ProductDetail = () => {
     return looks.filter((l) => l.productHandles.includes(product.handle));
   }, [product]);
 
-  // Variant-basierter Sale (wenn compareAtPrice vorhanden) — überschreibt livePrice nicht, ergänzt ihn
+  // Sale wird nur angezeigt, wenn das Produkt den Shopify-Tag `sale` trägt
+  // UND die gewählte Variante einen `compareAtPrice` > `price` hat.
+  const hasSaleTag = useMemo(
+    () => (product?.tags ?? []).some((t) => t.toLowerCase() === "sale"),
+    [product?.tags],
+  );
+
   const variantOnSale = useMemo(() => {
+    if (!hasSaleTag) return false;
     if (!selectedVariant?.compareAtPrice) return false;
     const price = parseFloat(selectedVariant.price.amount);
     const compare = parseFloat(selectedVariant.compareAtPrice.amount);
     return isFinite(compare) && compare > price;
-  }, [selectedVariant]);
+  }, [hasSaleTag, selectedVariant]);
 
   const variantDiscount = useMemo(() => {
     if (!variantOnSale || !selectedVariant?.compareAtPrice) return null;
@@ -321,47 +328,33 @@ const ProductDetail = () => {
           <h1 className="mt-2 font-display text-4xl leading-tight md:text-5xl">{product.title}</h1>
 
           {/* Preisblock */}
-          {selectedVariant && (() => {
-            const showVariantSale = variantOnSale;
-            const showLiveSale = !showVariantSale && livePrice?.on_sale && formatOriginalPrice(livePrice);
-            return (
-              <div className="mt-4">
-                <div className="flex flex-wrap items-baseline gap-3">
-                  {showVariantSale ? (
-                    <>
-                      <p className="text-2xl font-medium text-destructive">
-                        {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
-                      </p>
-                      <p className="text-base text-foreground/50 line-through">
-                        {formatPrice(selectedVariant.compareAtPrice!.amount, selectedVariant.compareAtPrice!.currencyCode)}
-                      </p>
-                      {variantDiscount && (
-                        <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
-                          -{variantDiscount}%
-                        </span>
-                      )}
-                    </>
-                  ) : showLiveSale ? (
-                    <>
-                      <p className="text-2xl font-medium text-destructive">{formatLivePrice(livePrice)}</p>
-                      <p className="text-base text-foreground/50 line-through">{formatOriginalPrice(livePrice)}</p>
-                      {discountPercent(livePrice) && (
-                        <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
-                          -{discountPercent(livePrice)}%
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-2xl font-medium">
-                      {formatLivePrice(livePrice) ??
-                        formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+          {selectedVariant && (
+            <div className="mt-4">
+              <div className="flex flex-wrap items-baseline gap-3">
+                {variantOnSale ? (
+                  <>
+                    <p className="text-2xl font-medium text-destructive">
+                      {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
                     </p>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</p>
+                    <p className="text-base text-foreground/50 line-through">
+                      {formatPrice(selectedVariant.compareAtPrice!.amount, selectedVariant.compareAtPrice!.currencyCode)}
+                    </p>
+                    {variantDiscount && (
+                      <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                        -{variantDiscount}%
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-2xl font-medium">
+                    {formatLivePrice(livePrice) ??
+                      formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                  </p>
+                )}
               </div>
-            );
-          })()}
+              <p className="mt-1 text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</p>
+            </div>
+          )}
 
           {/* Stock indicator */}
           <div className="mt-4 flex items-center gap-2 text-sm">
@@ -618,13 +611,15 @@ const ProductDetail = () => {
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{product.vendor}</p>
             {selectedVariant && (
               <p className="flex items-baseline gap-2 text-sm font-medium">
-                <span className={livePrice?.on_sale ? "text-destructive" : ""}>
-                  {formatLivePrice(livePrice) ??
-                    formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                <span className={variantOnSale ? "text-destructive" : ""}>
+                  {variantOnSale
+                    ? formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)
+                    : formatLivePrice(livePrice) ??
+                      formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
                 </span>
-                {livePrice?.on_sale && formatOriginalPrice(livePrice) && (
+                {variantOnSale && selectedVariant.compareAtPrice && (
                   <span className="text-xs text-foreground/50 line-through">
-                    {formatOriginalPrice(livePrice)}
+                    {formatPrice(selectedVariant.compareAtPrice.amount, selectedVariant.compareAtPrice.currencyCode)}
                   </span>
                 )}
               </p>
