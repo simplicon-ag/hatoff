@@ -186,11 +186,19 @@ const Neuheiten = () => {
         </section>
       ) : filtered.length === 0 ? (
         <section className="container-editorial py-24 text-center">
-          <p className="text-muted-foreground">Keine Neuheiten für „{activeBrand}".</p>
-          <Button variant="link" onClick={() => setActiveBrand("Alle")} className="mt-2">
+          <p className="text-muted-foreground">Keine Neuheiten für diese Auswahl.</p>
+          <Button
+            variant="link"
+            onClick={() => {
+              setActiveBrand("Alle");
+              setActiveCategory("alle");
+            }}
+            className="mt-2"
+          >
             Filter zurücksetzen
           </Button>
         </section>
+
       ) : (
         <>
           {/* Hero spotlight */}
