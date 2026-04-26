@@ -749,7 +749,14 @@ Deno.serve(async (req) => {
         console.warn(`[by-url] incomplete data for ${cu.url}`);
         continue;
       }
-      const colorName = extractColorFromTitle(sc.title) || `Farbe ${cu.colorId}`;
+      // Colour name: prefer title, fall back to URL slug, then to colorId.
+      let colorName = extractColorFromTitle(sc.title) || "";
+      if (!colorName) {
+        const slug = cu.url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
+        const slugColor = extractColorFromTitle(" " + slug.replace(/-/g, " "));
+        if (slugColor) colorName = slugColor.replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+      if (!colorName) colorName = `Farbe ${cu.colorId}`;
       colors.push({ colorName, colorId: cu.colorId, scraped: sc });
     }
 
