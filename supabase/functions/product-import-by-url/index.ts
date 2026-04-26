@@ -982,6 +982,28 @@ Deno.serve(async (req) => {
     if (base.features.length === 0) missing.push("Bullet-Features");
     if (!base.fit) missing.push("Passform");
 
+    // 7) Fire-and-forget: Looks für dieses Produkt generieren lassen
+    //    (läuft asynchron im Hintergrund, blockiert Response nicht)
+    let lookGenerationTriggered = false;
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      console.log(`[by-url] triggering look-generate for ${handle}`);
+      fetch(`${supabaseUrl}/functions/v1/look-generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({ productHandle: handle }),
+      })
+        .then((r) => r.text().then((t) => console.log(`[by-url] look-generate ${handle} → ${r.status}`, t.slice(0, 160))))
+        .catch((e) => console.warn(`[by-url] look-generate fetch error for ${handle}:`, e));
+      lookGenerationTriggered = true;
+    } catch (e) {
+      console.warn(`[by-url] look-generate trigger failed for ${handle}:`, e);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -1003,6 +1025,7 @@ Deno.serve(async (req) => {
         care_count: base.care_labels.length,
         description_length: base.description.length,
         missing_fields: missing,
+        look_generation_triggered: lookGenerationTriggered,
         shopify_admin_url: `https://${SHOPIFY_DOMAIN.replace(".myshopify.com","")}.myshopify.com/admin/products/${productId}`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
