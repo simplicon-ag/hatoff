@@ -39,18 +39,20 @@ export default function AdminLooks() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("curated_looks")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) {
-      toast.error("Looks konnten nicht geladen werden");
-    } else {
-      const all = (data ?? []) as Look[];
+    try {
+      // Use edge function to bypass RLS (drafts not readable for anon)
+      const { data, error } = await supabase.functions.invoke("look-admin", {
+        body: { action: "list" },
+      });
+      if (error) throw new Error(error.message);
+      const all = ((data as { looks?: Look[] })?.looks ?? []) as Look[];
       setDrafts(all.filter((l) => l.status === "draft"));
       setPublished(all.filter((l) => l.status === "published"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Looks konnten nicht geladen werden");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
