@@ -109,9 +109,44 @@ export default function AdminLooks() {
   };
 
   const createManual = async () => {
-    const handles = manualHandles.split(",").map((h) => h.trim()).filter(Boolean);
-    if (!manualTitle || handles.length < 2) {
-      toast.error("Titel und mindestens 2 Produkt-Handles nötig");
+    const handles = manualHandles
+      .split(",")
+      .map((h) => extractHandle(h))
+      .filter(Boolean);
+
+    if (handles.length === 0) {
+      toast.error("Mindestens 1 Produkt-Handle oder Shopify-URL nötig");
+      return;
+    }
+
+    // 1 Handle → KI übernimmt Begleiter + Texte + Bild
+    if (handles.length === 1) {
+      setSingleBusy(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("look-generate", {
+          body: { productHandle: handles[0], force: true },
+        });
+        if (error) throw new Error(error.message);
+        const created = (data as { created?: number; reason?: string })?.created ?? 0;
+        const reason = (data as { reason?: string })?.reason;
+        if (created > 0) {
+          toast.success(`${created} neue Look-Draft(s) — KI hat Begleiter, Titel & Story selbst gewählt`);
+          setManualTitle(""); setManualSubtitle(""); setManualHandles(""); setManualStory("");
+          refresh();
+        } else {
+          toast.warning(`Keine neuen Looks erzeugt${reason ? `: ${reason}` : ""}`);
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "KI-Generierung fehlgeschlagen");
+      } finally {
+        setSingleBusy(false);
+      }
+      return;
+    }
+
+    // 2+ Handles → klassisches manuelles Anlegen
+    if (!manualTitle) {
+      toast.error("Titel nötig, wenn du mehrere Produkte selbst kombinierst");
       return;
     }
     try {
