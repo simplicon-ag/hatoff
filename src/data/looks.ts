@@ -1,4 +1,13 @@
 // HATOFF — Curated Looks
+import weltBusiness from "@/assets/welt-business.jpg";
+import weltSmartCasual from "@/assets/welt-smart-casual.jpg";
+import weltFreizeit from "@/assets/welt-freizeit.jpg";
+import weltSommer from "@/assets/welt-sommer.jpg";
+import weltHemden from "@/assets/welt-hemden.jpg";
+import weltJacken from "@/assets/welt-jacken.jpg";
+import magHemd from "@/assets/mag-hemd.jpg";
+import magBusiness from "@/assets/mag-business.jpg";
+import magKombis from "@/assets/mag-kombis.jpg";
 // Each look references real Shopify product handles created in the store.
 import heroBuero from "@/assets/look-modernes-buero.jpg";
 import heroCafe from "@/assets/look-smart-casual-cafe.jpg";
