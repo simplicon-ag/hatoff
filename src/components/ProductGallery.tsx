@@ -35,6 +35,14 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
 
   const safeImages = images.length > 0 ? images : [];
   const current = safeImages[active];
+  const maxStart = Math.max(0, safeImages.length - THUMBS_VISIBLE);
+
+  // Keep the active thumbnail visible inside the window
+  useEffect(() => {
+    if (active < thumbStart) setThumbStart(active);
+    else if (active >= thumbStart + THUMBS_VISIBLE)
+      setThumbStart(Math.min(maxStart, active - THUMBS_VISIBLE + 1));
+  }, [active, thumbStart, maxStart]);
 
   useEffect(() => {
     if (lightbox) {
