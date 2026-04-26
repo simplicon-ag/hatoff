@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { Loader2, Check, ArrowRight } from "lucide-react";
+import { Loader2, Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { LookSetBuilder } from "@/components/LookSetBuilder";
@@ -10,8 +9,19 @@ import { fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
 
 const LookDetail = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { looks } = useCuratedLooks();
   const look = looks.find((l) => l.slug === slug);
+
+  const handleBack = () => {
+    // If user came from within the app, go back; otherwise go to /looks
+    if (location.key !== "default" && window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/looks");
+    }
+  };
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
