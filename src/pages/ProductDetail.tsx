@@ -350,7 +350,22 @@ const ProductDetail = () => {
                       return (
                         <button
                           key={c.value}
-                          onClick={() => setSelectedVariantId(c.variantId)}
+                          onClick={() => {
+                            // Beim Farbwechsel die zuvor gewählte Grösse beibehalten, falls verfügbar
+                            const currentSize = selectedVariant?.selectedOptions.find((o) => o.name === "Grösse" || o.name === "Size")?.value;
+                            if (currentSize) {
+                              const match = product.variants.edges.find(({ node: v }) => {
+                                const col = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                                const sz = v.selectedOptions.find((o) => o.name === "Grösse" || o.name === "Size")?.value;
+                                return col === c.value && sz === currentSize;
+                              });
+                              if (match) {
+                                setSelectedVariantId(match.node.id);
+                                return;
+                              }
+                            }
+                            setSelectedVariantId(c.variantId);
+                          }}
                           disabled={!c.available}
                           title={c.value}
                           aria-label={c.value}
