@@ -67,7 +67,7 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
 
   if (safeImages.length === 0) {
     return (
-      <div className="flex aspect-[4/5] items-center justify-center bg-secondary text-sm text-muted-foreground">
+      <div className="flex aspect-[4/5] items-center justify-center text-sm text-muted-foreground">
         Kein Bild
       </div>
     );
@@ -84,12 +84,16 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
                 key={img.url + i}
                 onClick={() => setActive(i)}
                 className={cn(
-                  "relative h-20 w-16 overflow-hidden border bg-white transition",
-                  i === active ? "border-primary" : "border-border hover:border-primary/60",
+                  "relative h-20 w-16 overflow-hidden border transition",
+                  i === active ? "border-primary" : "border-transparent hover:border-border",
                 )}
                 aria-label={`Bild ${i + 1} ansehen`}
               >
-                <img src={img.url} alt={img.altText ?? `${title} ${i + 1}`} className="h-full w-full object-contain p-1" />
+                <img
+                  src={img.url}
+                  alt={img.altText ?? `${title} ${i + 1}`}
+                  className="h-full w-full object-contain mix-blend-multiply"
+                />
               </button>
             ))}
           </div>
@@ -98,7 +102,7 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
         {/* Main image — desktop with hover zoom */}
         <div className="order-1 flex-1 md:order-2">
           <div
-            className="group relative hidden aspect-[4/5] cursor-zoom-in overflow-hidden border border-border bg-white md:block"
+            className="group relative hidden aspect-[4/5] cursor-zoom-in overflow-hidden md:block"
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setZoom((z) => ({ ...z, active: false }))}
             onClick={() => setLightbox(true)}
@@ -106,7 +110,7 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
             <img
               src={current.url}
               alt={current.altText ?? title}
-              className="h-full w-full object-contain p-10 transition-transform duration-300 ease-out"
+              className="h-full w-full object-contain p-6 mix-blend-multiply transition-transform duration-300 ease-out"
               style={
                 zoom.active
                   ? { transformOrigin: `${zoom.x}% ${zoom.y}%`, transform: "scale(1.65)" }
@@ -122,7 +126,7 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
           <div
             ref={trackRef}
             onScroll={onScroll}
-            className="flex aspect-[4/5] snap-x snap-mandatory overflow-x-auto border border-border bg-white md:hidden"
+            className="flex aspect-[4/5] snap-x snap-mandatory overflow-x-auto md:hidden"
             style={{ scrollbarWidth: "none" }}
           >
             {safeImages.map((img, i) => (
@@ -131,7 +135,11 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
                 onClick={() => setLightbox(true)}
                 className="relative h-full w-full flex-shrink-0 snap-center"
               >
-                <img src={img.url} alt={img.altText ?? `${title} ${i + 1}`} className="h-full w-full object-contain p-6" />
+                <img
+                  src={img.url}
+                  alt={img.altText ?? `${title} ${i + 1}`}
+                  className="h-full w-full object-contain p-4 mix-blend-multiply"
+                />
               </button>
             ))}
           </div>
