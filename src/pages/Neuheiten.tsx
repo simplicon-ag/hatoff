@@ -23,11 +23,16 @@ const Neuheiten = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // Sort by Shopify GID (monotonic → newest first)
-  const newest = useMemo(
-    () => [...products].sort((a, b) => b.node.id.localeCompare(a.node.id)),
-    [products],
-  );
+  // Nur Produkte mit Tag `neu` / `new` / `neuheit` (Präfixe wie `art:` ignorieren)
+  const newest = useMemo(() => {
+    const onlyNew = products.filter((p) =>
+      (p.node.tags ?? []).some((t) =>
+        /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")),
+      ),
+    );
+    // Sortierung: Shopify-GIDs sind monoton steigend → höchste ID = neuestes Produkt
+    return [...onlyNew].sort((a, b) => b.node.id.localeCompare(a.node.id));
+  }, [products]);
 
   const brands = useMemo(() => {
     const set = new Map<string, number>();

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
   SelectContent,
@@ -13,78 +12,64 @@ import {
 
 type SortKey = "discount-desc" | "price-asc" | "price-desc" | "title-asc";
 
-interface SaleEntry {
-  handle: string;
-  display_price_chf: number;
-  original_price_chf: number;
+/**
+ * Berechnet den höchsten Rabatt (in Prozent, 0–1) eines Produkts auf Basis
+ * von Shopify Variant-Preisen (`price` vs. `compareAtPrice`).
+ * Liefert 0, wenn keine Variante reduziert ist.
+ */
+function maxVariantDiscount(p: ShopifyProduct): number {
+  let max = 0;
+  for (const e of p.node.variants.edges) {
+    const v = e.node;
+    const compare = v.compareAtPrice?.amount ? parseFloat(v.compareAtPrice.amount) : 0;
+    const price = parseFloat(v.price.amount);
+    if (compare > price && compare > 0) {
+      const d = (compare - price) / compare;
+      if (d > max) max = d;
+    }
+  }
+  return max;
 }
 
 const Sale = () => {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
-  const [saleMap, setSaleMap] = useState<Map<string, SaleEntry>>(new Map());
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortKey>("discount-desc");
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const [{ data: saleRows }, allProducts] = await Promise.all([
-        supabase
-          .from("product_price_cache")
-          .select("handle, display_price_chf, original_price_chf")
-          .eq("on_sale", true),
-        fetchAllProducts(),
-      ]);
-      if (cancelled) return;
-
-      const map = new Map<string, SaleEntry>();
-      for (const r of saleRows ?? []) {
-        if (r.original_price_chf == null) continue;
-        map.set(r.handle, {
-          handle: r.handle,
-          display_price_chf: Number(r.display_price_chf),
-          original_price_chf: Number(r.original_price_chf),
-        });
-      }
-      setSaleMap(map);
-      setProducts(allProducts);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    fetchAllProducts()
+      .then(setProducts)
+      .finally(() => setLoading(false));
   }, []);
 
   const onSaleProducts = useMemo(() => {
-    const list = products.filter((p) => saleMap.has(p.node.handle));
-
-    const discount = (handle: string) => {
-      const e = saleMap.get(handle);
-      if (!e || !e.original_price_chf) return 0;
-      return (e.original_price_chf - e.display_price_chf) / e.original_price_chf;
-    };
+    // Sale-Produkte: müssen Tag `sale` tragen UND mind. eine reduzierte Variante haben.
+    const list = products.filter((p) => {
+      const hasSaleTag = (p.node.tags ?? []).some((t) => t.toLowerCase() === "sale");
+      if (!hasSaleTag) return false;
+      return maxVariantDiscount(p) > 0;
+    });
 
     const sorted = [...list];
     if (sort === "discount-desc") {
-      sorted.sort((a, b) => discount(b.node.handle) - discount(a.node.handle));
+      sorted.sort((a, b) => maxVariantDiscount(b) - maxVariantDiscount(a));
     } else if (sort === "price-asc") {
       sorted.sort(
         (a, b) =>
-          (saleMap.get(a.node.handle)?.display_price_chf ?? 0) -
-          (saleMap.get(b.node.handle)?.display_price_chf ?? 0),
+          parseFloat(a.node.priceRange.minVariantPrice.amount) -
+          parseFloat(b.node.priceRange.minVariantPrice.amount),
       );
     } else if (sort === "price-desc") {
       sorted.sort(
         (a, b) =>
-          (saleMap.get(b.node.handle)?.display_price_chf ?? 0) -
-          (saleMap.get(a.node.handle)?.display_price_chf ?? 0),
+          parseFloat(b.node.priceRange.minVariantPrice.amount) -
+          parseFloat(a.node.priceRange.minVariantPrice.amount),
       );
     } else if (sort === "title-asc") {
       sorted.sort((a, b) => a.node.title.localeCompare(b.node.title));
     }
     return sorted;
-  }, [products, saleMap, sort]);
+  }, [products, sort]);
 
   return (
     <SiteLayout>
@@ -96,7 +81,7 @@ const Sale = () => {
           Reduziert.
         </h1>
         <p className="mt-4 max-w-xl text-foreground/70">
-          Ausgewählte Stücke aus den aktuellen Aktionen unserer Marken — solange Vorrat reicht.
+          Ausgewählte Stücke aus den aktuellen Aktionen — solange Vorrat reicht.
         </p>
       </section>
 
@@ -135,7 +120,7 @@ const Sale = () => {
               Aktuell keine Aktionen verfügbar.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Schau bald wieder vorbei — Sale-Preise werden täglich aktualisiert.
+              Schau bald wieder vorbei — neue Aktionen werden laufend ergänzt.
             </p>
           </div>
         ) : (
