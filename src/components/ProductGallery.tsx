@@ -10,13 +10,25 @@ interface ImageNode {
 interface Props {
   images: ImageNode[];
   title: string;
+  /** Optional externally controlled active index (e.g. when a colour swatch is picked). */
+  activeIndex?: number;
 }
 
-export const ProductGallery = ({ images, title }: Props) => {
+export const ProductGallery = ({ images, title, activeIndex }: Props) => {
   const [active, setActive] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const [zoom, setZoom] = useState({ active: false, x: 50, y: 50 });
   const trackRef = useRef<HTMLDivElement>(null);
+
+  // Sync external activeIndex (colour swatch click) into local state
+  useEffect(() => {
+    if (activeIndex == null) return;
+    if (activeIndex < 0 || activeIndex >= images.length) return;
+    setActive(activeIndex);
+    // also scroll mobile carousel into view
+    const el = trackRef.current;
+    if (el) el.scrollTo({ left: activeIndex * el.clientWidth, behavior: "smooth" });
+  }, [activeIndex, images.length]);
 
   const safeImages = images.length > 0 ? images : [];
   const current = safeImages[active];

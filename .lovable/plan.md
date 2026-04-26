@@ -1,113 +1,56 @@
-## Ziel
+## Ausgangslage
 
-Ein einziger Button "**Alles holen & importieren**" im Admin scannt komplette `casamoda.com` + `venti.com` Kataloge, scraped jedes Produkt mit dem verbesserten Akkordeon-Scraper (Beschreibung/Material/Pflege), und legt es in Shopify an oder aktualisiert es. Live-Fortschritt sichtbar, jederzeit stoppbar.
+Beim Polo-Shirt 993106500 hat Casa Moda **15 Farben in einem einzigen Artikel** — der Importer macht das schon richtig: Alle Farb-URLs werden gruppiert und als **EIN Shopify-Produkt mit Varianten** (`option2: Farbe`) angelegt. Auf der Detail-Seite (`ProductDetail.tsx`) werden die Farben aktuell aber nur als **Text-Buttons** ("Schwarz", "Marine", "Rot"…) gerendert — ohne Bild, ohne automatischen Bildwechsel.
 
----
+Zusätzlich erwähnst du: derselbe Artikel existiert manchmal **zweimal als getrennte Produkte** (einmal "Sale", einmal "Neu") — das sind in Shopify aber zwei verschiedene Produkte mit unterschiedlichen Handles, weil Casa Moda sie unter zwei URLs führt. Diese müssen wir **cross-verlinken**, damit der Kunde aus der Sale-Variante zur Neu-Variante (oder umgekehrt) springen kann.
 
-## Was schon existiert (wird wiederverwendet)
+## Was ich ändere
 
-- ✅ `product-import-discover` — sammelt URLs aus 60+ Kategorie-Slugs beider Brands, gruppiert sie nach Artikelnummer, schreibt `pending`-Rows in `product_import_log`
-- ✅ `product-import-control` — start / stop / reset / purge
-- ✅ `product-import-run` — Worker-Batch (Scrape → Shopify)
-- ✅ `product-import-by-url` — Einzelimport mit dem **guten** Scraper (Akkordeon-Klick, Fit, NEU-Badge, Features)
-- ✅ Tabellen `product_import_log`, `product_import_job`
-- ✅ Admin-UI mit Live-Job-Status (Polling auf `product_import_job`)
+### 1. Farb-Swatches mit Produktbild (statt Text-Buttons)
+**Datei:** `src/pages/ProductDetail.tsx`
 
-## Was fehlt / geändert wird
+Wenn die Option `Farbe` heisst:
+- Statt eckige Text-Buttons → **runde/quadratische Bild-Swatches** wie auf casamoda.com (kleines Produktbild der jeweiligen Farbe)
+- Zuordnung Farbe → Bild über `images[].altText` oder die Bild-Reihenfolge (Importer hängt Bilder pro Farbe in Reihenfolge an)
+- Bei Klick auf eine Farbe: 
+  - `selectedVariantId` wechselt
+  - **Hauptbild + Galerie** scrollen automatisch zum ersten Bild dieser Farbe
+  - Preis aktualisiert sich (eine Farbe kann SALE sein, andere nicht — Shopify-Variant hat eigenen `price` + `compareAtPrice`)
+- Andere Optionen (Grösse) bleiben als Text-Buttons
 
-### 1. Discover erweitern um echtes **Sitemap-Crawling**
-Datei: `supabase/functions/product-import-discover/index.ts`
+### 2. Bilder pro Farb-Variante korrekt zuordnen
+**Datei:** `supabase/functions/product-import-run/index.ts`
 
-- Zusätzlich zu den hartcodierten Kategorie-Slugs auch `sitemap.xml` von beiden Brands lesen (`https://www.casamoda.com/sitemap.xml`, `https://www.venti.com/sitemap.xml`) — fängt auch Produkte ab, die in keiner Kategorie-Liste auftauchen
-- Optional `?include_existing=true` Parameter: bestehende Shopify-Handles werden NICHT übersprungen, sondern als `status='pending'` mit `update_mode=true` markiert → Worker macht Update statt Create
+Aktuell werden alle Bilder gemeinsam als Produkt-Bilder hochgeladen. Ich ergänze:
+- Pro Farb-Variante wird das **erste Bild dieser Farbe** über `attachImageToVariants(productId, imageUrl, [variantId])` an die Varianten-IDs gebunden (Funktion existiert schon in der Datei).
+- Dadurch kennt Shopify die Farbe→Bild-Zuordnung → das Frontend kann beim Variant-Switch automatisch das richtige Bild anzeigen.
 
-### 2. Worker auf den **guten Scraper** umstellen
-Datei: `supabase/functions/product-import-run/index.ts`
+### 3. Cross-Linking "Sale"-Produkt ↔ "Neu"-Produkt
+**Datei:** `supabase/functions/product-import-run/index.ts` + `src/pages/ProductDetail.tsx`
 
-- Scraper-Logik aus `product-import-by-url` extrahieren (Akkordeon-JS-Click, Fit-Detection, NEU-Badge, Features-Bullets, korrektes Material/Pflege-Parsing) und in den Batch-Worker einbauen
-- Pro Group (Artikel + alle Farben aus `scraped_data.color_urls`) parallel scrapen, dann **ein** Shopify-Produkt mit Color-Optionen anlegen — wie im by-url-Flow
-- **Update-Modus**: wenn Handle in Shopify existiert → `PUT /products/{id}.json` statt `POST` (Bilder/Beschreibung/Preis ersetzen, Varianten beibehalten)
-- Batch-Size auf 3 reduzieren (Akkordeon-Scrape dauert ~15s/Farbe, 3 Produkte × 2 Farben = ~90s, passt unter Edge-Function-Timeout)
+Wenn derselbe `articleId` (z.B. `993106500`) in **zwei Shopify-Produkten** landet (eins aus `/sale/`, eins aus `/neuheiten/`):
+- Beim Anlegen wird im **Shopify-Tag** `related-article:993106500` gesetzt
+- Auf der PDP fragen wir per Storefront-API alle Produkte mit demselben Tag ab
+- Falls > 1 Treffer → Block **"Auch erhältlich als"** mit Verlinkung (z.B. "→ Diesen Artikel als Neuheit ansehen" / "→ Im Sale ansehen")
+- Badge `SALE` / `NEU` jeweils sichtbar
 
-### 3. Selbst-laufender Worker (Cron)
-Damit "Ein Klick startet alles" wirklich von alleine bis zum Ende läuft:
+### 4. Sale-Badge & Compare-At-Preis sichtbar
+**Datei:** `src/pages/ProductDetail.tsx` + `src/components/ProductCard.tsx`
 
-- **pg_cron** + **pg_net** aktivieren (sind in der Lovable-Cloud verfügbar)
-- Cron-Job: alle 60 Sekunden `product-import-run` mit `batch_size=3` aufrufen, **wenn** `product_import_job.state = 'running'`
-- Worker setzt `state='done'` sobald keine `pending` Rows mehr da sind → Cron macht nix mehr
-- Stop-Button setzt `state='stopping'` → Worker beendet aktuellen Batch und setzt `state='stopped'`
+Wenn `compareAtPrice > price` der gewählten Variante:
+- Roter **SALE**-Badge oben links auf dem Hauptbild
+- Alter Preis durchgestrichen + neuer Preis in Akzentfarbe (wie im Screenshot)
+- Im ProductCard: Badge "NEU" wenn Tag `neu` vorhanden, "SALE" wenn `compareAtPrice > price`
 
-### 4. Admin-UI vereinfachen
-Datei: `src/pages/AdminImport.tsx`
+## Was ich NICHT ändere
 
-Neue Hero-Card ganz oben:
+- Der Importer-Flow bleibt wie er ist (Discover → Group by articleId → Run scrapt alle Farben → erstellt EIN Produkt pro Artikel)
+- Bestehende importierte Produkte bekommen die Bild→Variante-Zuordnung **beim nächsten Update-Run** (du hast Update-Mode an)
 
-```
-┌─────────────────────────────────────────────────┐
-│ 🚀 Voll-Import: alles holen                     │
-│                                                  │
-│ Scannt casamoda.com + venti.com komplett,       │
-│ legt neue Produkte an, aktualisiert bestehende. │
-│ Dauer: ~2-4 Stunden für ~800 Produkte.          │
-│                                                  │
-│ ☑ Bestehende Produkte aktualisieren             │
-│                                                  │
-│ [▶ Voll-Import starten]  [⏸ Stoppen]            │
-│                                                  │
-│ ▓▓▓▓▓▓░░░░░░░░░ 312 / 847 Produkte              │
-│ Aktuell: Casa Moda Businesshemd 3760 (Beige)    │
-└─────────────────────────────────────────────────┘
-```
+## Offene Punkte / Annahmen
 
-- Ein-Klick-Button löst hintereinander aus: `discover` → `control:start` → Cron läuft an
-- Live-Liste der letzten 10 verarbeiteten Produkte mit Status (✓ erstellt / ↻ aktualisiert / ✗ Fehler + Grund)
-- Bestehende Sektionen (Einzel-URL, Job-Status, Purge) bleiben darunter erhalten
+- **Farb-Bild-Zuordnung**: Die Reihenfolge der Bilder pro Farbe ist im Scraper deterministisch (erst Farbe A alle Bilder, dann Farbe B). Ich nutze das + `imgix`-URL-Muster `/product/{articleId}/{colorId}/...` um Bilder dem Variant zuzuordnen.
+- **"Sale" vs "Neu" als getrennte Produkte**: Falls du das vermeiden willst, könnten wir alternativ den Discover so ändern, dass Sale + Neu desselben `articleId` zu **einem** Produkt mit Tags `sale` UND `neu` zusammenfallen. Das wäre sauberer als Cross-Linking. **Möchtest du das stattdessen?** → Sag Bescheid, dann passe ich Punkt 3 entsprechend an.
 
-### 5. Datenbank-Migration
-
-```sql
--- Cron + HTTP für selbst-laufenden Worker
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
-
--- Update-Modus Flag pro Log-Row
-alter table product_import_log
-  add column if not exists update_mode boolean not null default false;
-
--- Cron-Job: jede Minute Worker triggern wenn Job läuft
-select cron.schedule(
-  'product-import-tick',
-  '* * * * *',
-  $$
-  select net.http_post(
-    url := 'https://xccffclxvdmwfgydebqx.supabase.co/functions/v1/product-import-run',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer <ANON_KEY>"}'::jsonb,
-    body := '{"batch_size":3,"only_if_running":true}'::jsonb
-  );
-  $$
-);
-```
-
----
-
-## Ehrliche Trade-offs / Risiken
-
-| Punkt | Realität |
-|---|---|
-| **Firecrawl-Credits** | Voll-Crawl ~800 Produkte × 2 Farben Ø = ~1600 Scrapes. Bei Standard-Plan → ggf. Credits aufstocken. |
-| **Beschreibung/Material** | Akkordeon-Klick funktioniert in ~70-90% der Fälle. Den Rest siehst du in Shopify als leeres Feld und pflegst nach. |
-| **Dauer** | Bei 60s Cron-Tick × 3 Produkte/Tick = 60 Produkte/h. 800 Produkte = ~13h. Wenn du schneller willst → batch_size hoch oder Cron auf 30s. |
-| **Update-Modus** | Aktualisiert Bilder/Preis/Beschreibung. Manuell hinzugefügte Tags/Badges in Shopify bleiben erhalten (wir touchen `tags` nur additiv). |
-
----
-
-## Reihenfolge der Umsetzung
-
-1. Migration: `pg_cron`, `pg_net`, `update_mode`-Spalte, Cron-Job
-2. `product-import-discover` um Sitemap + `include_existing` erweitern
-3. Scraper-Logik aus `by-url` in `product-import-run` mergen + Update-Modus
-4. `product-import-run` um `only_if_running`-Guard erweitern (Cron-Safety)
-5. `AdminImport.tsx` Hero-Card oben, Live-Liste der letzten 10 Items
-6. End-to-End-Test mit ~5 Produkten, dann Voll-Crawl freigeben
-
-Nach Approval setze ich das in Default-Mode um.
+## Aufwand
+~30 Min Implementation, keine DB-Migration nötig.

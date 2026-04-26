@@ -25,8 +25,10 @@ interface Variant {
   id: string;
   title: string;
   price: { amount: string; currencyCode: string };
+  compareAtPrice?: { amount: string; currencyCode: string } | null;
   availableForSale: boolean;
   selectedOptions: Array<{ name: string; value: string }>;
+  image?: { url: string; altText: string | null } | null;
 }
 
 interface Product {
@@ -42,6 +44,25 @@ interface Product {
   options: Array<{ name: string; values: string[] }>;
 }
 
+/** Find an image index that best matches the chosen variant — uses variant.image.url first, then altText/colour-name fallback. */
+function findVariantImageIndex(
+  images: Array<{ url: string; altText: string | null }>,
+  variant: Variant | undefined,
+): number | null {
+  if (!variant) return null;
+  if (variant.image?.url) {
+    const idx = images.findIndex((i) => i.url === variant.image!.url);
+    if (idx >= 0) return idx;
+  }
+  // Fallback: match by colour name in altText
+  const colour = variant.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+  if (colour) {
+    const idx = images.findIndex((i) => (i.altText ?? "").toLowerCase().includes(colour.toLowerCase()));
+    if (idx >= 0) return idx;
+  }
+  return null;
+}
+
 const ProductDetail = () => {
   const { handle } = useParams<{ handle: string }>();
   const [product, setProduct] = useState<Product | null>(null);
@@ -49,6 +70,7 @@ const ProductDetail = () => {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [related, setRelated] = useState<ShopifyProduct[]>([]);
+  const [siblings, setSiblings] = useState<ShopifyProduct[]>([]);
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
   const { price: livePrice } = useLivePrice(handle);
@@ -69,6 +91,16 @@ const ProductDetail = () => {
             setRelated(items.filter((i) => i.node.handle !== p.handle).slice(0, 4));
           });
         }
+
+        // Cross-Linking: andere Produkte mit demselben Artikel-Tag (z.B. art:993106500)
+        const articleTag = p?.tags?.find((t) => /^art:/i.test(t));
+        if (articleTag) {
+          fetchProducts(10, `tag:"${articleTag}"`).then((items) => {
+            setSiblings(items.filter((i) => i.node.handle !== p.handle));
+          });
+        } else {
+          setSiblings([]);
+        }
       })
       .finally(() => setLoading(false));
   }, [handle]);
@@ -78,9 +110,59 @@ const ProductDetail = () => {
     [product, selectedVariantId],
   );
 
+  // Eindeutige Farben (erste Variant pro Farbe → repräsentatives Bild)
+  const colorOptions = useMemo(() => {
+    if (!product) return [] as Array<{ value: string; variantId: string; image: string | null; available: boolean }>;
+    const seen = new Map<string, { value: string; variantId: string; image: string | null; available: boolean }>();
+    for (const { node: v } of product.variants.edges) {
+      const value = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+      if (!value) continue;
+      const existing = seen.get(value);
+      if (!existing) {
+        seen.set(value, {
+          value,
+          variantId: v.id,
+          image: v.image?.url ?? null,
+          available: v.availableForSale,
+        });
+      } else if (!existing.available && v.availableForSale) {
+        // upgrade to available variant if previous was sold out
+        seen.set(value, { ...existing, variantId: v.id, available: true });
+      }
+    }
+    return Array.from(seen.values());
+  }, [product]);
+
+  // Bild-Index in der Galerie für die aktuelle Variante
+  const variantImageIndex = useMemo(() => {
+    if (!product || !selectedVariant) return null;
+    const imgs = product.images.edges.map((e) => e.node);
+    return findVariantImageIndex(imgs, selectedVariant);
+  }, [product, selectedVariant]);
+
   const relatedLooks = useMemo(() => {
     if (!product) return [];
     return looks.filter((l) => l.productHandles.includes(product.handle));
+  }, [product]);
+
+  // Variant-basierter Sale (wenn compareAtPrice vorhanden) — überschreibt livePrice nicht, ergänzt ihn
+  const variantOnSale = useMemo(() => {
+    if (!selectedVariant?.compareAtPrice) return false;
+    const price = parseFloat(selectedVariant.price.amount);
+    const compare = parseFloat(selectedVariant.compareAtPrice.amount);
+    return isFinite(compare) && compare > price;
+  }, [selectedVariant]);
+
+  const variantDiscount = useMemo(() => {
+    if (!variantOnSale || !selectedVariant?.compareAtPrice) return null;
+    const price = parseFloat(selectedVariant.price.amount);
+    const compare = parseFloat(selectedVariant.compareAtPrice.amount);
+    return Math.round(((compare - price) / compare) * 100);
+  }, [variantOnSale, selectedVariant]);
+
+  const isNewArrival = useMemo(() => {
+    if (!product) return false;
+    return product.tags?.some((t) => /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")));
   }, [product]);
 
   const handleAdd = async () => {
@@ -146,12 +228,24 @@ const ProductDetail = () => {
       </div>
 
       <section className="container-editorial grid gap-10 py-8 md:grid-cols-[1.1fr_1fr] md:gap-16 md:py-12">
-        <ProductGallery images={images} title={product.title} />
+        <ProductGallery images={images} title={product.title} activeIndex={variantImageIndex ?? undefined} />
 
         <div className="flex flex-col">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">{product.vendor}</p>
+              <div className="mt-2 flex items-center gap-2">
+                {variantOnSale && (
+                  <span className="bg-destructive px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground">
+                    Sale
+                  </span>
+                )}
+                {isNewArrival && !variantOnSale && (
+                  <span className="bg-foreground px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-background">
+                    Neu
+                  </span>
+                )}
+              </div>
               <h1 className="mt-2 font-display text-4xl leading-tight md:text-5xl">{product.title}</h1>
             </div>
             <div className="flex gap-1">
@@ -172,31 +266,46 @@ const ProductDetail = () => {
             </div>
           </div>
 
-          {selectedVariant && (
-            <div className="mt-5 flex flex-wrap items-baseline gap-3">
-              {livePrice?.on_sale && formatOriginalPrice(livePrice) ? (
-                <>
-                  <p className="text-2xl font-medium text-destructive">
-                    {formatLivePrice(livePrice)}
+          {selectedVariant && (() => {
+            // Variant-Sale (compareAtPrice) hat Vorrang vor LivePrice, weil pro Variant unterschiedlich
+            const showVariantSale = variantOnSale;
+            const showLiveSale = !showVariantSale && livePrice?.on_sale && formatOriginalPrice(livePrice);
+            return (
+              <div className="mt-5 flex flex-wrap items-baseline gap-3">
+                {showVariantSale ? (
+                  <>
+                    <p className="text-2xl font-medium text-destructive">
+                      {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
+                    </p>
+                    <p className="text-lg text-foreground/50 line-through">
+                      {formatPrice(selectedVariant.compareAtPrice!.amount, selectedVariant.compareAtPrice!.currencyCode)}
+                    </p>
+                    {variantDiscount && (
+                      <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                        -{variantDiscount}%
+                      </span>
+                    )}
+                  </>
+                ) : showLiveSale ? (
+                  <>
+                    <p className="text-2xl font-medium text-destructive">{formatLivePrice(livePrice)}</p>
+                    <p className="text-lg text-foreground/50 line-through">{formatOriginalPrice(livePrice)}</p>
+                    {discountPercent(livePrice) && (
+                      <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                        -{discountPercent(livePrice)}%
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-2xl font-medium">
+                    {formatLivePrice(livePrice) ??
+                      formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
                   </p>
-                  <p className="text-lg text-foreground/50 line-through">
-                    {formatOriginalPrice(livePrice)}
-                  </p>
-                  {discountPercent(livePrice) && (
-                    <span className="rounded bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
-                      -{discountPercent(livePrice)}%
-                    </span>
-                  )}
-                </>
-              ) : (
-                <p className="text-2xl font-medium">
-                  {formatLivePrice(livePrice) ??
-                    formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
-                </p>
-              )}
-              <span className="text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</span>
-            </div>
-          )}
+                )}
+                <span className="text-xs text-muted-foreground">inkl. MwSt., zzgl. Versand</span>
+              </div>
+            );
+          })()}
 
           {/* Stock indicator */}
           <div className="mt-4 flex items-center gap-2 text-sm">
@@ -215,42 +324,149 @@ const ProductDetail = () => {
           {product.options.map((opt) => {
             // Skip default "Title" option that exists when product has no real variants
             if (opt.name === "Title" && opt.values.length === 1 && opt.values[0] === "Default Title") return null;
+
+            const isColor = opt.name === "Farbe" || opt.name === "Color";
+            const currentValue = selectedVariant?.selectedOptions.find((o) => o.name === opt.name)?.value;
+
             return (
               <div key={opt.name} className="mt-7">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{opt.name}</p>
-                  {selectedVariant && (
-                    <p className="text-xs text-muted-foreground">
-                      Gewählt: {selectedVariant.selectedOptions.find((o) => o.name === opt.name)?.value}
-                    </p>
+                  <p className="text-sm font-medium">
+                    {opt.name}
+                    {isColor && currentValue && (
+                      <span className="ml-2 font-normal text-muted-foreground">: {currentValue}</span>
+                    )}
+                  </p>
+                  {!isColor && currentValue && (
+                    <p className="text-xs text-muted-foreground">Gewählt: {currentValue}</p>
                   )}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {product.variants.edges.map(({ node: v }) => {
-                    const value = v.selectedOptions.find((o) => o.name === opt.name)?.value;
-                    if (!value) return null;
-                    const active = v.id === selectedVariantId;
-                    return (
-                      <button
-                        key={v.id}
-                        onClick={() => setSelectedVariantId(v.id)}
-                        disabled={!v.availableForSale}
-                        className={cn(
-                          "min-w-12 border px-4 py-2 text-sm transition",
-                          active
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-background hover:border-primary",
-                          !v.availableForSale && "line-through opacity-40",
-                        )}
-                      >
-                        {value}
-                      </button>
-                    );
-                  })}
-                </div>
+
+                {isColor ? (
+                  // Bild-Swatches für Farben
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {colorOptions.map((c) => {
+                      const active = c.value === currentValue;
+                      return (
+                        <button
+                          key={c.value}
+                          onClick={() => {
+                            // Beim Farbwechsel die zuvor gewählte Grösse beibehalten, falls verfügbar
+                            const currentSize = selectedVariant?.selectedOptions.find((o) => o.name === "Grösse" || o.name === "Size")?.value;
+                            if (currentSize) {
+                              const match = product.variants.edges.find(({ node: v }) => {
+                                const col = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                                const sz = v.selectedOptions.find((o) => o.name === "Grösse" || o.name === "Size")?.value;
+                                return col === c.value && sz === currentSize;
+                              });
+                              if (match) {
+                                setSelectedVariantId(match.node.id);
+                                return;
+                              }
+                            }
+                            setSelectedVariantId(c.variantId);
+                          }}
+                          disabled={!c.available}
+                          title={c.value}
+                          aria-label={c.value}
+                          className={cn(
+                            "relative h-14 w-14 overflow-hidden border-2 bg-secondary transition",
+                            active ? "border-primary ring-1 ring-primary/40" : "border-transparent hover:border-border",
+                            !c.available && "opacity-40",
+                          )}
+                        >
+                          {c.image ? (
+                            <img src={c.image} alt={c.value} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-wider text-muted-foreground">
+                              {c.value.slice(0, 4)}
+                            </span>
+                          )}
+                          {!c.available && (
+                            <span className="absolute inset-0 flex items-center justify-center bg-background/40 text-[9px] font-semibold uppercase tracking-wider text-foreground">
+                              ✕
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  // Text-Buttons für Grösse / sonstige Optionen
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(() => {
+                      // Eindeutige Werte basierend auf Varianten, die zur aktuell gewählten Farbe passen
+                      const colourValue = currentValue && isColor ? currentValue : selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                      const seen = new Map<string, { variantId: string; available: boolean }>();
+                      for (const { node: v } of product.variants.edges) {
+                        const value = v.selectedOptions.find((o) => o.name === opt.name)?.value;
+                        if (!value) continue;
+                        // Wenn es eine Farbe gibt, nur Varianten dieser Farbe für die Grössen-Buttons
+                        if (colourValue) {
+                          const vColor = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                          if (vColor && vColor !== colourValue) continue;
+                        }
+                        const existing = seen.get(value);
+                        if (!existing || (!existing.available && v.availableForSale)) {
+                          seen.set(value, { variantId: v.id, available: v.availableForSale });
+                        }
+                      }
+                      return Array.from(seen.entries()).map(([value, info]) => {
+                        const active = value === currentValue;
+                        return (
+                          <button
+                            key={value}
+                            onClick={() => setSelectedVariantId(info.variantId)}
+                            disabled={!info.available}
+                            className={cn(
+                              "min-w-12 border px-4 py-2 text-sm transition",
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-background hover:border-primary",
+                              !info.available && "line-through opacity-40",
+                            )}
+                          >
+                            {value}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
               </div>
             );
           })}
+
+          {/* Cross-Linking: dasselbe Modell als Sale/Neu */}
+          {siblings.length > 0 && (
+            <div className="mt-7 border border-border bg-secondary/40 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Auch erhältlich als
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {siblings.map((s) => {
+                  const isSale = s.node.tags?.some((t) => /sale/i.test(t.replace(/^[a-z]+:/i, "")));
+                  const isNew = s.node.tags?.some((t) => /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")));
+                  const label = isSale ? "Im Sale" : isNew ? "Als Neuheit" : s.node.title;
+                  return (
+                    <Link
+                      key={s.node.handle}
+                      to={`/product/${s.node.handle}`}
+                      className="inline-flex items-center gap-2 border border-border bg-background px-3 py-1.5 text-xs font-medium hover:border-primary"
+                    >
+                      <span className={cn(
+                        "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                        isSale ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background",
+                      )}>
+                        {isSale ? "Sale" : "Neu"}
+                      </span>
+                      → {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Quantity */}
           <div className="mt-7">
