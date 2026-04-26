@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { Loader2, Check, ArrowRight } from "lucide-react";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
+import { Loader2, Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { LookSetBuilder } from "@/components/LookSetBuilder";
@@ -9,8 +9,19 @@ import { fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
 
 const LookDetail = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { looks } = useCuratedLooks();
   const look = looks.find((l) => l.slug === slug);
+
+  const handleBack = () => {
+    // If user came from within the app, go back; otherwise go to /looks
+    if (location.key !== "default" && window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/looks");
+    }
+  };
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,6 +60,15 @@ const LookDetail = () => {
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-foreground/10 to-foreground/70" />
+        <button
+          type="button"
+          onClick={handleBack}
+          className="absolute left-6 top-6 z-10 inline-flex items-center gap-2 rounded-full bg-background/80 px-4 py-2 text-sm font-medium text-foreground backdrop-blur-sm transition hover:bg-background"
+          aria-label="Zurück"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Zurück
+        </button>
         <div className="container-editorial relative flex h-full flex-col justify-end pb-12 text-primary-foreground">
           <p className="text-[11px] uppercase tracking-[0.3em] opacity-90">Look</p>
           <h1 className="mt-3 max-w-3xl font-display text-5xl md:text-6xl">{look.title}</h1>
