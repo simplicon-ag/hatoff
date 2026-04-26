@@ -166,6 +166,37 @@ export async function fetchProductsByHandles(handles: string[]): Promise<Shopify
 }
 
 /**
+ * Findet die Farb-Option (Farbe / Color / Colour) eines Produkts, falls vorhanden.
+ */
+export function getColorOption(product: ShopifyProduct["node"]) {
+  return product.options.find((o) => /farbe|color|colour/i.test(o.name));
+}
+
+/**
+ * Expandiert die Produktliste so, dass jedes Mehrfarb-Produkt
+ * pro Farbvariante als eigene Karte erscheint. Produkte ohne Farb-Option
+ * bleiben unverändert.
+ */
+export interface ExpandedProduct extends ShopifyProduct {
+  initialColor?: string;
+}
+
+export function expandProductsByColor(products: ShopifyProduct[]): ExpandedProduct[] {
+  const out: ExpandedProduct[] = [];
+  for (const p of products) {
+    const colorOpt = getColorOption(p.node);
+    if (!colorOpt || colorOpt.values.length <= 1) {
+      out.push(p);
+      continue;
+    }
+    for (const color of colorOpt.values) {
+      out.push({ ...p, initialColor: color });
+    }
+  }
+  return out;
+}
+
+/**
  * Formatiert einen Preis im HATOFF-Schema:
  *  - Währung immer CHF (Shopify liefert teilweise andere Codes für Sandbox-Stores)
  *  - Endet immer auf `.95` (psychologische Preisgestaltung)
