@@ -38,7 +38,17 @@ async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
         body: { handles: newOnes },
       });
       if (error) throw error;
-      const prices: LivePrice[] = data?.prices ?? [];
+      const rawPrices: LivePrice[] = data?.prices ?? [];
+      // Sales werden ausschliesslich in Shopify (Variant compareAtPrice) gepflegt.
+      // Der Brand-Scrape liefert weiterhin den CHF-Anzeigepreis, aber wir
+      // ignorieren `on_sale` / `original_price_*` aus dem Cache, damit nur
+      // manuell in Shopify gesetzte Sales sichtbar werden.
+      const prices: LivePrice[] = rawPrices.map((p) => ({
+        ...p,
+        on_sale: false,
+        original_price_chf: null,
+        original_price_eur: null,
+      }));
       for (const p of prices) memCache.set(p.handle, p);
       return prices;
     })();
