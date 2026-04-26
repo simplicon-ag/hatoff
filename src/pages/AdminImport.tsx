@@ -6,11 +6,28 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2, Link2, CheckCircle2 } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
+
+type SingleImportResult = {
+  success: boolean;
+  action?: "created" | "updated";
+  shopify_product_id?: string;
+  handle?: string;
+  title?: string;
+  colors_found?: number;
+  colors?: string[];
+  sizes?: string[];
+  images_uploaded?: number;
+  price_eur?: number | null;
+  material?: string;
+  article_number?: string;
+  error?: string;
+};
 
 type JobRow = {
   id: string;
