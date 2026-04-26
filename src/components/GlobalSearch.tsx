@@ -88,17 +88,34 @@ export const GlobalSearch = () => {
       const vendor = (p.node.vendor ?? "").toLowerCase();
       const type = (p.node.productType ?? "").toLowerCase();
       const handle = p.node.handle.toLowerCase();
-      const tags = p.node.tags.map((t) => t.toLowerCase());
-      const skus = p.node.variants.edges.flatMap((v) =>
+      const rawTags = p.node.tags.map((t) => t.toLowerCase());
+      // Split tags on ":" so "art:126430023" also matches just "126430023".
+      const tagParts = new Set<string>();
+      rawTags.forEach((t) => {
+        tagParts.add(t);
+        t.split(/[:\-_/\s]+/)
+          .filter(Boolean)
+          .forEach((part) => tagParts.add(part));
+      });
+      const variantValues = p.node.variants.edges.flatMap((v) =>
         v.node.selectedOptions.map((o) => o.value.toLowerCase()),
       );
+      // Article numbers in description (e.g. "Artikelnummer: 126430023").
       const description = (p.node.description ?? "").toLowerCase();
+      const descNumbers = new Set(description.match(/\b\d{5,}\b/g) ?? []);
 
       // Each token must match somewhere relevant; sum the best score per token.
       let total = 0;
       for (const t of tokens) {
         let best = 0;
-        if (handle === t || tags.includes(t) || skus.includes(t)) best = 100;
+        const isNumeric = /^\d{4,}$/.test(t);
+        if (
+          handle === t ||
+          tagParts.has(t) ||
+          variantValues.includes(t) ||
+          descNumbers.has(t)
+        )
+          best = 100;
         else if (handle.includes(t)) best = Math.max(best, 60);
         else if (titleWords.includes(t)) best = Math.max(best, 80);
         else if (title.startsWith(t)) best = Math.max(best, 50);
@@ -106,9 +123,10 @@ export const GlobalSearch = () => {
         else if (vendor === t) best = Math.max(best, 70);
         else if (vendor.includes(t)) best = Math.max(best, 25);
         else if (type.includes(t)) best = Math.max(best, 20);
-        else if (tags.some((tag) => tag.includes(t))) best = Math.max(best, 15);
-        // Description is intentionally ignored to avoid noisy matches.
-        if (best === 0) return 0; // every token must match
+        else if (rawTags.some((tag) => tag.includes(t)))
+          best = Math.max(best, 15);
+        else if (isNumeric && description.includes(t)) best = 100;
+        if (best === 0) return 0;
         total += best;
       }
       return total;
