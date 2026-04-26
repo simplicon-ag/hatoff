@@ -1239,12 +1239,12 @@ for (const look of looks) {
 }
 
 export const welten = [
-  { id: "business", title: "Business", description: "Souverän auftreten.", image: "/src/assets/welt-business.jpg" },
-  { id: "smart-casual", title: "Smart Casual", description: "Locker mit Haltung.", image: "/src/assets/welt-smart-casual.jpg" },
-  { id: "freizeit", title: "Freizeit", description: "Tage ohne Eile.", image: "/src/assets/welt-freizeit.jpg" },
-  { id: "sommer", title: "Sommer", description: "Leicht und hell.", image: "/src/assets/welt-sommer.jpg" },
-  { id: "hemden", title: "Hemden-Welt", description: "Das Fundament.", image: "/src/assets/welt-hemden.jpg" },
-  { id: "jacken", title: "Jacken-Welt", description: "Schicht für Schicht.", image: "/src/assets/welt-jacken.jpg" },
+  { id: "business", title: "Business", description: "Souverän auftreten.", image: weltBusiness },
+  { id: "smart-casual", title: "Smart Casual", description: "Locker mit Haltung.", image: weltSmartCasual },
+  { id: "freizeit", title: "Freizeit", description: "Tage ohne Eile.", image: weltFreizeit },
+  { id: "sommer", title: "Sommer", description: "Leicht und hell.", image: weltSommer },
+  { id: "hemden", title: "Hemden-Welt", description: "Das Fundament.", image: weltHemden },
+  { id: "jacken", title: "Jacken-Welt", description: "Schicht für Schicht.", image: weltJacken },
 ];
 
 export const anlaesse = [
