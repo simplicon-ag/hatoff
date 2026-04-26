@@ -36,6 +36,8 @@ export default function AdminLooks() {
   // Backfill
   const [backfilling, setBackfilling] = useState(false);
   const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0 });
+  const [backfillCreated, setBackfillCreated] = useState(0);
+  const [maxPerAnchor, setMaxPerAnchor] = useState(4);
 
   const refresh = useCallback(async () => {
     setLoading(true);
