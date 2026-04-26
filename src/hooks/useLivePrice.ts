@@ -85,7 +85,7 @@ export function useLivePrices(handles: string[]) {
     const out: Record<string, LivePrice> = {};
     for (const h of stableHandles) {
       const cached = memCache.get(h);
-      if (cached) out[h] = cached;
+      if (cached) out[h] = normalizeLivePrice(cached);
     }
     return out;
   });
