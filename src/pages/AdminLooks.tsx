@@ -29,6 +29,10 @@ export default function AdminLooks() {
   const [manualHandles, setManualHandles] = useState("");
   const [manualStory, setManualStory] = useState("");
 
+  // Single-handle look generation
+  const [singleHandle, setSingleHandle] = useState("");
+  const [singleBusy, setSingleBusy] = useState(false);
+
   // Backfill
   const [backfilling, setBackfilling] = useState(false);
   const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0 });
