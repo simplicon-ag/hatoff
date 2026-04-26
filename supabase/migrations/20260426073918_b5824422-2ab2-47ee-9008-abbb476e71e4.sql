@@ -1,0 +1,1 @@
+DELETE FROM public.style_inspiration_cache;
