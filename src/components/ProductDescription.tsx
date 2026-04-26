@@ -83,7 +83,9 @@ function parseDescription(raw: string): Section {
   return { intro: introParts.join("\n\n"), pairs };
 }
 
-export const ProductDescription = ({ description }: Props) => {
+import { forwardRef } from "react";
+
+export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ description }, ref) => {
   const { intro, pairs } = parseDescription(description);
 
   if (!intro && pairs.length === 0) {
