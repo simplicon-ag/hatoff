@@ -16,6 +16,8 @@ import { SiteLayout } from "@/components/SiteLayout";
 type SingleImportResult = {
   success: boolean;
   action?: "created" | "updated";
+  already_exists?: boolean;
+  matched_by?: "handle" | "article_number";
   shopify_product_id?: string;
   handle?: string;
   title?: string;
