@@ -125,10 +125,25 @@ export default function AdminLooks() {
     } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); }
   };
 
+  const extractHandle = (input: string): string => {
+    const trimmed = input.trim();
+    if (!trimmed) return "";
+    // Try to parse as URL and pull /products/<handle>
+    try {
+      const url = new URL(trimmed);
+      const match = url.pathname.match(/\/products\/([^/?#]+)/i);
+      if (match) return match[1];
+    } catch {
+      // not a URL, fall through
+    }
+    // Already a handle
+    return trimmed.replace(/^\/+|\/+$/g, "");
+  };
+
   const generateForHandle = async () => {
-    const h = singleHandle.trim();
+    const h = extractHandle(singleHandle);
     if (!h) {
-      toast.error("Bitte einen Produkt-Handle eingeben");
+      toast.error("Bitte einen Produkt-Handle oder eine Shopify-URL eingeben");
       return;
     }
     setSingleBusy(true);
@@ -140,7 +155,7 @@ export default function AdminLooks() {
       const created = (data as { created?: number; reason?: string })?.created ?? 0;
       const reason = (data as { reason?: string })?.reason;
       if (created > 0) {
-        toast.success(`${created} neue Look-Draft(s) für "${h}" erstellt`);
+        toast.success(`${created} neue Look-Draft(s) für "${h}" erstellt — passende Begleitstücke aus dem Katalog kombiniert`);
         setSingleHandle("");
         refresh();
       } else {
