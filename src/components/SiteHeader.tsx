@@ -6,12 +6,10 @@ import { CartDrawer } from "./CartDrawer";
 
 const navItems = [
   { to: "/looks", label: "Looks" },
+  { to: "/neuheiten", label: "Neuheiten" },
   { to: "/shop", label: "Shop" },
   { to: "/sale", label: "Sale", highlight: true },
-  { to: "/saison/fs-2026", label: "F/S 2026" },
-  { to: "/saison/hw-2026", label: "H/W 2026" },
-  { to: "/marken", label: "Marken" },
-  { to: "/magazin", label: "Magazin" },
+  { to: "/club", label: "CLUB" },
 ];
 
 export const SiteHeader = () => {
