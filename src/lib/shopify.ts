@@ -10,6 +10,7 @@ export interface ShopifyProduct {
     id: string;
     title: string;
     description: string;
+    descriptionHtml: string;
     handle: string;
     vendor: string;
     productType: string;
@@ -44,6 +45,7 @@ export const PRODUCTS_QUERY = `
           id
           title
           description
+          descriptionHtml
           handle
           vendor
           productType
@@ -77,6 +79,7 @@ export const PRODUCT_BY_HANDLE_QUERY = `
       id
       title
       description
+      descriptionHtml
       handle
       vendor
       productType

@@ -1,5 +1,8 @@
 interface Props {
+  /** Plain-text description (Fallback / Parser-Quelle) */
   description: string;
+  /** Optional: Shopify-Original-HTML. Wenn gesetzt, wird es 1:1 (sanitized) gerendert. */
+  descriptionHtml?: string;
   /** "default" = stacked (used in accordion). "split" = 2-column intro|features layout. */
   layout?: "default" | "split";
 }
@@ -119,8 +122,32 @@ function parseDescription(raw: string): Section {
 }
 
 import { forwardRef } from "react";
+import DOMPurify from "dompurify";
 
-export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ description, layout = "default" }, ref) => {
+export const ProductDescription = forwardRef<HTMLDivElement, Props>(({ description, descriptionHtml, layout = "default" }, ref) => {
+  // Wenn Shopify-HTML vorhanden ist, übernehmen wir die Original-Formatierung 1:1
+  // (sanitized). Tailwind-Typografie via Klassen für saubere Darstellung von
+  // <p>, <ul>, <li>, <strong>, <a> usw.
+  if (descriptionHtml && descriptionHtml.trim()) {
+    const clean = DOMPurify.sanitize(descriptionHtml, {
+      ALLOWED_TAGS: [
+        "p", "br", "strong", "b", "em", "i", "u", "span",
+        "ul", "ol", "li", "a",
+        "h1", "h2", "h3", "h4", "h5", "h6",
+        "table", "thead", "tbody", "tr", "th", "td",
+        "hr", "blockquote",
+      ],
+      ALLOWED_ATTR: ["href", "target", "rel", "title"],
+    });
+    return (
+      <div
+        ref={ref}
+        className="shopify-description text-[15px] leading-[1.7] text-foreground/85 [&_p]:my-3 [&_strong]:font-semibold [&_strong]:text-foreground [&_b]:font-semibold [&_b]:text-foreground [&_ul]:my-3 [&_ul]:ml-5 [&_ul]:list-disc [&_ol]:my-3 [&_ol]:ml-5 [&_ol]:list-decimal [&_li]:my-1 [&_li]:marker:text-foreground/60 [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-primary [&_h2]:font-display [&_h2]:text-xl [&_h2]:mt-6 [&_h2]:mb-2 [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mt-4 [&_h3]:mb-2"
+        dangerouslySetInnerHTML={{ __html: clean }}
+      />
+    );
+  }
+
   const { intro, pairs } = parseDescription(description);
 
   if (!intro && pairs.length === 0) {

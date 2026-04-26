@@ -36,6 +36,7 @@ interface Product {
   id: string;
   title: string;
   description: string;
+  descriptionHtml?: string;
   handle: string;
   vendor: string;
   productType: string;
@@ -294,7 +295,7 @@ const ProductDetail = () => {
           <div className="border-t border-border pt-8 md:pt-10">
             <h2 className="font-display text-2xl md:text-3xl">Produktinformationen</h2>
             <div className="mt-6 md:mt-8">
-              <ProductDescription description={product.description} />
+              <ProductDescription description={product.description} descriptionHtml={product.descriptionHtml} />
             </div>
           </div>
         </div>
