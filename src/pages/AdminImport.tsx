@@ -24,8 +24,16 @@ type SingleImportResult = {
   sizes?: string[];
   images_uploaded?: number;
   price_eur?: number | null;
+  compare_at_price_eur?: number | null;
   material?: string;
   article_number?: string;
+  fit?: string;
+  is_new?: boolean;
+  features_count?: number;
+  care_count?: number;
+  description_length?: number;
+  missing_fields?: string[];
+  shopify_admin_url?: string;
   error?: string;
 };
 
