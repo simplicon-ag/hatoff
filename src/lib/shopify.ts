@@ -50,14 +50,16 @@ export const PRODUCTS_QUERY = `
           tags
           priceRange { minVariantPrice { amount currencyCode } }
           images(first: 5) { edges { node { url altText } } }
-          variants(first: 20) {
+          variants(first: 50) {
             edges {
               node {
                 id
                 title
                 price { amount currencyCode }
+                compareAtPrice { amount currencyCode }
                 availableForSale
                 selectedOptions { name value }
+                image { url altText }
               }
             }
           }
@@ -80,15 +82,17 @@ export const PRODUCT_BY_HANDLE_QUERY = `
       productType
       tags
       priceRange { minVariantPrice { amount currencyCode } }
-      images(first: 8) { edges { node { url altText } } }
-      variants(first: 20) {
+      images(first: 30) { edges { node { url altText } } }
+      variants(first: 100) {
         edges {
           node {
             id
             title
             price { amount currencyCode }
+            compareAtPrice { amount currencyCode }
             availableForSale
             selectedOptions { name value }
+            image { url altText }
           }
         }
       }
