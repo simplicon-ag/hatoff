@@ -1,5 +1,7 @@
 interface Props {
   description: string;
+  /** "default" = stacked (used in accordion). "split" = 2-column intro|features layout. */
+  layout?: "default" | "split";
 }
 
 // Keywords that mark structured product info inside Shopify's flowing description
