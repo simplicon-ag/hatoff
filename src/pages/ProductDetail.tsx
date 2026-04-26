@@ -86,6 +86,7 @@ const ProductDetail = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [userPickedVariant, setUserPickedVariant] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [related, setRelated] = useState<ShopifyProduct[]>([]);
   const [siblings, setSiblings] = useState<ShopifyProduct[]>([]);
