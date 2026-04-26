@@ -1,6 +1,6 @@
 import { Gift, Truck, Sparkles, UserRound, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 const benefits = [
   {
@@ -26,13 +26,6 @@ const benefits = [
 ];
 
 export const ClubMemberCta = () => {
-  const handleJoin = () => {
-    toast.success("Bald verfügbar", {
-      description: "Der HATOFF Club startet in Kürze. Wir melden uns, sobald es losgeht.",
-      position: "top-right",
-    });
-  };
-
   return (
     <section className="bg-foreground text-background">
       <div className="container-editorial py-16 md:py-20">
@@ -48,13 +41,15 @@ export const ClubMemberCta = () => {
               die guten Stil zu schätzen wissen.
             </p>
             <Button
-              onClick={handleJoin}
+              asChild
               size="lg"
               variant="secondary"
               className="mt-8 group bg-background text-foreground hover:bg-background/90"
             >
-              Jetzt kostenlos beitreten
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              <Link to="/club">
+                Jetzt kostenlos beitreten
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
             </Button>
             <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-background/50">
               Keine Kosten · Jederzeit kündbar
