@@ -1,5 +1,8 @@
 interface Props {
+  /** Plain-text description (Fallback / Parser-Quelle) */
   description: string;
+  /** Optional: Shopify-Original-HTML. Wenn gesetzt, wird es 1:1 (sanitized) gerendert. */
+  descriptionHtml?: string;
   /** "default" = stacked (used in accordion). "split" = 2-column intro|features layout. */
   layout?: "default" | "split";
 }
