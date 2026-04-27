@@ -96,7 +96,7 @@ export const HeroCarousel = () => {
             {SLIDES[active].eyebrow} · Kuratiertes Outfit-Universum
           </p>
         </div>
-        <h1 className="mt-4 max-w-3xl text-balance font-display text-5xl leading-[1.05] md:text-7xl">
+        <h1 className="mt-4 max-w-3xl text-balance font-display text-[2.5rem] leading-[1.05] sm:text-5xl md:text-7xl">
           Finde deinen Look. Einfach kombiniert. Stilvoll getragen.
         </h1>
         <p className="mt-5 max-w-xl text-base leading-relaxed opacity-90 md:text-lg">
