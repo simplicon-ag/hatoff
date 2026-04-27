@@ -939,6 +939,16 @@ Deno.serve(async (req) => {
       );
     }
 
+    // 2b) Cap colors so we don't exceed Shopify REST API's 100-variant limit.
+    //     Variants = colors × sizes. We pick the highest color count that
+    //     keeps total under 100. Original URL is colors[0] so it's preserved.
+    const sizeCount = Math.max(1, colors[0].scraped.sizes.length);
+    const maxColors = Math.max(1, Math.floor(95 / sizeCount));
+    if (colors.length > maxColors) {
+      console.warn(`[by-url] capping colors from ${colors.length} to ${maxColors} (sizes=${sizeCount}, REST 100-variant limit)`);
+      colors.splice(maxColors);
+    }
+
     // 3) Build colour-neutral base
     const first = colors[0].scraped;
     const baseTitle = stripColorFromTitle(first.title) || first.title;
