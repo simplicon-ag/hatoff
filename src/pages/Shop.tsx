@@ -70,9 +70,11 @@ const Shop = () => {
     const q = searchParams.get("q") ?? "";
     const marke = searchParams.get("marke");
     const welt = searchParams.get("welt");
+    const status = searchParams.get("status");
     setSearch((prev) => (prev === q ? prev : q));
     if (marke) setSelectedVendors(new Set([marke]));
     if (welt) setSelectedWelten(new Set([welt]));
+    if (status) setSelectedStatus(new Set(status.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
