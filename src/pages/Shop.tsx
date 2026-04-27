@@ -539,6 +539,11 @@ const Shop = () => {
                 const n = new Set(selectedWelten); n.delete(w); setSelectedWelten(n);
               }} />
             ))}
+            {Array.from(selectedStatus).map((s) => (
+              <FilterChip key={`st-${s}`} label={STATUS_LABELS[s] ?? titleCase(s)} onRemove={() => {
+                const n = new Set(selectedStatus); n.delete(s); setSelectedStatus(n);
+              }} /> 
+            ))}
             {Array.from(selectedColors).map((c) => (
               <FilterChip key={`col-${c}`} label={titleCase(c)} onRemove={() => {
                 const n = new Set(selectedColors); n.delete(c); setSelectedColors(n);
