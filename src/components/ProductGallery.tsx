@@ -116,7 +116,7 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
                   <img
                     src={img.url}
                     alt={img.altText ?? `${title} ${idx + 1}`}
-                    className="h-full w-full object-contain"
+                    className="product-img h-full w-full object-contain"
                   />
                 </button>
               );
@@ -146,7 +146,7 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
             <img
               src={current.url}
               alt={current.altText ?? title}
-              className="h-full w-full object-contain p-6 transition-transform duration-300 ease-out"
+              className="product-img h-full w-full object-contain p-6 transition-transform duration-300 ease-out"
               style={
                 zoom.active
                   ? { transformOrigin: `${zoom.x}% ${zoom.y}%`, transform: "scale(1.65)" }
@@ -174,7 +174,7 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
                 <img
                   src={img.url}
                   alt={img.altText ?? `${title} ${i + 1}`}
-                  className="h-full w-full object-contain p-4"
+                  className="product-img h-full w-full object-contain p-4"
                 />
               </button>
             ))}

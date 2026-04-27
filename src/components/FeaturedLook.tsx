@@ -170,7 +170,7 @@ export const FeaturedLook = ({ look }: Props) => {
                       src={s.image}
                       alt={s.product.node.title}
                       loading="lazy"
-                      className="absolute inset-0 h-full w-full object-contain p-3 transition-transform duration-500 group-hover/item:scale-105"
+                      className="product-img absolute inset-0 h-full w-full object-contain p-3 transition-transform duration-500 group-hover/item:scale-105"
                     />
                   )}
                 </Link>

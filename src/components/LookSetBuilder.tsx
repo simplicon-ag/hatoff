@@ -210,7 +210,7 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false, recom
                       src={img}
                       alt={cleanTitle}
                       loading="lazy"
-                      className="h-full w-full object-cover"
+                      className="product-img h-full w-full object-contain"
                     />
                   )}
                 </div>

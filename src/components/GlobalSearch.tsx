@@ -238,12 +238,14 @@ export const GlobalSearch = () => {
                       onSelect={() => go(`/produkte/${p.node.handle}`)}
                     >
                       {img && (
-                        <img
-                          src={img}
-                          alt=""
-                          className="mr-3 h-10 w-10 rounded-sm object-cover"
-                          loading="lazy"
-                        />
+                        <div className="mr-3 h-10 w-10 flex-shrink-0 overflow-hidden rounded-sm bg-secondary/60">
+                          <img
+                            src={img}
+                            alt=""
+                            className="product-img h-full w-full object-contain"
+                            loading="lazy"
+                          />
+                        </div>
                       )}
                       <div className="flex flex-1 flex-col">
                         <span className="text-sm">{p.node.title}</span>
