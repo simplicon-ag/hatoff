@@ -14,6 +14,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
 import { TrustBar } from "@/components/TrustBar";
 import { TestimonialsSection } from "@/components/TestimonialsSection";
+import { WeeklyEditions } from "@/components/WeeklyEditions";
 import { magazinArtikel, marken } from "@/data/looks";
 import editorialMorgen from "@/assets/editorial-fs26-morgen.jpg";
 import editorialMittag from "@/assets/editorial-fs26-mittag.jpg";
@@ -111,73 +112,8 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ───────── Editorial Story (Triptychon — Saison-Auftritt) ───────── */}
-      <section className="container-editorial py-16 md:py-24">
-        <div className="mb-10 flex flex-col gap-6 md:mb-14 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-2xl">
-            <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
-              Ausgabe 01 · Frühling/Sommer 2026
-            </p>
-            <h2 className="mt-3 font-display text-4xl leading-[1.05] md:text-6xl">
-              Leinen, Salbei,<br className="hidden md:block" /> ein langer Tag.
-            </h2>
-            <p className="mt-5 max-w-xl text-muted-foreground">
-              Eine Kollektion in Naturtönen, getragen vom ersten Cappuccino bis zur blauen Stunde.
-              Drei Momente, ein Stoff, ein Stil.
-            </p>
-          </div>
-          <Link
-            to="/looks"
-            className="self-start text-sm font-medium text-primary hover:underline md:self-end"
-          >
-            Zur Kollektion entdecken →
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
-          {[
-            {
-              src: editorialMorgen,
-              chapter: "I · Morgen",
-              caption: "08:14 — Leinenhemd, Sand-Chino, das erste Licht.",
-              alt: "Mann in weissem Leinenhemd am Frühstückstisch im Morgenlicht",
-            },
-            {
-              src: editorialMittag,
-              chapter: "II · Mittag",
-              caption: "13:42 — Salbeigrün am Marktplatz, Ärmel umgeschlagen.",
-              alt: "Mann in salbeigrünem Leinenhemd auf einem südeuropäischen Marktplatz",
-            },
-            {
-              src: editorialAbend,
-              chapter: "III · Abend",
-              caption: "19:30 — Crème über Indigo, der Tag wird weich.",
-              alt: "Mann in crèmefarbenem Pullover und Indigohose zur blauen Stunde",
-            },
-          ].map((frame) => (
-            <figure key={frame.chapter} className="group">
-              <div className="aspect-[3/4] overflow-hidden bg-secondary">
-                <img
-                  src={frame.src}
-                  alt={frame.alt}
-                  loading="lazy"
-                  width={896}
-                  height={1184}
-                  className="h-full w-full object-cover transition-transform duration-[1200ms] group-hover:scale-[1.03]"
-                />
-              </div>
-              <figcaption className="mt-4">
-                <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-                  {frame.chapter}
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-foreground/80">
-                  {frame.caption}
-                </p>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-      </section>
+      {/* ───────── Wochenausgaben — 7 Tage, 7 Looks ───────── */}
+      <WeeklyEditions />
 
       {/* ───────── Featured Looks (gleichwertig, dezente Anlass-Hinweise) ───────── */}
       <section className="container-editorial py-16 md:py-24">
