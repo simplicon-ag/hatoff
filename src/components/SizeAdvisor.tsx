@@ -166,11 +166,13 @@ const SizeAdvisorSheet = ({ isOpen, onOpenChange, opts }: SheetProps) => {
           {opts.product && (
             <div className="flex items-start gap-3 rounded-md border border-border bg-secondary/30 p-3">
               {opts.product.node.images.edges[0]?.node.url && (
-                <img
-                  src={opts.product.node.images.edges[0].node.url}
-                  alt=""
-                  className="h-14 w-12 flex-shrink-0 rounded object-cover"
-                />
+                <div className="h-14 w-12 flex-shrink-0 overflow-hidden rounded bg-secondary/60">
+                  <img
+                    src={opts.product.node.images.edges[0].node.url}
+                    alt=""
+                    className="product-img h-full w-full object-contain"
+                  />
+                </div>
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">

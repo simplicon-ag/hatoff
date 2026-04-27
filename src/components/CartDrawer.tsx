@@ -69,7 +69,7 @@ export const CartDrawer = () => {
                     <li key={item.variantId} className="flex gap-4 border-b border-border pb-5">
                       <div className="h-20 w-16 flex-shrink-0 overflow-hidden bg-secondary">
                         {item.productImage && (
-                          <img src={item.productImage} alt={item.productTitle} className="h-full w-full object-cover" />
+                          <img src={item.productImage} alt={item.productTitle} className="product-img h-full w-full object-contain" />
                         )}
                       </div>
                       <div className="flex flex-1 flex-col">

@@ -126,4 +126,9 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* Produktbilder: weisser Hintergrund verschwindet auf hellen Flächen.
+     Verlangt einen hellen Container-Hintergrund (bg-secondary, bg-background, bg-muted). */
+  .product-img {
+    mix-blend-mode: multiply;
+  }
 }

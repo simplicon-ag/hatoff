@@ -145,7 +145,7 @@ export const QuickViewDialog = ({ open, onClose, product }: Props) => {
         <div className="grid md:grid-cols-2">
           <div className="relative aspect-[4/5] bg-secondary md:aspect-auto">
             {heroImage ? (
-              <img src={heroImage} alt={product.title} className="absolute inset-0 h-full w-full object-contain p-6" />
+              <img src={heroImage} alt={product.title} className="product-img absolute inset-0 h-full w-full object-contain p-6" />
             ) : null}
           </div>
           <div className="flex max-h-[80vh] flex-col overflow-y-auto p-6 md:p-8">
