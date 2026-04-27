@@ -261,26 +261,22 @@ export const WeeklyEditions = () => {
 const MosaicGrid = ({ looks }: { looks: CuratedLookRow[] }) => {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-6 md:gap-4">
-      {looks[0] && <LookTile look={looks[0]} day={1} className="col-span-2 row-span-2 md:col-span-3 md:row-span-2 aspect-[3/4]" />}
-      {looks[1] && <LookTile look={looks[1]} day={2} className="col-span-1 md:col-span-3 aspect-square md:aspect-[3/2]" />}
-      {looks[2] && <LookTile look={looks[2]} day={3} className="col-span-1 md:col-span-3 aspect-square md:aspect-[3/2]" />}
-      {looks[3] && <LookTile look={looks[3]} day={4} className="col-span-1 md:col-span-2 aspect-[3/4]" />}
-      {looks[4] && <LookTile look={looks[4]} day={5} className="col-span-1 md:col-span-2 aspect-[3/4]" />}
-      {looks[5] && <LookTile look={looks[5]} day={6} className="col-span-1 md:col-span-2 aspect-[3/4]" />}
-      {looks[6] && <LookTile look={looks[6]} day={7} className="col-span-2 md:col-span-6 aspect-[2/1] md:aspect-[3/1]" />}
+      {looks[0] && <LookTile look={looks[0]} className="col-span-2 row-span-2 md:col-span-3 md:row-span-2 aspect-[3/4]" />}
+      {looks[1] && <LookTile look={looks[1]} className="col-span-1 md:col-span-3 aspect-square md:aspect-[3/2]" />}
+      {looks[2] && <LookTile look={looks[2]} className="col-span-1 md:col-span-3 aspect-square md:aspect-[3/2]" />}
+      {looks[3] && <LookTile look={looks[3]} className="col-span-1 md:col-span-2 aspect-[3/4]" />}
+      {looks[4] && <LookTile look={looks[4]} className="col-span-1 md:col-span-2 aspect-[3/4]" />}
+      {looks[5] && <LookTile look={looks[5]} className="col-span-1 md:col-span-2 aspect-[3/4]" />}
+      {looks[6] && <LookTile look={looks[6]} className="col-span-2 md:col-span-6 aspect-[2/1] md:aspect-[3/1]" />}
     </div>
   );
 };
 
-const dayNames = ["", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
-
 const LookTile = ({
   look,
-  day,
   className,
 }: {
   look: CuratedLookRow;
-  day: number;
   className?: string;
 }) => (
   <Link to={`/looks/${look.slug}`} className={cn("group relative block overflow-hidden bg-secondary", className)}>
@@ -297,10 +293,6 @@ const LookTile = ({
       </div>
     )}
     <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
-    <div className="absolute left-3 top-3 flex items-center gap-2 bg-background/90 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-foreground backdrop-blur md:left-4 md:top-4">
-      <span className="font-display text-xs tabular-nums">{String(day).padStart(2, "0")}</span>
-      <span className="text-muted-foreground">{dayNames[day]}</span>
-    </div>
     <div className="absolute inset-x-0 bottom-0 p-3 md:p-5">
       <h3 className="font-display text-base leading-tight text-white drop-shadow-sm md:text-2xl">
         {look.title}
