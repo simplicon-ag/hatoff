@@ -10,6 +10,9 @@ import { ProductDescription } from "@/components/ProductDescription";
 import { TrustBadges } from "@/components/TrustBadges";
 import { ProductCard } from "@/components/ProductCard";
 import { AiStyleGenerator } from "@/components/AiStyleGenerator";
+import { ProductReviews } from "@/components/reviews/ProductReviews";
+import { RatingStars } from "@/components/reviews/RatingStars";
+import { useProductReviews } from "@/hooks/useProductReviews";
 
 import { YouMightAlsoLike } from "@/components/YouMightAlsoLike";
 import { ClubMemberCta } from "@/components/ClubMemberCta";
