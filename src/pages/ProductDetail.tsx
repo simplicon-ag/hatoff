@@ -97,6 +97,7 @@ const ProductDetail = () => {
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
   const { price: livePrice } = useLivePrice(handle);
+  const { stats: reviewStats } = useProductReviews(handle);
 
   useEffect(() => {
     if (!handle) return;
