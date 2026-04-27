@@ -314,7 +314,12 @@ Deno.serve(async (req) => {
     console.log("[discover] fetching Casa Moda URLs (categories + sitemap)...");
     const [cmCats, cmSitemap] = await Promise.all([
       discoverBrandUrls("casa-moda", "https://www.casamoda.com", CASAMODA_SLUGS, CASAMODA_PRODUCT_RE),
-      fetchSitemapUrls("casa-moda", "https://www.casamoda.com/sitemap.xml", CASAMODA_PRODUCT_RE),
+      fetchSitemapUrls(
+        "casa-moda",
+        "https://www.casamoda.com",
+        "https://www.casamoda.com/export/sitemap/sitemap_index.xml",
+        CASAMODA_PRODUCT_RE,
+      ),
     ]);
     const cmUrls = Array.from(new Set([...cmCats, ...cmSitemap]));
     console.log(`[discover] Casa Moda: ${cmUrls.length} URLs (cats=${cmCats.length}, sitemap=${cmSitemap.length})`);
