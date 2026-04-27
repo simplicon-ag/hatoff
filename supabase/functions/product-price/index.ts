@@ -254,15 +254,12 @@ Deno.serve(async (req) => {
     }
 
     const results: PriceResult[] = [];
+    const toScrape: string[] = [];
 
     for (const handle of handles) {
-      // Cache-Hit?
       const c = cacheMap.get(handle);
 
-      // Mismatch-Einträge: vom Audit als falsch markiert. Cache-Wert NICHT
-      // ausliefern (sonst kämen falsche Sale-Preise in die UI) und auch
-      // NICHT überschreiben (sonst geht die Mismatch-Markierung verloren).
-      // Stattdessen: stiller Shopify-Fallback ohne Sale-Badge.
+      // Mismatch-Einträge: stiller Shopify-Fallback
       if (c && c.status === "mismatch") {
         const display = fallbackPrice(shopifyPrices[handle]);
         results.push({
@@ -318,116 +315,99 @@ Deno.serve(async (req) => {
         };
         results.push(result);
         await supabase.from("product_price_cache").upsert(
-          {
-            handle: result.handle,
-            brand: result.brand,
-            source_url: result.source_url,
-            raw_price_eur: result.raw_price_eur,
-            display_price_chf: result.display_price_chf,
-            original_price_eur: result.original_price_eur,
-            original_price_chf: result.original_price_chf,
-            on_sale: result.on_sale,
-            status: result.status,
-            fetched_at: result.fetched_at,
-          },
+          { ...result },
           { onConflict: "handle" },
         );
         continue;
       }
 
+      toScrape.push(handle);
+    }
+
+    // Hard-Cap: max. 4 Live-Scrapes pro Request — verhindert CPU/Wall-Time-Timeouts.
+    // Übrige Handles bekommen sofortigen Shopify-Fallback (werden NICHT gecacht,
+    // damit sie beim nächsten Request erneut versucht werden).
+    const MAX_LIVE_SCRAPES = 4;
+    const scrapeNow = toScrape.slice(0, MAX_LIVE_SCRAPES);
+    const scrapeLater = toScrape.slice(MAX_LIVE_SCRAPES);
+
+    for (const handle of scrapeLater) {
+      results.push({
+        handle,
+        brand: detectBrand(handle) ?? "unknown",
+        source_url: null,
+        raw_price_eur: null,
+        display_price_chf: fallbackPrice(shopifyPrices[handle]),
+        original_price_eur: null,
+        original_price_chf: null,
+        on_sale: false,
+        status: "fallback",
+        fetched_at: new Date().toISOString(),
+      });
+    }
+
+    async function scrapeOne(handle: string): Promise<PriceResult> {
+      const brand = detectBrand(handle)!;
       const term = handleToSearchTerm(handle, brand);
       const site = brandSite(brand);
-
-      let result: PriceResult;
       try {
         const foundUrl = await firecrawlSearchUrl(term, site);
         if (!foundUrl) {
-          const display = fallbackPrice(shopifyPrices[handle]);
-          result = {
-            handle,
-            brand,
-            source_url: null,
-            raw_price_eur: null,
-            display_price_chf: display,
-            original_price_eur: null,
-            original_price_chf: null,
-            on_sale: false,
-            status: "not_found",
+          return {
+            handle, brand, source_url: null, raw_price_eur: null,
+            display_price_chf: fallbackPrice(shopifyPrices[handle]),
+            original_price_eur: null, original_price_chf: null,
+            on_sale: false, status: "not_found",
             fetched_at: new Date().toISOString(),
           };
-        } else {
-          // Eigene Anfrage zur vollen Produktseite — Snippets sind oft irreführend
-          const md = await firecrawlScrape(foundUrl);
-          const parsed = md ? extractEurPrices(md) : null;
-          if (!parsed) {
-            const display = fallbackPrice(shopifyPrices[handle]);
-            result = {
-              handle,
-              brand,
-              source_url: foundUrl,
-              raw_price_eur: null,
-              display_price_chf: display,
-              original_price_eur: null,
-              original_price_chf: null,
-              on_sale: false,
-              status: "fallback",
-              fetched_at: new Date().toISOString(),
-            };
-          } else {
-            // EUR → CHF 1:1 → auf .95 abrunden
-            const chf = roundDownTo95(parsed.current);
-            const origChf =
-              parsed.original !== null ? roundDownTo95(parsed.original) : null;
-            const onSale = origChf !== null && origChf > chf;
-            result = {
-              handle,
-              brand,
-              source_url: foundUrl,
-              raw_price_eur: parsed.current,
-              display_price_chf: chf,
-              original_price_eur: parsed.original,
-              original_price_chf: origChf,
-              on_sale: onSale,
-              status: "ok",
-              fetched_at: new Date().toISOString(),
-            };
-          }
         }
+        const md = await firecrawlScrape(foundUrl);
+        const parsed = md ? extractEurPrices(md) : null;
+        if (!parsed) {
+          return {
+            handle, brand, source_url: foundUrl, raw_price_eur: null,
+            display_price_chf: fallbackPrice(shopifyPrices[handle]),
+            original_price_eur: null, original_price_chf: null,
+            on_sale: false, status: "fallback",
+            fetched_at: new Date().toISOString(),
+          };
+        }
+        const chf = roundDownTo95(parsed.current);
+        const origChf = parsed.original !== null ? roundDownTo95(parsed.original) : null;
+        return {
+          handle, brand, source_url: foundUrl,
+          raw_price_eur: parsed.current,
+          display_price_chf: chf,
+          original_price_eur: parsed.original,
+          original_price_chf: origChf,
+          on_sale: origChf !== null && origChf > chf,
+          status: "ok",
+          fetched_at: new Date().toISOString(),
+        };
       } catch (err) {
         console.error(`Firecrawl error for ${handle}:`, err);
-        const display = fallbackPrice(shopifyPrices[handle]);
-        result = {
-          handle,
-          brand,
-          source_url: null,
-          raw_price_eur: null,
-          display_price_chf: display,
-          original_price_eur: null,
-          original_price_chf: null,
-          on_sale: false,
-          status: "fallback",
+        return {
+          handle, brand, source_url: null, raw_price_eur: null,
+          display_price_chf: fallbackPrice(shopifyPrices[handle]),
+          original_price_eur: null, original_price_chf: null,
+          on_sale: false, status: "fallback",
           fetched_at: new Date().toISOString(),
         };
       }
+    }
 
-      // Cache speichern
-      await supabase.from("product_price_cache").upsert(
-        {
-          handle: result.handle,
-          brand: result.brand,
-          source_url: result.source_url,
-          raw_price_eur: result.raw_price_eur,
-          display_price_chf: result.display_price_chf,
-          original_price_eur: result.original_price_eur,
-          original_price_chf: result.original_price_chf,
-          on_sale: result.on_sale,
-          status: result.status,
-          fetched_at: result.fetched_at,
-        },
-        { onConflict: "handle" },
-      );
-
-      results.push(result);
+    // Concurrency 2 — doppelt so schnell wie sequenziell, schonend für Firecrawl
+    const CONCURRENCY = 2;
+    for (let i = 0; i < scrapeNow.length; i += CONCURRENCY) {
+      const batch = scrapeNow.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(batch.map(scrapeOne));
+      for (const result of batchResults) {
+        results.push(result);
+        await supabase.from("product_price_cache").upsert(
+          { ...result },
+          { onConflict: "handle" },
+        );
+      }
     }
 
     return new Response(JSON.stringify({ prices: results }), {
