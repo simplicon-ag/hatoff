@@ -311,6 +311,16 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
       if (text.length > 40) description = text;
     }
   }
+  // New Casa Moda layout (2024+): <h3>Produktinformationen</h3><p class="mb-3">…</p>
+  if (!description) {
+    const h3Match = html.match(
+      /<h[23][^>]*>\s*Produktinformationen?\s*<\/h[23]>\s*<p[^>]*>([\s\S]*?)<\/p>/i,
+    );
+    if (h3Match) {
+      const text = decode(h3Match[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+      if (text.length > 40) description = text;
+    }
+  }
   // Fallback: meta description (often empty on Casa Moda)
   if (!description) {
     const metaDesc = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
