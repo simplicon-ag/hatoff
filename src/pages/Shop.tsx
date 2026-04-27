@@ -32,6 +32,25 @@ const tagValue = (tag: string, prefix: string) =>
     ? tag.slice(prefix.length + 1).trim()
     : null;
 
+const isNewProduct = (p: ShopifyProduct) => {
+  const tags = p.node.tags ?? [];
+  const isNew = tags.some((t) => /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")));
+  const isSale = tags.some((t) => t.toLowerCase() === "sale");
+  return isNew && !isSale;
+};
+
+const isSaleProduct = (p: ShopifyProduct) => {
+  const hasSaleTag = (p.node.tags ?? []).some((t) => t.toLowerCase() === "sale");
+  if (!hasSaleTag) return false;
+  return p.node.variants.edges.some((v) => {
+    const cmp = v.node.compareAtPrice?.amount ? parseFloat(v.node.compareAtPrice.amount) : 0;
+    const price = parseFloat(v.node.price.amount);
+    return cmp > price;
+  });
+};
+
+const STATUS_LABELS: Record<string, string> = { neu: "Neu", sale: "Sale" };
+
 const FilterChip = ({ label, onRemove }: { label: string; onRemove: () => void }) => (
   <button
     type="button"
