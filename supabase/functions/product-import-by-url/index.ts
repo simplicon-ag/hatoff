@@ -887,8 +887,17 @@ Deno.serve(async (req) => {
     console.log(`[by-url] start brand=${brand} handle=${handle} force=${force} existing=${existing?.id ?? "no"}`);
 
     // 1) Find sibling colour URLs
-    const colorUrls = await discoverColorUrls(sourceUrl, parsed.articleId, brand);
-    console.log(`[by-url] discovered ${colorUrls.length} colour URLs`);
+    const colorUrlsAll = await discoverColorUrls(sourceUrl, parsed.articleId, brand);
+    // Pre-cap before scraping: avoid 150s timeout on products with 20+ colors.
+    // Final cap based on actual size count happens after scraping.
+    const PRE_SCRAPE_CAP = 24;
+    const colorUrls = colorUrlsAll.length > PRE_SCRAPE_CAP
+      ? colorUrlsAll.slice(0, PRE_SCRAPE_CAP)
+      : colorUrlsAll;
+    if (colorUrlsAll.length > PRE_SCRAPE_CAP) {
+      console.warn(`[by-url] pre-cap ${colorUrlsAll.length} -> ${PRE_SCRAPE_CAP} color URLs (avoid timeout)`);
+    }
+    console.log(`[by-url] discovered ${colorUrlsAll.length} colour URLs, will scrape ${colorUrls.length}`);
 
     // 2) Scrape every colour IN PARALLEL (was sequential — caused 150s timeouts
     //    on products with 5-7 colour variants like Casa Moda Leinenhemden).
@@ -937,6 +946,16 @@ Deno.serve(async (req) => {
         JSON.stringify({ success: false, error: "Keine Farb-Variante konnte gescraped werden" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // 2b) Cap colors so we don't exceed Shopify REST API's 100-variant limit.
+    //     Variants = colors × sizes. We pick the highest color count that
+    //     keeps total under 100. Original URL is colors[0] so it's preserved.
+    const sizeCount = Math.max(1, colors[0].scraped.sizes.length);
+    const maxColors = Math.max(1, Math.floor(95 / sizeCount));
+    if (colors.length > maxColors) {
+      console.warn(`[by-url] capping colors from ${colors.length} to ${maxColors} (sizes=${sizeCount}, REST 100-variant limit)`);
+      colors.splice(maxColors);
     }
 
     // 3) Build colour-neutral base
