@@ -1,17 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight,
   Flame,
   Sparkles,
-  Star,
-  Truck,
-  MapPin,
   Compass,
   MousePointerClick,
   ShoppingBag,
 } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
+import { HeroCarousel } from "@/components/HeroCarousel";
 import { FeaturedLook } from "@/components/FeaturedLook";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
@@ -19,7 +16,6 @@ import { magazinArtikel, marken, welten } from "@/data/looks";
 import { useCuratedLooks } from "@/hooks/useCuratedLooks";
 import { fetchProducts, fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
 import { supabase } from "@/integrations/supabase/client";
-import heroImg from "@/assets/hero.jpg";
 
 const weltLabel: Record<string, string> = {
   business: "Für's Büro",
