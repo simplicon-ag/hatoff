@@ -1,133 +1,139 @@
+## Ziel
 
-# HATOFF Club – Mitgliederbereich mit Punkten & Stufen
+Den Store auf das nächste Level heben — in 5 klaren Phasen, damit nach jedem Schritt etwas Sichtbares da ist und du Feedback geben kannst, bevor wir tiefer gehen.
 
-Ziel: Eigene `/club` Seite mit Login, persönlichem Dashboard, echtem Punktestand in der Datenbank und 3 Stufen mit Rabatt-Vorteilen.
-
----
-
-## 1. Stufen-Konzept (fix verdrahtet im Code)
-
-| Stufe   | ab Punkten | Rabatt | Vorteile                                           |
-|---------|------------|--------|----------------------------------------------------|
-| Bronze  | 0          | 5 %    | Willkommen, Gratis Versand ab 100 CHF              |
-| Silber  | 500        | 10 %   | Gratis Versand & Retoure, Early Access (24 h)      |
-| Gold    | 1500       | 15 %   | Stil-Concierge, Geburtstags-Geschenk, Preview-Sale |
-
-Punkte-Logik (Konzept im UI erklärt):  
-**1 CHF Umsatz = 1 Punkt** · 100 Bonus-Punkte für Anmeldung · Punkte verfallen nicht im ersten Jahr.
-
-> Hinweis: Punkte werden in dieser Version **manuell oder per interner Funktion** gutgeschrieben (kein automatisches Mapping aus Shopify-Bestellungen, weil es noch keine Bestellhistorie pro Nutzer in der App gibt). Dafür gibt es ein einfaches RPC, das Punkte hinzufügt – später kann das von einer Bestell-Webhook-Funktion aufgerufen werden.
+Reihenfolge nach Impact: erst der lebendige Hero (Quick Win, dein Ärgernis), dann Conversion-Hebel, dann Loyalty echt, dann Look-Erlebnis, dann Polish.
 
 ---
 
-## 2. Authentifizierung (Lovable Cloud)
+## Phase 1 — Lebendiger Homepage-Hero ✨ (dein Quick Win)
 
-- **Email + Passwort** und **Google Sign-In** (Standard-Defaults)
-- Neue Seite `/auth` mit Tabs *Anmelden / Registrieren*
-- Passwort vergessen + `/reset-password` Seite
-- `onAuthStateChange` Listener vor `getSession()` (Best Practice)
-- Auto-Confirm Email **aus** (User muss bestätigen)
+Statt eines statischen Bildes ein editorial **Hero-Carousel** mit 3 Slides, die zwischen Look-Welten wechseln (Auto-Play 6 s, manuell per Pfeil/Dot-Indikatoren). Subtile Ken-Burns-Bewegung (langsamer Zoom) auf jedem Bild. Headline und CTA bleiben fix, nur der Untertitel-Eyebrow ändert sich pro Slide ("Für's Büro" → "Weekend" → "Date Night"). Plus: dezenter **Live-Counter** unter den Trust-Badges („3 neue Looks diese Woche") gespeist aus `useCuratedLooks`.
 
----
-
-## 3. Datenbank (neue Tabellen)
-
-### `profiles`
-- `id` uuid PK = `auth.users.id`
-- `display_name` text
-- `avatar_url` text
-- `birthday` date (für Gold-Geburtstagsgeschenk, optional)
-- `created_at`, `updated_at` timestamptz
-- RLS: Jeder User liest/aktualisiert nur seinen eigenen Eintrag
-- Trigger `on_auth_user_created` legt automatisch ein Profil + 100 Willkommens-Punkte an
-
-### `club_points_ledger` (Transaktions-Log)
-- `id` uuid PK
-- `user_id` uuid → `auth.users.id` ON DELETE CASCADE, **NOT NULL**
-- `points` int (positiv = Gutschrift, negativ = Einlösung)
-- `reason` text (z. B. `welcome_bonus`, `purchase`, `birthday`, `manual`)
-- `meta` jsonb (Bestell-Ref etc.)
-- `created_at` timestamptz
-- RLS: User darf nur **eigene** Zeilen lesen (kein Insert/Update/Delete für Clients)
-
-### View / Funktion `get_my_points()`
-- SECURITY DEFINER, gibt aktuelle Summe für `auth.uid()` zurück
-- Wird vom Frontend für den Punktestand verwendet
-
-### RPC `add_club_points(_user_id, _points, _reason, _meta)`
-- SECURITY DEFINER, intern aufrufbar (z. B. später aus Edge Function)
-- In dieser Version aus dem Admin-Bereich oder per Demo-Button erreichbar – siehe unten
+**Dateien:**
+- `src/pages/Index.tsx` — Hero-Section umbauen
+- `src/components/HeroCarousel.tsx` (neu) — nutzt embla (bereits via `carousel.tsx` da)
+- 2 zusätzliche Hero-Bilder via AI generieren
 
 ---
 
-## 4. Neue Seiten / Routen
+## Phase 2 — Conversion-Hebel
 
-### `/club` (öffentlich – Marketing-Landing)
-Ersetzt langfristig `ClubMemberCta`. Inhalt:
-- Hero: „HATOFF Club. Stil wird belohnt."
-- 3 Stufen-Karten (Bronze/Silber/Gold) mit Rabatt + Vorteilen, im editorialen Stil (warmer Sand-BG, dezente Trennlinien – passend zum Rest der Seite)
-- „So funktioniert's" – 3 Schritte (Anmelden → Einkaufen → Punkte sammeln → Rabatte)
-- FAQ-Akkordeon (Verfall, Übertragbarkeit, Kündigung)
-- CTA wechselt je nach Auth-Status:
-  - eingeloggt → „Zum Mitgliederbereich" → `/club/mein-konto`
-  - ausgeloggt → „Kostenlos beitreten" → `/auth?redirect=/club/mein-konto`
+### 2a) Echte Wunschliste
+Tabelle `wishlist_items` (user_id, product_handle, created_at). RLS: User sieht nur eigene. Herz-Button auf `ProductCard` & `ProductDetail` togglet echten Eintrag. Neue Seite `/club/wunschliste` (geschützt) zeigt gespeicherte Stücke. Im Header-User-Menü Link dorthin. Für nicht-eingeloggte User: Toast „Logge dich ein, um zu speichern" mit CTA zu `/auth`.
 
-### `/club/mein-konto` (geschützt)
-Persönliches Dashboard:
-- Begrüssung mit `display_name`
-- Grosse Punkte-Anzeige + aktuelle Stufe (Badge)
-- **Progress-Bar** zur nächsten Stufe (`Progress` Komponente, schon vorhanden)
-- 3 Stufen-Karten mit visueller Markierung „Du bist hier"
-- Aktueller Rabatt-Code-Hinweis (statisch generiert: z. B. `CLUB-BRONZE-5`, später dynamisch)
-- Punkte-Historie: Liste der letzten 20 Einträge aus `club_points_ledger`
-- Einstellungen: `display_name` & `birthday` editierbar
-- Logout-Button
+### 2b) Quick-View Modal auf Produktkarten
+Zweiter Button in der Hover-Aktion (neben „In den Warenkorb"): „Schnellansicht" → öffnet Dialog mit Galerie-Slider, Größenwahl, Farbwahl, Preis, Add-to-Cart — ohne die Listing-Seite zu verlassen. Spart 1 Klick auf jedem Produkt.
 
-### `/auth`
-Login + Registrierung mit Google + Email/Passwort, „Passwort vergessen" Link
+### 2c) Aktive Filter-Chips im Shop
+Über dem Produkt-Grid auf `/shop` eine Reihe Chips, die jeden aktiven Filter zeigen (z. B. „Farbe: Cognac ✕", „Marke: Casa Moda ✕"). Klick entfernt einzeln. Plus „Alle zurücksetzen". Macht den aktuellen Zustand transparent — User filtert mutiger.
 
-### `/reset-password`
-Pflicht-Seite für Passwort-Reset-Flow
+### 2d) Sticky Add-to-Cart auf Mobile (Produktseite)
+Beim Scrollen auf `/product/:handle` erscheint unten ein schmaler Sticky-Bar mit Mini-Bild, Preis, „In den Warenkorb"-Button. Nur Mobile (`md:hidden`). Verschwindet wenn der echte CTA im Viewport ist (IntersectionObserver).
+
+**Dateien:**
+- Migration: `wishlist_items` Tabelle + RLS
+- `src/hooks/useWishlist.ts` (neu)
+- `src/components/ProductCard.tsx`, `src/pages/ProductDetail.tsx` — Wunschlist-Button echt machen
+- `src/pages/ClubWishlist.tsx` (neu) + Route in `App.tsx`
+- `src/components/QuickViewDialog.tsx` (neu)
+- `src/pages/Shop.tsx` — Active-Filter-Chips
+- `src/components/StickyAddToCart.tsx` (neu) → in `ProductDetail.tsx`
 
 ---
 
-## 5. Komponenten (neu)
+## Phase 3 — Loyalty echt machen
 
-- `src/pages/Club.tsx` – öffentliche Landing
-- `src/pages/ClubAccount.tsx` – geschütztes Dashboard
-- `src/pages/Auth.tsx` – Login/Signup
-- `src/pages/ResetPassword.tsx`
-- `src/components/club/TierCard.tsx` – einzelne Stufen-Karte
-- `src/components/club/PointsBalance.tsx` – grosse Punkte-Anzeige + Progress
-- `src/components/club/PointsHistory.tsx` – Tabelle der Transaktionen
-- `src/components/club/RequireAuth.tsx` – Route-Wrapper, leitet auf `/auth` um
-- `src/hooks/useAuth.ts` – Session-State Hook (mit `onAuthStateChange`)
-- `src/hooks/useClubPoints.ts` – React Query Hook für Punktestand + Stufe
-- `src/lib/club-tiers.ts` – Stufen-Definition + Helper `tierForPoints(points)`
+### 3a) Punkte gegen Rabatt-Code einlösen
+Neue Sektion auf `/club/mein-konto` „Belohnungen": 3 Stufen-Coupons:
+- 200 Punkte → 10 CHF Rabatt-Code
+- 500 Punkte → 30 CHF Rabatt-Code  
+- 1000 Punkte → 75 CHF Rabatt-Code
 
----
+„Einlösen"-Button ruft Edge Function `club-redeem` auf, die:
+1. Punkte-Saldo prüft (via `get_my_points()`)
+2. Über Shopify-Tools einen einmaligen Discount-Code generiert (Format `HATOFF-CLUB-XXXX`, einmal verwendbar, an User-Email gebunden via Note)
+3. Punkte über `add_club_points(-X, 'redeemed_reward')` abzieht
+4. Code in neue Tabelle `club_rewards` schreibt (user_id, code, value_chf, redeemed_at, used_at)
 
-## 6. Anpassungen an bestehenden Dateien
+User sieht aktive Codes mit Copy-Button.
 
-- **`src/App.tsx`**: neue Routen `/club`, `/club/mein-konto`, `/auth`, `/reset-password`
-- **`src/components/SiteHeader.tsx`**: „CLUB" Link existiert bereits → zeigt jetzt `/club`. Zusätzlich: kleines Personen-Icon rechts (neben Cart) – führt zu `/auth` (ausgeloggt) oder `/club/mein-konto` (eingeloggt)
-- **`src/components/ClubMemberCta.tsx`**: bleibt als Teaser auf der Startseite, der „Jetzt beitreten" Button verlinkt jetzt auf `/club` statt nur Toast zu zeigen
-- **`src/pages/Index.tsx`**: keine Logik-Änderung, nur Verlinkung über `ClubMemberCta`
+### 3b) Refer-a-Friend
+Auf `/club/mein-konto` ein eindeutiger Empfehlungslink (z. B. `/?ref=ABC123`). Wenn neuer User mit `?ref=` kommt und sich registriert: 50 Punkte für Werber, 50 für neuen User. Speicherung in `profiles.referral_code` (Spalte ergänzen) und `profiles.referred_by`.
 
----
+### 3c) Geburtstags-Bonus
+Im Profil-Editor `birthday`-Feld bereits vorhanden. Edge Function `club-birthday-check` (manuell triggerbar, später Cron): vergibt am Geburtstag 100 Punkte mit reason `birthday_YYYY`. Verhindert Doppel-Vergabe pro Jahr via reason-Check.
 
-## 7. Demo-Punkte vergeben
-
-Da es noch keine Bestell-Pipeline an User-IDs gibt, baue ich für die erste Version im Dashboard einen kleinen, dezenten **„Demo: 50 Punkte gutschreiben"** Button (nur sichtbar in Dev/Preview oder hinter einem Schalter). So kannst du das System direkt ausprobieren. Sobald Bestellungen pro User existieren, ersetzen wir das durch eine Edge Function, die `add_club_points` aufruft.
-
----
-
-## 8. Was bewusst NICHT in diesem Schritt enthalten ist
-
-- Automatische Punktevergabe nach Shopify-Checkout (braucht Webhook + User-Mapping)
-- Generierung echter, einlösbarer Rabattcodes pro User in Shopify (würde Shopify Admin API + Coupon-Tabelle erfordern – als Folge-Schritt)
-- Mehrsprachigkeit / Newsletter-Kopplung
+**Dateien:**
+- Migration: `club_rewards` Tabelle, `profiles.referral_code` & `referred_by`, RLS
+- Edge Functions: `club-redeem`, `club-birthday-check`, `club-referral` (Trigger bei Signup)
+- `supabase/functions/club-redeem/index.ts` nutzt `shopify--create_price_rule` + `shopify--create_discount_code` über Admin-Token
+- `src/components/club/RewardsCatalog.tsx` (neu)
+- `src/components/club/ReferralCard.tsx` (neu)
+- `src/pages/ClubAccount.tsx` — neue Sektionen einbinden
+- `src/pages/Auth.tsx` — `?ref=`-Param auswerten, in user_metadata speichern
+- `handle_new_user`-Trigger erweitern: bei `referred_by` 50 Punkte beidseitig
 
 ---
 
-Wenn du den Plan bestätigst, baue ich alles oben genannte in einem Schritt: Migration, Auth-Seiten, Club-Seiten, Header-Update und Verknüpfung mit der bestehenden Startseiten-CTA.
+## Phase 4 — Look-Erlebnis aufwerten
+
+### 4a) Editorial Hero auf `/looks`
+Aktuell nur „Komplette Looks, kuratiert für dich" + Filter-Pills. Neu: Großes Hero-Spotlight oben mit dem ersten Look (riesiges Bild, Titel im Editorial-Stil, „Look ansehen"-CTA). Drunter ein zweites kleineres Block: **„Look der Woche"** mit Story-Text. Erst danach das Grid.
+
+### 4b) Sticky „Komplettes Outfit kaufen" auf Look-Detail
+Auf `/looks/:slug` ein Sticky-Bar unten (Desktop & Mobile) mit „4 Stücke · CHF 487 — Ganzer Look in den Warenkorb". Aktion fügt alle Look-Produkte mit Default-Variante in einem Schwung hinzu (existierende `addItem`-Schleife). Großer emotionaler Hebel.
+
+### 4c) „Ähnliche Stimmung"
+Unter jedem Look-Detail: 3 Looks aus derselben `welt`, exklusive aktueller. Hält User im Look-Universum.
+
+**Dateien:**
+- `src/pages/Looks.tsx` — Hero-Sektion
+- `src/pages/LookDetail.tsx` — Sticky-Buy-Bar + verwandte Looks
+- `src/components/LookBuyBar.tsx` (neu)
+
+---
+
+## Phase 5 — Polish & Trust
+
+### 5a) Skeleton-Loaders
+Statt „Produkte werden geladen …" → Grid aus 6 grauen Skeleton-Karten (animate-pulse). Wirkt sofort professioneller. Auf `/shop`, `/looks`, `/neuheiten`, `/sale`, Homepage-Sections.
+
+### 5b) Newsletter-Popup mit 10 %-Incentive
+Einmalig nach 15 s oder beim Exit-Intent (Mausbewegung Richtung Browser-Schließen) — Modal mit „10 % auf deine erste Bestellung — sichere dir den Stilbrief". Ablehnung speichert Cookie für 30 Tage. Bei Eintragung: Edge Function generiert einen einmaligen Discount-Code (gleicher Mechanismus wie Loyalty), schickt per E-Mail (Resend, falls verfügbar — sonst direkt im Modal anzeigen + Copy). Footer-Newsletter-Form bekommt denselben Mechanismus, aber ohne Popup-Druck.
+
+### 5c) Footer rechtlich
+- `/impressum`, `/datenschutz`, `/agb` als echte Seiten anlegen (Platzhalter-Texte mit Hinweis „bitte anpassen")
+- Footer-Links darauf umstellen
+- Cookie-Banner (minimal, kein Cookiebot — nur einfacher Hinweis mit Akzeptieren/Ablehnen, lokaler State, kein Tracking-Block weil aktuell keine Tracker im Code)
+
+### 5d) Reviews-UI (leer, ehrlich)
+Auf `ProductDetail` neuer Tab/Akkordeon „Bewertungen": leere Sterne-UI + „Noch keine Bewertungen — sei der Erste". **Keine Fake-Reviews** (Policy). Karten bleiben ohne Sterne, bis echte Daten da sind. Vorbereitung für späteres Reviews-System (z. B. nach erstem Order-Webhook).
+
+**Dateien:**
+- `src/components/ui/ProductCardSkeleton.tsx`, `LookCardSkeleton.tsx` (neu) + Einbau in alle Listing-Pages
+- `src/components/NewsletterPopup.tsx` (neu) → in `SiteLayout.tsx`
+- `supabase/functions/newsletter-signup/index.ts` (neu)
+- `src/pages/Impressum.tsx`, `Datenschutz.tsx`, `Agb.tsx` (neu)
+- `src/components/CookieBanner.tsx` (neu)
+- `src/components/ProductDescription.tsx` oder neuer `ReviewsSection.tsx`
+- `src/components/SiteFooter.tsx` — Links anpassen
+
+---
+
+## Was wir NICHT tun (bewusst)
+
+- **Bottom-Tab-Bar Mobile** — abgelehnt
+- **Fake-Reviews** — Policy
+- **Sale-Counter / „X Personen schauen"** — wirkt billig, passt nicht zur Editorial-Brand
+- **Cookiebot/echtes Tracking** — kein Bedarf solange keine Tracker drin sind
+
+---
+
+## Reihenfolge & Stop-Punkte
+
+Ich liefere **Phase 1 als Ersten Schritt** (Hero-Carousel + 2 generierte Bilder + Live-Counter). Sobald das steht und du es dir angeschaut hast, geht's mit Phase 2 weiter. So musst du nicht 2 Stunden warten, bis du etwas siehst, und kannst nach jeder Phase noch umsteuern.
+
+Rough Aufwand (Code-Volumen): Phase 1 klein · Phase 2 groß · Phase 3 groß (Edge Functions + Shopify Discount API) · Phase 4 mittel · Phase 5 mittel.
+
+**Bestätige den Plan und ich starte mit Phase 1.** Falls du eine andere Reihenfolge willst (z. B. erst Loyalty, dann Hero) sag Bescheid — alles modular.
