@@ -143,11 +143,11 @@ async function firecrawlScrape(url: string, apiKey: string): Promise<string | nu
         url,
         formats: ["html"],
         onlyMainContent: false,
-        waitFor: 4000,
+        waitFor: 1500,
         actions: [
-          { type: "wait", milliseconds: 1500 },
+          { type: "wait", milliseconds: 500 },
           { type: "scroll", direction: "down" },
-          { type: "wait", milliseconds: 1000 },
+          { type: "wait", milliseconds: 500 },
         ],
       }),
     });
@@ -592,9 +592,13 @@ async function processRow(
     updated_at: new Date().toISOString(),
   }).eq("id", row.id);
 
-  // 2) Scrape every colour
+  // 2) Scrape a bounded number of colours per run. Some articles expose many
+  // colour URLs; scraping every variant + uploading every image can exceed the
+  // 150s function limit. The product still gets all colour options from the
+  // discovered URLs, while full data/images come from the first few colours.
   const colors: ColorData[] = [];
-  for (const cu of colorUrls) {
+  const urlsToScrape = colorUrls.slice(0, 3);
+  for (const cu of urlsToScrape) {
     const html = await firecrawlScrape(cu.url, firecrawlKey);
     if (!html) {
       console.warn(`[worker] firecrawl failed for ${cu.url}`);
@@ -626,7 +630,17 @@ async function processRow(
 
   // 4) Upsert
   const existingId = await findShopifyProductByHandle(handle, adminToken);
-  const payload = buildProductPayload(base, colors, handle);
+  const discoveredColorIds = new Set(colors.map((c) => c.colorId));
+  const allColors = [...colors];
+  for (const cu of colorUrls) {
+    if (discoveredColorIds.has(cu.colorId)) continue;
+    allColors.push({
+      colorId: cu.colorId,
+      colorName: `Farbe ${cu.colorId}`,
+      scraped: { ...base, image_urls: [], article_number: base.article_number },
+    });
+  }
+  const payload = buildProductPayload(base, allColors, handle);
 
   let productId: string;
   let action: "created" | "updated";
@@ -724,7 +738,7 @@ async function processRow(
     scraped_data: {
       base_title: baseTitle,
       title: baseTitle,
-      colors: colors.map((c) => ({ colorName: c.colorName, colorId: c.colorId })),
+      colors: allColors.map((c) => ({ colorName: c.colorName, colorId: c.colorId })),
       sizes: base.sizes,
       price_eur: base.price_eur,
       image_urls: aggregatedImages,
@@ -755,7 +769,7 @@ async function processRow(
     });
   }
 
-  return { ok: true, action, productId, title: baseTitle, colorsCount: colors.length };
+  return { ok: true, action, productId, title: baseTitle, colorsCount: allColors.length };
 }
 
 async function triggerLookGeneration(productHandle: string): Promise<void> {
