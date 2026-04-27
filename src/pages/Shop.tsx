@@ -219,6 +219,7 @@ const Shop = () => {
         return false;
       });
     }
+    if (selectedColors.size > 0) {
       list = list.filter((p) =>
         p.node.tags.some((t) => {
           const v = tagValue(t, "farbe");
