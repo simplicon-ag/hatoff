@@ -1054,8 +1054,6 @@ Deno.serve(async (req) => {
         }
       } catch { /* noop */ }
       lookGenerationTriggered = true;
-    } catch (e) {
-      console.warn(`[by-url] look-generate trigger failed for ${handle}:`, e);
     }
 
     return new Response(
