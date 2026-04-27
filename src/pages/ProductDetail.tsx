@@ -203,15 +203,32 @@ const ProductDetail = () => {
     return Array.from(seen.values());
   }, [product]);
 
-  // Bild-Index in der Galerie für die aktuelle Variante
-  // Bild-Index in der Galerie für die aktuelle Variante.
+  // Galerie-Bilder pro gewählter Farbe filtern.
+  // Casa Moda & Co. nutzen ein Naming wie "...-{farbslug}-image-1-...",
+  // "...-{farbslug}-image-2-..." — dh der Prefix vor `-image-` identifiziert
+  // die Farbe. Wir filtern alle Galeriebilder, deren Prefix mit dem Prefix
+  // des Variantenbildes übereinstimmt. Wenn kein Match (oder das Produkt
+  // hat keine Farboption), zeigen wir alle Bilder.
+  const galleryImages = useMemo(() => {
+    if (!product) return [] as Array<{ url: string; altText: string | null }>;
+    const all = product.images.edges.map((e) => e.node);
+    const variantUrl = selectedVariant?.image?.url;
+    if (!variantUrl) return all;
+    const prefix = variantUrl.match(/\/([^/?]+-image-)\d+-/)?.[1];
+    if (!prefix) return all;
+    const filtered = all.filter((img) => img.url.includes(`/${prefix}`));
+    // Wenn das Filter-Pattern nicht greift (zB nur 1 Treffer trotz mehrerer
+    // Farben → Naming weicht ab), lieber alle Bilder zeigen statt zu wenig.
+    return filtered.length >= 2 ? filtered : all;
+  }, [product, selectedVariant]);
+
+  // Bild-Index in der gefilterten Galerie für die aktuelle Variante.
   // Beim Initialaufruf zeigen wir IMMER das erste Bild — erst wenn der
   // Nutzer aktiv eine andere Farbe wählt, springen wir zum Variantenbild.
   const variantImageIndex = useMemo(() => {
-    if (!product || !selectedVariant || !userPickedVariant) return null;
-    const imgs = product.images.edges.map((e) => e.node);
-    return findVariantImageIndex(imgs, selectedVariant);
-  }, [product, selectedVariant, userPickedVariant]);
+    if (!selectedVariant || !userPickedVariant) return null;
+    return findVariantImageIndex(galleryImages, selectedVariant);
+  }, [galleryImages, selectedVariant, userPickedVariant]);
 
   const relatedLooks = useMemo(() => {
     if (!product) return [];
@@ -295,7 +312,7 @@ const ProductDetail = () => {
     );
   }
 
-  const images = product.images.edges.map((e) => e.node);
+  const images = galleryImages;
   const available = selectedVariant?.availableForSale ?? false;
 
   return (
