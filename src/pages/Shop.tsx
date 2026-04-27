@@ -302,7 +302,7 @@ const Shop = () => {
     selectedVendors.size +
     selectedCategories.size +
     selectedWelten.size +
-    
+    selectedStatus.size +
     selectedColors.size +
     selectedSizes.size +
     (onlyAvailable ? 1 : 0) +
