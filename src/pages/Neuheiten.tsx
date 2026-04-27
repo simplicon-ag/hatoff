@@ -102,23 +102,19 @@ const Neuheiten = () => {
           >
             Alle <span className="ml-1 text-xs opacity-70">{newest.length}</span>
           </button>
-          {CATEGORIES.map((cat) => {
-            const count = categoryCounts.get(cat.id) ?? 0;
-            if (count === 0) return null;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`rounded-full border px-4 py-2 text-sm transition ${
-                  activeCategory === cat.id
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary"
-                }`}
-              >
-                {cat.label} <span className="ml-1 text-xs opacity-70">{count}</span>
-              </button>
-            );
-          })}
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`rounded-full border px-4 py-2 text-sm transition ${
+                activeCategory === cat.id
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background hover:border-primary"
+              }`}
+            >
+              {cat.label} <span className="ml-1 text-xs opacity-70">{cat.count}</span>
+            </button>
+          ))}
         </div>
       </section>
 
