@@ -19,6 +19,8 @@ interface Props {
    * Wird genutzt, um Mehrfarb-Produkte als mehrere Karten in der Liste darzustellen.
    */
   initialColor?: string;
+  /** Wenn true, wird der Cart-Button nicht im Bild, sondern unten neben dem Preis dargestellt. */
+  compactCart?: boolean;
 }
 
 export const ProductCard = ({ product, priority, initialColor }: Props) => {
