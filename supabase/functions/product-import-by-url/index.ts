@@ -311,6 +311,16 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
       if (text.length > 40) description = text;
     }
   }
+  // New Casa Moda layout (2024+): <h3>Produktinformationen</h3><p class="mb-3">…</p>
+  if (!description) {
+    const h3Match = html.match(
+      /<h[23][^>]*>\s*Produktinformationen?\s*<\/h[23]>\s*<p[^>]*>([\s\S]*?)<\/p>/i,
+    );
+    if (h3Match) {
+      const text = decode(h3Match[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+      if (text.length > 40) description = text;
+    }
+  }
   // Fallback: meta description (often empty on Casa Moda)
   if (!description) {
     const metaDesc = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
@@ -368,6 +378,26 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
       if (txt && txt.length < 200) features.push(txt);
     }
     if (features.length > 0) break;
+  }
+
+  // New Casa Moda layout (2024+): the bullet column sits in a sibling
+  // <div class="col-12 col-lg-4 ..."><ul ...><li>…</li>…</ul></div>
+  // immediately after the Produktinformationen block. Anchor on Produktinformationen
+  // to avoid pulling unrelated <ul>s (nav, recommendations, footer).
+  if (features.length === 0) {
+    const anchor = html.search(/<h[23][^>]*>\s*Produktinformationen?\s*<\/h[23]>/i);
+    if (anchor >= 0) {
+      // Search a 6 KB window after the heading for the next <ul>…</ul>
+      const window = html.slice(anchor, anchor + 6000);
+      const ulMatch = window.match(/<ul[^>]*>([\s\S]{0,2000}?)<\/ul>/i);
+      if (ulMatch) {
+        const liMatches = ulMatch[1].match(/<li[^>]*>([\s\S]*?)<\/li>/gi) ?? [];
+        for (const li of liMatches) {
+          const txt = decode(li.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+          if (txt && txt.length < 200 && txt.length > 2) features.push(txt);
+        }
+      }
+    }
   }
 
   // 3) Badges (NEU / Sale)
@@ -465,9 +495,25 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   else if (/jacke|mantel|parka|weste/.test(t)) product_type = "Jacke";
   else if (/krawatt|fliege|tuch|gürtel|guertel|schal|cap/.test(t)) product_type = "Accessoire";
 
-  const sizes = product_type
-    ? BRAND_DEFAULT_SIZES[product_type] ?? ["S", "M", "L", "XL", "XXL"]
-    : ["S", "M", "L", "XL", "XXL"];
+  // Extract real sizes from page (Casa Moda + Venti both expose them via
+  // <option data-article-variant-size="S">…</option> in the size selector).
+  // Fall back to brand defaults only if nothing is found.
+  const extractedSizes: string[] = [];
+  const seenSize = new Set<string>();
+  const sizeRegex = /data-article-variant-size="([^"]+)"/gi;
+  let sizeMatch: RegExpExecArray | null;
+  while ((sizeMatch = sizeRegex.exec(html)) !== null) {
+    const s = decode(sizeMatch[1]).trim();
+    if (s && !seenSize.has(s)) {
+      seenSize.add(s);
+      extractedSizes.push(s);
+    }
+  }
+  const sizes = extractedSizes.length > 0
+    ? extractedSizes
+    : product_type
+      ? BRAND_DEFAULT_SIZES[product_type] ?? ["S", "M", "L", "XL", "XXL"]
+      : ["S", "M", "L", "XL", "XXL"];
 
   // 9) Tags — brand, type, fit, NEU
   const tags = [brand];
