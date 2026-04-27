@@ -212,7 +212,13 @@ const Shop = () => {
         }),
       );
     }
-    if (selectedColors.size > 0) {
+    if (selectedStatus.size > 0) {
+      list = list.filter((p) => {
+        if (selectedStatus.has("neu") && isNewProduct(p)) return true;
+        if (selectedStatus.has("sale") && isSaleProduct(p)) return true;
+        return false;
+      });
+    }
       list = list.filter((p) =>
         p.node.tags.some((t) => {
           const v = tagValue(t, "farbe");
