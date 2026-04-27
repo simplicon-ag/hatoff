@@ -12,30 +12,13 @@ const HERO_COUNT = 3;
 const GRID_COUNT = 18;
 const LOOKS_COUNT = 3;
 
-type CategoryId =
-  | "alle"
-  | "freizeithemden"
-  | "polos-tshirts"
-  | "strick-sweat"
-  | "jacken-westen"
-  | "hosen"
-  | "accessoires";
+type CategoryId = string; // entspricht jetzt direkt dem Shopify productType (oder "alle")
 
-const CATEGORIES: Array<{ id: CategoryId; label: string; match: RegExp }> = [
-  { id: "freizeithemden", label: "Freizeithemden", match: /(freizeithemd|hemd|shirt(?!.*t-?shirt)|bluse)/i },
-  { id: "polos-tshirts", label: "Polos & T-Shirts", match: /(polo|t-?shirt|longsleeve)/i },
-  { id: "strick-sweat", label: "Strick & Sweat", match: /(strick|pullover|pulli|sweat|sweater|cardigan|hoodie|kapuzen)/i },
-  { id: "jacken-westen", label: "Jacken & Westen", match: /(jacke|mantel|weste|blazer|sakko|parka|gilet|anorak)/i },
-  { id: "hosen", label: "Hosen", match: /(hose|chino|jeans|bermuda|short|trouser|pant)/i },
-  { id: "accessoires", label: "Accessoires", match: /(g[üu]rtel|krawatte|schal|tuch|m[üu]tze|cap|hut|socke|sock|tasche|geldb[öo]rse|portemonnaie|einstecktuch|fliege|tie|belt|accessoir)/i },
-];
+const ALL_CATEGORY: CategoryId = "alle";
 
-function detectCategory(p: ShopifyProduct): CategoryId | null {
-  const hay = `${p.node.productType ?? ""} ${(p.node.tags ?? []).join(" ")} ${p.node.title}`.toLowerCase();
-  for (const cat of CATEGORIES) {
-    if (cat.match.test(hay)) return cat.id;
-  }
-  return null;
+function getProductType(p: ShopifyProduct): string | null {
+  const t = p.node.productType?.trim();
+  return t && t.length > 0 ? t : null;
 }
 
 const Neuheiten = () => {
@@ -64,18 +47,21 @@ const Neuheiten = () => {
     return [...onlyNew].sort((a, b) => b.node.id.localeCompare(a.node.id));
   }, [products]);
 
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<CategoryId, number>();
+  // Liste aller in den Neuheiten vorkommenden Product Types, alphabetisch sortiert.
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
     newest.forEach((p) => {
-      const cat = detectCategory(p);
-      if (cat) counts.set(cat, (counts.get(cat) ?? 0) + 1);
+      const t = getProductType(p);
+      if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
     });
-    return counts;
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], "de"))
+      .map(([id, count]) => ({ id, label: id, count }));
   }, [newest]);
 
   const filtered = useMemo(() => {
-    if (activeCategory === "alle") return newest;
-    return newest.filter((p) => detectCategory(p) === activeCategory);
+    if (activeCategory === ALL_CATEGORY) return newest;
+    return newest.filter((p) => getProductType(p) === activeCategory);
   }, [newest, activeCategory]);
 
 
@@ -116,23 +102,19 @@ const Neuheiten = () => {
           >
             Alle <span className="ml-1 text-xs opacity-70">{newest.length}</span>
           </button>
-          {CATEGORIES.map((cat) => {
-            const count = categoryCounts.get(cat.id) ?? 0;
-            if (count === 0) return null;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`rounded-full border px-4 py-2 text-sm transition ${
-                  activeCategory === cat.id
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary"
-                }`}
-              >
-                {cat.label} <span className="ml-1 text-xs opacity-70">{count}</span>
-              </button>
-            );
-          })}
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`rounded-full border px-4 py-2 text-sm transition ${
+                activeCategory === cat.id
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background hover:border-primary"
+              }`}
+            >
+              {cat.label} <span className="ml-1 text-xs opacity-70">{cat.count}</span>
+            </button>
+          ))}
         </div>
       </section>
 
