@@ -131,6 +131,16 @@ export const CartDrawer = () => {
                 <Button
                   className="w-full"
                   size="lg"
+                  onClick={handleViewCart}
+                  disabled={items.length === 0}
+                >
+                  <ShoppingBag className="mr-2 h-4 w-4" />
+                  Warenkorb ansehen
+                </Button>
+                <Button
+                  variant="outline"
+                  className="mt-2 w-full"
+                  size="lg"
                   onClick={handleCheckout}
                   disabled={isLoading || isSyncing || items.length === 0}
                 >
@@ -139,7 +149,7 @@ export const CartDrawer = () => {
                   ) : (
                     <>
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Zur Kasse
+                      Direkt zur Kasse
                     </>
                   )}
                 </Button>
