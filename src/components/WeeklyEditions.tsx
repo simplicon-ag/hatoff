@@ -305,7 +305,7 @@ const LookTile = ({
   <Link
     to={`/looks/${look.slug}`}
     className={cn(
-      "group relative block overflow-hidden rounded-sm bg-neutral-900 ring-1 ring-border/40",
+      "group relative block overflow-hidden rounded-sm bg-foreground/90 ring-1 ring-border/40",
       className,
     )}
   >
