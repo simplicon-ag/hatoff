@@ -268,13 +268,20 @@ export default function AdminImport() {
         "product-import-by-url",
         { body: { url, force } },
       );
-      // Edge function returns 409 with structured body for duplicates; supabase-js
-      // surfaces non-2xx as `error`, but `data` may still be populated. Prefer data.
-      const payload: SingleImportResult | null =
-        (data as SingleImportResult | null) ??
-        (error && typeof (error as { context?: unknown }).context === "object"
-          ? null
-          : null);
+
+      // supabase.functions.invoke surfaces non-2xx (z. B. 409) als `error` mit
+      // `error.context` = Response. data ist dann null. Body manuell lesen.
+      let payload: SingleImportResult | null = (data as SingleImportResult | null) ?? null;
+      if (!payload && error) {
+        const ctx = (error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            payload = (await ctx.clone().json()) as SingleImportResult;
+          } catch {
+            // ignore parse failure, fall through to throw
+          }
+        }
+      }
 
       if (payload?.already_exists) {
         setSingleResult(payload);
@@ -285,12 +292,12 @@ export default function AdminImport() {
       }
 
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Unbekannter Fehler");
-      setSingleResult(data);
+      if (!payload?.success) throw new Error(payload?.error || "Unbekannter Fehler");
+      setSingleResult(payload);
       toast.success(
-        data.action === "created"
-          ? `Neu angelegt: ${data.title} (${data.colors_found} Farben)`
-          : `Aktualisiert: ${data.title} (${data.colors_found} Farben)`,
+        payload.action === "created"
+          ? `Neu angelegt: ${payload.title} (${payload.colors_found} Farben)`
+          : `Aktualisiert: ${payload.title} (${payload.colors_found} Farben)`,
       );
       setSingleUrl("");
       fetchAll();
