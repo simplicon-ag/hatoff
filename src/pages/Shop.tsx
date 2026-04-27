@@ -290,7 +290,7 @@ const Shop = () => {
     setSelectedVendors(new Set());
     setSelectedCategories(new Set());
     setSelectedWelten(new Set());
-    
+    setSelectedStatus(new Set());
     setSelectedColors(new Set());
     setSelectedSizes(new Set());
     setPriceRange([facets.priceMin, facets.priceMax]);
