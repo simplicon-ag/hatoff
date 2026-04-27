@@ -295,9 +295,9 @@ export default function AdminImport() {
       if (!payload?.success) throw new Error(payload?.error || "Unbekannter Fehler");
       setSingleResult(payload);
       toast.success(
-        data.action === "created"
-          ? `Neu angelegt: ${data.title} (${data.colors_found} Farben)`
-          : `Aktualisiert: ${data.title} (${data.colors_found} Farben)`,
+        payload.action === "created"
+          ? `Neu angelegt: ${payload.title} (${payload.colors_found} Farben)`
+          : `Aktualisiert: ${payload.title} (${payload.colors_found} Farben)`,
       );
       setSingleUrl("");
       fetchAll();
