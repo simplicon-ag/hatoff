@@ -674,7 +674,14 @@ const ProductDetail = () => {
         </Accordion>
       </section>
 
-
+      {/* Bewertungen — verifizierte Käufer */}
+      <ProductReviews
+        productHandle={product.handle}
+        productTitle={product.title}
+        sizeOptions={
+          product.options.find((o) => o.name === "Grösse" || o.name === "Size")?.values ?? []
+        }
+      />
 
       {/* Sticky mobile CTA */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden">
