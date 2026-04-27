@@ -24,7 +24,11 @@ interface Props {
 export const ProductCard = ({ product, priority, initialColor }: Props) => {
   const p = product.node;
   const price = p.priceRange.minVariantPrice;
-  const { price: livePrice } = useLivePrice(p.handle);
+  const shopifyAmount = parseFloat(price.amount);
+  const { price: livePrice } = useLivePrice(
+    p.handle,
+    Number.isFinite(shopifyAmount) && shopifyAmount > 0 ? shopifyAmount : undefined,
+  );
   const displayPrice = formatLivePrice(livePrice) ?? formatPrice(price.amount, price.currencyCode);
 
   // Sale-Logik: nur wenn das Produkt explizit den Tag `sale` trägt UND ein
