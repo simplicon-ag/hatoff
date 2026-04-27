@@ -1,75 +1,80 @@
+## Ziel
 
-## Look-Likes — auch ohne Login, 1 Like pro IP
+Der bisherige Block **„Style-Welten — Sechs Welten, ein Stil."** auf der Startseite (`src/pages/Index.tsx`) gefällt dir nicht: die 6 Kacheln wirken visuell uneinheitlich (Flatlays, Personen, Stillleben gemischt) und mischen Anlass-Welten mit Produktkategorien.
 
-Ja, machbar. Wir nutzen eine Edge Function, die die IP serverseitig aus den Request-Headers liest (vom Client kommende IPs sind nicht vertrauenswürdig), und speichern den Like in einer eigenen Tabelle mit `UNIQUE(look_slug, ip_hash)`.
+Wir ersetzen ihn durch eine **redaktionelle Saison-Story als Triptychon** — drei vertikale Bilder, eine durchgehende Headline, eine Sequenz, die einen Tag in der Kollektion erzählt. Magazinhaft, ruhig, hochwertig.
 
-### Datenbank
+---
 
-**Neue Tabelle `look_likes`**
-- `id uuid PK`
-- `look_slug text NOT NULL`
-- `ip_hash text NOT NULL` — SHA-256 aus IP + Server-Salt (kein Klartext, DSGVO-freundlich)
-- `user_id uuid NULL` — falls eingeloggt, zusätzlich speichern
-- `created_at timestamptz DEFAULT now()`
-- `UNIQUE (look_slug, ip_hash)` → harte Sperre: 1 Like pro IP pro Look
-- Index auf `look_slug` für schnelles Counting
+## Konzept der Editorial Story
 
-**RLS**
-- `SELECT`: public erlaubt (nur für Counts; alternativ nur via RPC)
-- `INSERT/DELETE/UPDATE`: keine Policies → nur Edge Function (Service Role) darf schreiben
+**Saison-Thema:** Frühling/Sommer 2026 — *Leinen & Salbei*
+**Stimmung:** ruhig, hell, natürlich — Naturtöne, Salbeigrün, Sand, Crème, weiches Tageslicht
+**Layout:** Triptychon — 3 vertikale Bilder nebeneinander, gleiche Höhe, gleiche Bildsprache
 
-**RPC `get_look_like_count(_slug text) → int`** (SECURITY DEFINER, public)
-- Liefert die Anzahl Likes für einen Look — vermeidet, dass der Client `count(*)` selbst macht.
+**Struktur des Blocks (von oben nach unten):**
 
-### Edge Function `look-like`
+1. **Eyebrow-Label**: `AUSGABE 01 · FRÜHLING/SOMMER 2026`
+2. **Headline (gross, Display-Font)**: „Leinen, Salbei, ein langer Tag."
+3. **Lead-Text** (1–2 Sätze, max. 2 Zeilen): „Eine Kollektion in Naturtönen, getragen vom ersten Cappuccino bis zur blauen Stunde. Drei Momente, ein Stoff, ein Stil."
+4. **Triptychon (3 Spalten auf Desktop, gestapelt auf Mobile):**
+   - **Bild 1 — Morgen** · Bildunterschrift: „08:14 — Leinenhemd, Sand-Chino, das erste Licht."
+   - **Bild 2 — Mittag** · Bildunterschrift: „13:42 — Salbeigrün am Marktplatz, Ärmel umgeschlagen."
+   - **Bild 3 — Abend** · Bildunterschrift: „19:30 — Crème über Indigo, der Tag wird weich."
+5. **CTA**: Textlink rechts „Zur Kollektion entdecken →" (verlinkt auf `/looks?welt=hemden` oder `/looks`)
 
-Eine Function mit zwei Aktionen (POST mit `{ slug, action: "toggle" | "status" }`):
+Bildunterschriften sind klein, in Mono- oder kleiner Sans, mit Uhrzeit als ruhiges redaktionelles Detail.
 
-1. **IP ermitteln**: `x-forwarded-for` (erster Eintrag) → fallback `cf-connecting-ip`.
-2. **Hashen**: `sha256(ip + LOOK_LIKE_SALT)` — neuer Secret `LOOK_LIKE_SALT` wird via add_secret angefordert.
-3. **`status`**: gibt `{ liked: boolean, count: number }` zurück (für initiales Rendering).
-4. **`toggle`**:
-   - Falls Eintrag mit `(slug, ip_hash)` existiert → DELETE (unlike).
-   - Sonst INSERT (mit optionalem `user_id` aus JWT, falls Header vorhanden).
-   - Antwort: `{ liked: boolean, count: number }`.
-5. CORS-Headers wie üblich, `verify_jwt = false` (default), JWT manuell parsen falls vorhanden — sonst anonym.
+---
 
-Kleine Rate-Limit-Sicherheit: max 1 Toggle pro IP pro Sekunde via In-Memory-Map (Best-Effort).
+## Umsetzung
 
-### Frontend
+### 1. Drei neue Hero-Bilder generieren (Lifestyle, mit Personen)
 
-**Neuer Hook `src/hooks/useLookLikes.ts`**
-- Lädt Status beim Mount via `supabase.functions.invoke("look-like", { body: { slug, action: "status" } })`.
-- `toggle()` → optimistisches Update, rollt bei Fehler zurück.
-- Cached Counts in einem kleinen Map-Store, damit `LookCard` und `LookDetail` synchron bleiben.
+Konsistente Bildsprache, gleiches Model, gleiche Bildlogik — nur Tageszeit und Setting variieren:
 
-**`LookCard.tsx`**
-- Kleiner Heart-Button oben rechts auf der Karte (absolute, mit Backdrop-Blur).
-- Zeigt aktuelle Anzahl daneben.
-- `onClick` stoppt Navigation, ruft `toggle()`.
+- `src/assets/editorial-fs26-morgen.jpg` — Mann am Frühstückstisch am Fenster, weisses Leinenhemd, Sand-Chino, Cappuccino, weiches Morgenlicht (warmer Crème-Ton)
+- `src/assets/editorial-fs26-mittag.jpg` — Mann auf einem südeuropäischen Marktplatz, salbeigrünes Leinenhemd (Ärmel umgeschlagen), Sand-Chino, Mittagslicht, Naturschatten
+- `src/assets/editorial-fs26-abend.jpg` — Mann auf einer Terrasse zur blauen Stunde, crèmefarbener Pullover über Hemd, Indigo-Hose, weiches Gegenlicht
 
-**`LookDetail.tsx`**
-- Größerer Like-Button im Hero-Bereich (neben Titel oder unter Subtitle), mit Animation beim Liken (kleiner Pulse).
-- Anzeige: „❤ 124 Likes“.
+Alle drei in **vertikalem Format (3:4 oder 4:5)**, gleicher Look & Feel, gleicher Model-Typ, gleiche Farbtemperatur-Familie. So funktioniert das Triptychon als Sequenz.
 
-### UX-Details
+### 2. Neue Section in `src/pages/Index.tsx`
 
-- Wenn schon geliked: Herz gefüllt + andere Farbe (`destructive`).
-- Klick erneut → Like wird entfernt (Toggle).
-- Toast bei Fehler („Du hast diesen Look bereits geliked“ falls UNIQUE-Conflict trotz Race).
-- Eingeloggte User: zusätzlich `user_id` gespeichert → später nutzbar für „Meine gelikten Looks“.
+- Den bestehenden Block „Style-Welten" (ca. Zeilen 84–115, die Section mit `welten.map(...)`) **komplett entfernen**.
+- An gleicher Stelle eine neue Section einfügen mit:
+  - Container `container-editorial`
+  - Headline-Block (Eyebrow + Display-Headline + Lead)
+  - Grid: `grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6`
+  - Drei `<figure>`-Elemente mit `<img>` (aspect-[3/4]) + `<figcaption>`
+  - CTA-Link am Ende rechtsbündig
+- Die drei Bilder als ES6-Imports oben in der Datei einbinden.
+- Spacing analog zu den anderen Sections: `py-16 md:py-24`.
 
-### Hinweise / Trade-offs
+### 3. Aufräumen
 
-- IP-Limit ist nicht perfekt: User mit dynamischer IP (Mobilfunk) oder VPN können mehrfach liken; mehrere Personen im selben Haushalt-WLAN teilen ein Limit. Für ein Vanity-Engagement-Feature ist das aber Standard und akzeptabel.
-- Salt wird in Supabase Secrets gehalten, nicht im Code — IP-Hashes sind damit nicht reversibel.
-- Keine Cookies/LocalStorage-Tricks nötig — Server entscheidet.
+- Der `welten`-Export in `src/data/looks.ts` wird **nicht entfernt** — er wird vermutlich noch an anderer Stelle (z.B. `Looks.tsx`) verwendet. Ich prüfe das im Default-Modus per `rg "welten"` und entferne nur, falls keine andere Verwendung existiert.
+- Die alten `welt-*.jpg`-Imports in `Index.tsx` werden mitgelöscht; die Asset-Dateien selbst bleiben (könnten anderswo gebraucht werden).
+- Das Mapping-Objekt `weltLabel` in `Index.tsx` (oben in der Datei) bleibt — wird weiterhin von der „Featured Looks"-Section verwendet.
 
-### Was passiert nach Approval
+### 4. Responsive & QA
 
-1. Migration: Tabelle `look_likes` + RPC `get_look_like_count` + RLS.
-2. Secret `LOOK_LIKE_SALT` anfordern (auto-generiert oder vom User gesetzt).
-3. Edge Function `look-like` deployen.
-4. Hook `useLookLikes` + Like-Buttons in `LookCard` und `LookDetail`.
+- Desktop (≥ md): 3 Bilder nebeneinander, Headline links, CTA rechts in derselben Zeile
+- Mobile: Bilder gestapelt, Headline darüber, CTA als eigener Block am Ende
+- Bildunterschriften klein (`text-xs uppercase tracking-[0.2em] text-muted-foreground`)
+- Visuelle Prüfung im Preview nach Implementierung
 
-Sag „approved“ und ich leg los.
+---
+
+## Was sich nicht ändert
+
+- Hero-Carousel oben bleibt unverändert
+- „So funktioniert HATOFF" bleibt
+- „Featured Looks", „Brand Strip", „Social Proof Wall", „Neu eingetroffen", „Sale-Highlights", „Magazin" bleiben alle unverändert
+- Die Routing-Struktur (`/looks?welt=...`) bleibt — nur der Einstiegspunkt auf der Homepage ändert sich
+
+---
+
+## Ergebnis
+
+Statt eines unruhigen 6er-Rasters bekommt die Startseite einen **ruhigen, magazinhaften Saison-Auftritt** — eine erzählerische Sequenz, die Atmosphäre transportiert und neugierig macht, ohne dass jede Kachel erklärt werden muss. Das passt zum redaktionellen HATOFF-Ton und hebt sich klar von den darunter folgenden Produkt- und Look-Sektionen ab.
