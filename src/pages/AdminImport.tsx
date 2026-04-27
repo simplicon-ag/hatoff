@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -89,7 +89,6 @@ export default function AdminImport() {
   const [singleUrl, setSingleUrl] = useState("");
   const [singleBusy, setSingleBusy] = useState(false);
   const [singleResult, setSingleResult] = useState<SingleImportResult | null>(null);
-  const tickRef = useRef<number | null>(null);
 
   const fetchAll = async () => {
     const [{ data: jobData }, { data: logData }] = await Promise.all([
@@ -121,33 +120,6 @@ export default function AdminImport() {
     const interval = window.setInterval(fetchAll, 3000);
     return () => window.clearInterval(interval);
   }, []);
-
-  // Auto-tick: while job state is "running", call the worker every 6s
-  useEffect(() => {
-    if (job?.state !== "running") {
-      if (tickRef.current) {
-        window.clearInterval(tickRef.current);
-        tickRef.current = null;
-      }
-      return;
-    }
-    if (tickRef.current) return;
-    const tick = async () => {
-      try {
-        await supabase.functions.invoke("product-import-run", {
-          body: { batch_size: 2 },
-        });
-      } catch (err) {
-        console.error("[admin-import] worker tick failed", err);
-      }
-    };
-    tick();
-    tickRef.current = window.setInterval(tick, 20000);
-    return () => {
-      if (tickRef.current) window.clearInterval(tickRef.current);
-      tickRef.current = null;
-    };
-  }, [job?.state]);
 
   const runDiscover = async () => {
     setDiscovering(true);
