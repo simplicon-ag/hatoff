@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, ShoppingBag } from "lucide-react";
+import { Eye, Loader2, ShoppingBag } from "lucide-react";
 import type { ShopifyProduct } from "@/lib/shopify";
 import { formatPrice } from "@/lib/shopify";
 import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
+import { WishlistButton } from "./WishlistButton";
+import { QuickViewDialog } from "./QuickViewDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
