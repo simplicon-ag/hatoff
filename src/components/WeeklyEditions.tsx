@@ -302,20 +302,37 @@ const LookTile = ({
   look: CuratedLookRow;
   className?: string;
 }) => (
-  <Link to={`/looks/${look.slug}`} className={cn("group relative block overflow-hidden bg-secondary", className)}>
+  <Link
+    to={`/looks/${look.slug}`}
+    className={cn(
+      "group relative block overflow-hidden rounded-sm bg-foreground/90 ring-1 ring-border/40",
+      className,
+    )}
+  >
     {look.hero_image_url ? (
-      <img
-        src={look.hero_image_url}
-        alt={look.title}
-        loading="lazy"
-        className="h-full w-full object-cover transition-transform duration-[1200ms] group-hover:scale-[1.04]"
-      />
+      <>
+        {/* Blurred backdrop layer — füllt evtl. weisse Bildränder mit eigenem Bildinhalt */}
+        <img
+          src={look.hero_image_url}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl opacity-70"
+        />
+        {/* Vordergrund — leicht überskaliert, damit weisse Bildränder out-of-frame sind */}
+        <img
+          src={look.hero_image_url}
+          alt={look.title}
+          loading="lazy"
+          className="relative h-full w-full scale-[1.06] object-cover transition-transform duration-[1200ms] group-hover:scale-[1.12]"
+        />
+      </>
     ) : (
       <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
         Kein Bild
       </div>
     )}
-    <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
     <div className="absolute inset-x-0 bottom-0 p-3 md:p-5">
       <h3 className="font-display text-base leading-tight text-white drop-shadow-sm md:text-2xl">
         {look.title}
