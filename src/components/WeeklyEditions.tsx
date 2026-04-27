@@ -121,24 +121,47 @@ export const WeeklyEditions = () => {
       const { week, year } = isoWeek(weekStart);
       const season = seasonOf(weekStart);
 
-      // Verfügbare Looks (noch nicht verwendet) nach Saison-Score sortieren
       const available = looks.filter((l) => !usedSlugs.has(l.slug));
       if (available.length === 0) break;
 
-      const scored = available
-        .map((l) => ({ look: l, score: matchScore(l, season.key) }))
-        .sort((a, b) => {
-          if (b.score !== a.score) return b.score - a.score;
-          // tiebreaker: stable order (createdAt desc bereits durch Query)
-          return 0;
-        });
+      // Looks nach Welt gruppieren, innerhalb jeder Welt saisonal sortiert
+      const byWelt = new Map<string, CuratedLookRow[]>();
+      for (const l of available) {
+        const key = l.welt ?? "andere";
+        if (!byWelt.has(key)) byWelt.set(key, []);
+        byWelt.get(key)!.push(l);
+      }
+      for (const arr of byWelt.values()) {
+        arr.sort((a, b) => matchScore(b, season.key) - matchScore(a, season.key));
+      }
 
-      const chosen = scored.slice(0, LOOKS_PER_EDITION).map((s) => s.look);
+      // Welten-Reihenfolge: saisonal stärkste zuerst — aber Round-Robin pickt
+      // reihum aus jeder Welt, damit jede Ausgabe einen Mix enthält
+      // (Casual, Business, Hemden, Jacken …).
+      const weltOrder = Array.from(byWelt.keys()).sort((a, b) => {
+        const sa = WELT_SEASON_AFFINITY[a]?.[season.key] ?? 0;
+        const sb = WELT_SEASON_AFFINITY[b]?.[season.key] ?? 0;
+        return sb - sa;
+      });
+
+      const chosen: CuratedLookRow[] = [];
+      let safety = 0;
+      while (chosen.length < LOOKS_PER_EDITION && safety < LOOKS_PER_EDITION * 4) {
+        let pickedThisRound = false;
+        for (const welt of weltOrder) {
+          if (chosen.length >= LOOKS_PER_EDITION) break;
+          const next = byWelt.get(welt)!.shift();
+          if (next) {
+            chosen.push(next);
+            pickedThisRound = true;
+          }
+        }
+        if (!pickedThisRound) break;
+        safety++;
+      }
+
       chosen.forEach((l) => usedSlugs.add(l.slug));
 
-      // Nur volle Ausgaben (7 Looks) in den Archiv aufnehmen, sonst überspringen für Vergangenheit?
-      // Wunsch: "die anderen KW Wochen noch nicht hinzufügen" → nur Wochen mit Inhalt zeigen.
-      // Aktuelle Woche zeigen wir auch wenn nicht voll, ältere nur wenn voll.
       if (chosen.length === LOOKS_PER_EDITION || i === 0) {
         editions.push({
           number: i + 1,
