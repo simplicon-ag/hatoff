@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { ExternalLink, Loader2, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { formatPrice } from "@/lib/shopify";
 
 export const CartDrawer = () => {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { items, isLoading, isSyncing, updateQuantity, removeItem, getCheckoutUrl, syncCart } = useCartStore();
 
   const totalItems = items.reduce((s, i) => s + i.quantity, 0);
@@ -24,6 +26,11 @@ export const CartDrawer = () => {
   useEffect(() => {
     if (open) syncCart();
   }, [open, syncCart]);
+
+  const handleViewCart = () => {
+    setOpen(false);
+    navigate("/warenkorb");
+  };
 
   const handleCheckout = () => {
     const url = getCheckoutUrl();
@@ -124,6 +131,16 @@ export const CartDrawer = () => {
                 <Button
                   className="w-full"
                   size="lg"
+                  onClick={handleViewCart}
+                  disabled={items.length === 0}
+                >
+                  <ShoppingBag className="mr-2 h-4 w-4" />
+                  Warenkorb ansehen
+                </Button>
+                <Button
+                  variant="outline"
+                  className="mt-2 w-full"
+                  size="lg"
                   onClick={handleCheckout}
                   disabled={isLoading || isSyncing || items.length === 0}
                 >
@@ -132,7 +149,7 @@ export const CartDrawer = () => {
                   ) : (
                     <>
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Zur Kasse
+                      Direkt zur Kasse
                     </>
                   )}
                 </Button>
