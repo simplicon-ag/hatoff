@@ -54,7 +54,8 @@ export const SiteHeader = () => {
           {/* Logo zentriert */}
           <Link
             to="/"
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+            aria-label="HATOFF Startseite"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 inline-flex items-center"
           >
             <Logo />
           </Link>

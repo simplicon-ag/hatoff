@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import logoUrl from "@/assets/logo-hatoff.svg";
 
 interface LogoProps {
@@ -6,15 +5,15 @@ interface LogoProps {
 }
 
 export const Logo = ({ className = "" }: LogoProps) => (
-  <Link
-    to="/"
-    className={`group inline-flex items-center ${className}`}
-    aria-label="HATOFF Startseite"
+  <span
+    className={`inline-flex items-center ${className}`}
+    aria-label="HATOFF"
   >
     <img
       src={logoUrl}
       alt="HATOFF"
-      className="h-16 w-auto md:h-24 transition-opacity group-hover:opacity-80 dark:invert"
+      className="h-7 w-auto md:h-9 transition-opacity hover:opacity-80 dark:invert"
+      draggable={false}
     />
-  </Link>
+  </span>
 );
