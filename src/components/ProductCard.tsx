@@ -201,19 +201,19 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
           )}
 
           {soldOut && (
-            <span className="absolute left-3 top-3 bg-foreground/90 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-background">
+            <span className="absolute left-3 top-3 bg-foreground/90 px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-background sm:text-[10px]">
               Ausverkauft
             </span>
           )}
 
           {!soldOut && !onSale && isNew && (
-            <span className="absolute left-3 top-3 bg-foreground px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-background">
+            <span className="absolute left-3 top-3 bg-foreground px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-background sm:text-[10px]">
               Neu
             </span>
           )}
 
           {!soldOut && onSale && discount && (
-            <span className="absolute left-3 top-3 bg-destructive px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground">
+            <span className="absolute left-3 top-3 bg-destructive px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground sm:text-[10px]">
               -{discount}%
             </span>
           )}
