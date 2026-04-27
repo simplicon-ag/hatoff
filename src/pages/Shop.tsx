@@ -17,7 +17,9 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { SlidersHorizontal, X, Search } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { SlidersHorizontal, X, Search, ChevronDown, LayoutGrid, Grid2X2 } from "lucide-react";
 
 type SortKey = "featured" | "price-asc" | "price-desc" | "title-asc" | "newest";
 
