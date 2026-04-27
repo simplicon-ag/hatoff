@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Menu, User, X } from "lucide-react";
+import { Heart, Menu, User, X } from "lucide-react";
 import { Logo } from "./Logo";
 import { CartDrawer } from "./CartDrawer";
 import { GlobalSearch } from "./GlobalSearch";
 import { useAuth } from "@/hooks/useAuth";
+import { useWishlist } from "@/hooks/useWishlist";
 
 const navItems = [
   { to: "/looks", label: "Looks" },
