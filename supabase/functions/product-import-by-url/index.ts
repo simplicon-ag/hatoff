@@ -883,7 +883,10 @@ Deno.serve(async (req) => {
     // 4) Upsert: re-use the existence result from the early check.
     //    With force=true we update the matched product (by handle or by article number).
     const existingId = existing?.id ?? null;
-    const payload = buildProductPayload(base, colors, handle);
+    const payload = buildProductPayload(base, colors, handle, {
+      status: productStatus,
+      categoryTag,
+    });
 
     let productId: string;
     let action: "created" | "updated";
