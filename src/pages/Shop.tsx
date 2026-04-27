@@ -17,7 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { SlidersHorizontal, X, Search } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { SlidersHorizontal, X, Search, ChevronDown, LayoutGrid, Grid2X2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type SortKey = "featured" | "price-asc" | "price-desc" | "title-asc" | "newest";
 
@@ -77,6 +80,7 @@ const Shop = () => {
   const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [density, setDensity] = useState<3 | 4>(4);
 
   useEffect(() => {
     fetchAllProducts()
@@ -355,6 +359,82 @@ const Shop = () => {
     );
   };
 
+  /** Inline-Popover-Filter wie auf klassischen Shop-Toolbars (Farbe ▾, Grösse ▾, …). */
+  const FacetPopover = ({
+    label,
+    items,
+    selected,
+    onToggle,
+    capitalize = false,
+    columns = 1,
+  }: {
+    label: string;
+    items: Array<[string, number]>;
+    selected: Set<string>;
+    onToggle: (v: string) => void;
+    capitalize?: boolean;
+    columns?: 1 | 2;
+  }) => {
+    if (items.length === 0) return null;
+    const count = selected.size;
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 text-sm transition",
+              count > 0
+                ? "text-foreground"
+                : "text-foreground/75 hover:text-foreground",
+            )}
+          >
+            <span>{label}</span>
+            {count > 0 && (
+              <span className="rounded-full bg-foreground px-1.5 text-[10px] font-medium text-background">
+                {count}
+              </span>
+            )}
+            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-72 p-0">
+          <div className="border-b border-border px-4 py-2.5 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            {label}
+          </div>
+          <ScrollArea className="max-h-72">
+            <div className={cn("p-3", columns === 2 ? "grid grid-cols-2 gap-y-2" : "space-y-2")}>
+              {items.map(([v, c]) => (
+                <label
+                  key={v}
+                  className="flex cursor-pointer items-center justify-between gap-3 px-1.5 py-1 text-sm hover:bg-muted/50"
+                >
+                  <span className="flex items-center gap-2">
+                    <Checkbox checked={selected.has(v)} onCheckedChange={() => onToggle(v)} />
+                    <span>{capitalize ? titleCase(v) : v}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">{c}</span>
+                </label>
+              ))}
+            </div>
+          </ScrollArea>
+          {count > 0 && (
+            <div className="border-t border-border p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => Array.from(selected).forEach(onToggle)}
+              >
+                <X className="h-3.5 w-3.5" /> Auswahl zurücksetzen
+              </Button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
   const FilterPanel = () => (
     <div className="space-y-6">
       <div>
@@ -454,14 +534,60 @@ const Shop = () => {
         </h1>
       </section>
 
-      <section className="container-editorial py-12">
-        {/* Toolbar */}
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-3 border-y border-border py-4">
-          <div className="flex flex-1 items-center gap-3">
-            {/* Mobile filter trigger */}
+      <section className="container-editorial py-10">
+        {/* Kategorie-Pills (Produkttypen) */}
+        {facets.categories.length > 0 && (
+          <ScrollArea className="-mx-4 mb-6 whitespace-nowrap px-4">
+            <div className="flex justify-center gap-2 pb-2">
+              <button
+                onClick={() => setSelectedCategories(new Set())}
+                className={cn(
+                  "shrink-0 border px-5 py-2 text-sm transition",
+                  selectedCategories.size === 0
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border bg-background text-foreground/80 hover:border-foreground",
+                )}
+              >
+                Alle
+              </button>
+              {facets.categories.map(([cat, count]) => {
+                const active = selectedCategories.has(cat);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      const next = new Set(selectedCategories);
+                      next.has(cat) ? next.delete(cat) : next.add(cat);
+                      setSelectedCategories(next);
+                    }}
+                    className={cn(
+                      "shrink-0 border px-5 py-2 text-sm transition",
+                      active
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border bg-background text-foreground/80 hover:border-foreground",
+                    )}
+                  >
+                    {cat}
+                    <span className="ml-1.5 text-xs opacity-60">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        )}
+
+        {/* Horizontale Filter-Toolbar */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-y border-border py-3">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="hidden items-center gap-2 pr-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground md:inline-flex">
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtern nach:
+            </span>
+
+            {/* Mobile: gesamtes Filter-Sheet */}
             <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="lg:hidden">
+                <Button variant="outline" size="sm" className="md:hidden">
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   Filter{" "}
                   {activeCount > 0 && (
@@ -481,7 +607,84 @@ const Shop = () => {
               </SheetContent>
             </Sheet>
 
-            <div className="relative max-w-xs flex-1">
+            {/* Desktop: einzelne Popover-Filter */}
+            <div className="hidden flex-wrap items-center md:flex">
+              <FacetPopover
+                label="Marke"
+                items={facets.vendors}
+                selected={selectedVendors}
+                onToggle={toggle(selectedVendors, setSelectedVendors)}
+              />
+              <FacetPopover
+                label="Farbe"
+                items={facets.colors}
+                selected={selectedColors}
+                onToggle={toggle(selectedColors, setSelectedColors)}
+                capitalize
+              />
+              <FacetPopover
+                label="Grösse"
+                items={facets.sizes}
+                selected={selectedSizes}
+                onToggle={toggle(selectedSizes, setSelectedSizes)}
+                columns={2}
+              />
+              <FacetPopover
+                label="Welt"
+                items={facets.welten}
+                selected={selectedWelten}
+                onToggle={toggle(selectedWelten, setSelectedWelten)}
+                capitalize
+              />
+              <FacetPopover
+                label="Status"
+                items={facets.status}
+                selected={selectedStatus}
+                onToggle={toggle(selectedStatus, setSelectedStatus)}
+                capitalize
+              />
+
+              {/* Preis als eigener Popover */}
+              {priceRange && facets.priceMax > facets.priceMin && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 text-sm transition",
+                        priceRange[0] !== facets.priceMin || priceRange[1] !== facets.priceMax
+                          ? "text-foreground"
+                          : "text-foreground/75 hover:text-foreground",
+                      )}
+                    >
+                      <span>Preis</span>
+                      <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-72">
+                    <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                      Preis
+                    </p>
+                    <Slider
+                      min={facets.priceMin}
+                      max={facets.priceMax}
+                      step={5}
+                      value={priceRange}
+                      onValueChange={(v) => setPriceRange([v[0], v[1]] as [number, number])}
+                    />
+                    <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+                      <span>CHF {priceRange[0]}</span>
+                      <span>CHF {priceRange[1]}</span>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Suche */}
+            <div className="relative hidden w-48 sm:block">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -491,18 +694,36 @@ const Shop = () => {
               />
             </div>
 
-            <p className="hidden text-xs text-muted-foreground sm:block">
-              {loading ? "—" : `${filtered.length} ${filtered.length === 1 ? "Artikel" : "Artikel"}`}
-            </p>
-          </div>
+            {/* Density-Toggle (Desktop) */}
+            <div className="hidden items-center border border-border lg:flex">
+              <button
+                type="button"
+                aria-label="4 Spalten"
+                onClick={() => setDensity(4)}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center transition",
+                  density === 4 ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground",
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="3 Spalten"
+                onClick={() => setDensity(3)}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center transition",
+                  density === 3 ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground",
+                )}
+              >
+                <Grid2X2 className="h-4 w-4" />
+              </button>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <span className="hidden text-xs uppercase tracking-[0.18em] text-muted-foreground sm:inline">
-              Sortieren
-            </span>
+            {/* Sortieren */}
             <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <SelectTrigger className="h-9 w-44">
-                <SelectValue />
+              <SelectTrigger className="h-9 w-44 border-border">
+                <SelectValue placeholder="Sortieren" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="featured">Empfohlen</SelectItem>
@@ -519,7 +740,7 @@ const Shop = () => {
         {activeCount > 0 && (
           <div className="mb-6 flex flex-wrap items-center gap-2">
             <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-              Aktive Filter
+              {loading ? "—" : `${filtered.length} Artikel`}
             </span>
             {search.trim() && (
               <FilterChip label={`„${search.trim()}"`} onRemove={() => setSearch("")} />
@@ -542,7 +763,7 @@ const Shop = () => {
             {Array.from(selectedStatus).map((s) => (
               <FilterChip key={`st-${s}`} label={STATUS_LABELS[s] ?? titleCase(s)} onRemove={() => {
                 const n = new Set(selectedStatus); n.delete(s); setSelectedStatus(n);
-              }} /> 
+              }} />
             ))}
             {Array.from(selectedColors).map((c) => (
               <FilterChip key={`col-${c}`} label={titleCase(c)} onRemove={() => {
@@ -573,38 +794,36 @@ const Shop = () => {
           </div>
         )}
 
-        <div className="grid gap-10 lg:grid-cols-[260px_1fr]">
-          {/* Desktop filters */}
-          <aside className="hidden lg:block">
-            <FilterPanel />
-          </aside>
-
-          <div>
-            {loading ? (
-              <p className="py-16 text-center text-muted-foreground">Produkte werden geladen …</p>
-            ) : filtered.length === 0 ? (
-              <div className="py-16 text-center">
-                <p className="text-muted-foreground">Keine Produkte gefunden.</p>
-                {activeCount > 0 && (
-                  <Button variant="link" onClick={clearFilters} className="mt-2">
-                    Filter zurücksetzen
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-                {expandProductsByColor(filtered).map((p, i) => (
-                  <ProductCard
-                    key={`${p.node.id}-${p.initialColor ?? "default"}`}
-                    product={p}
-                    initialColor={p.initialColor}
-                    priority={i < 6}
-                  />
-                ))}
-              </div>
+        {/* Produktraster */}
+        {loading ? (
+          <p className="py-16 text-center text-muted-foreground">Produkte werden geladen …</p>
+        ) : filtered.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-muted-foreground">Keine Produkte gefunden.</p>
+            {activeCount > 0 && (
+              <Button variant="link" onClick={clearFilters} className="mt-2">
+                Filter zurücksetzen
+              </Button>
             )}
           </div>
-        </div>
+        ) : (
+          <div
+            className={cn(
+              "grid gap-x-4 gap-y-10 sm:grid-cols-2 md:grid-cols-3",
+              density === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3",
+            )}
+          >
+            {expandProductsByColor(filtered).map((p, i) => (
+              <ProductCard
+                key={`${p.node.id}-${p.initialColor ?? "default"}`}
+                product={p}
+                initialColor={p.initialColor}
+                priority={i < 6}
+                compactCart
+              />
+            ))}
+          </div>
+        )}
       </section>
     </SiteLayout>
   );

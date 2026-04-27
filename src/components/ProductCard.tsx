@@ -19,9 +19,11 @@ interface Props {
    * Wird genutzt, um Mehrfarb-Produkte als mehrere Karten in der Liste darzustellen.
    */
   initialColor?: string;
+  /** Wenn true, wird der Cart-Button nicht im Bild, sondern unten neben dem Preis dargestellt. */
+  compactCart?: boolean;
 }
 
-export const ProductCard = ({ product, priority, initialColor }: Props) => {
+export const ProductCard = ({ product, priority, initialColor, compactCart = false }: Props) => {
   const p = product.node;
   const price = p.priceRange.minVariantPrice;
   const shopifyAmount = parseFloat(price.amount);
@@ -92,6 +94,25 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
   const images = p.images.edges;
   const primary = colorImage ?? images[0]?.node ?? null;
   const secondary = colorImage ? null : images[1]?.node ?? null;
+
+  // Farb-Swatches: pro Farbe ein Variantenbild (für die Bubbles unten links)
+  const colorSwatches = useMemo(() => {
+    if (!colorOption) return [] as Array<{ value: string; image: string | null }>;
+    const seen = new Map<string, string | null>();
+    for (const { node: v } of p.variants.edges) {
+      const value = v.selectedOptions.find((o) => /farbe|color|colour/i.test(o.name))?.value;
+      if (!value || seen.has(value)) continue;
+      seen.set(value, v.image?.url ?? null);
+    }
+    return Array.from(seen.entries()).map(([value, image]) => ({ value, image }));
+  }, [colorOption, p.variants.edges]);
+
+  // Wenn die Karte auf eine Farbe fokussiert ist → keine Bubbles (Sub-Card)
+  // Sonst: andere Farben als Bubbles darstellen
+  const otherSwatches = useMemo(
+    () => (initialColor ? [] : colorSwatches),
+    [initialColor, colorSwatches],
+  );
 
   const firstAvailable =
     variantsForColor.find((v) => v.availableForSale) ??
@@ -223,7 +244,31 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
             </button>
           </div>
 
-          {!soldOut && (
+          {/* Farb-Swatches unten links: kleine runde Vorschauen anderer Farben */}
+          {otherSwatches.length > 1 && (
+            <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+              {otherSwatches.slice(0, 4).map((s) => (
+                <span
+                  key={s.value}
+                  title={s.value}
+                  className="h-6 w-6 overflow-hidden rounded-full border border-border bg-background shadow-sm"
+                >
+                  {s.image ? (
+                    <img src={s.image} alt={s.value} className="h-full w-full object-cover" loading="lazy" />
+                  ) : (
+                    <span className="block h-full w-full bg-muted" />
+                  )}
+                </span>
+              ))}
+              {otherSwatches.length > 4 && (
+                <span className="ml-1 text-[10px] font-medium text-foreground/70">
+                  +{otherSwatches.length - 4}
+                </span>
+              )}
+            </div>
+          )}
+
+          {!soldOut && !compactCart && (
             <button
               onClick={handleQuickAdd}
               disabled={adding || isLoading}
@@ -237,28 +282,40 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
             </button>
           )}
         </div>
-        <div className="mt-4 space-y-1">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
-          <h3 className="font-display text-lg leading-tight">
-            {p.title}
-            {initialColor && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                · {initialColor}
-              </span>
+        <div className="mt-4 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
+            <h3 className="font-display text-lg leading-tight">
+              {p.title}
+              {initialColor && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  · {initialColor}
+                </span>
+              )}
+            </h3>
+            {onSale ? (
+              <p className="flex items-baseline gap-2 text-sm">
+                <span className="font-medium text-destructive">{displayPrice}</span>
+                <span className="text-foreground/50 line-through">{originalPrice}</span>
+              </p>
+            ) : (
+              <p className="text-sm text-foreground/80">{displayPrice}</p>
             )}
-          </h3>
-          {onSale ? (
-            <p className="flex items-baseline gap-2 text-sm">
-              <span className="font-medium text-destructive">{displayPrice}</span>
-              <span className="text-foreground/50 line-through">{originalPrice}</span>
-            </p>
-          ) : (
-            <p className="text-sm text-foreground/80">{displayPrice}</p>
-          )}
-          {showColorHint && (
-            <p className="pt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              +{colorCount} {colorCount === 2 ? "Farbe" : "Farben"}
-            </p>
+            {showColorHint && !compactCart && (
+              <p className="pt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                +{colorCount} {colorCount === 2 ? "Farbe" : "Farben"}
+              </p>
+            )}
+          </div>
+          {compactCart && !soldOut && (
+            <button
+              onClick={handleQuickAdd}
+              disabled={adding || isLoading}
+              aria-label="Zum Warenkorb hinzufügen"
+              className="flex h-9 w-9 shrink-0 items-center justify-center border border-border text-foreground/80 transition hover:border-foreground hover:bg-foreground hover:text-background disabled:opacity-60"
+            >
+              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />}
+            </button>
           )}
         </div>
       </Link>
