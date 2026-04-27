@@ -10,6 +10,9 @@ import { ProductDescription } from "@/components/ProductDescription";
 import { TrustBadges } from "@/components/TrustBadges";
 import { ProductCard } from "@/components/ProductCard";
 import { AiStyleGenerator } from "@/components/AiStyleGenerator";
+import { ProductReviews } from "@/components/reviews/ProductReviews";
+import { RatingStars } from "@/components/reviews/RatingStars";
+import { useProductReviews } from "@/hooks/useProductReviews";
 
 import { YouMightAlsoLike } from "@/components/YouMightAlsoLike";
 import { ClubMemberCta } from "@/components/ClubMemberCta";
@@ -94,6 +97,7 @@ const ProductDetail = () => {
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
   const { price: livePrice } = useLivePrice(handle);
+  const { stats: reviewStats } = useProductReviews(handle);
 
   useEffect(() => {
     if (!handle) return;
@@ -370,6 +374,14 @@ const ProductDetail = () => {
 
           {/* Titel */}
           <h1 className="mt-2 font-display text-4xl leading-tight md:text-5xl">{product.title}</h1>
+
+          {/* Reviews summary (compact) */}
+          {reviewStats && reviewStats.count > 0 && (
+            <a href="#bewertungen" className="mt-3 inline-flex items-center gap-2 text-xs text-foreground/70 hover:text-foreground">
+              <RatingStars value={Number(reviewStats.avg_rating)} size="xs" />
+              <span>{Number(reviewStats.avg_rating).toFixed(1)} · {reviewStats.count} {reviewStats.count === 1 ? "Bewertung" : "Bewertungen"}</span>
+            </a>
+          )}
 
           {/* Preisblock */}
           {selectedVariant && (
@@ -662,7 +674,14 @@ const ProductDetail = () => {
         </Accordion>
       </section>
 
-
+      {/* Bewertungen — verifizierte Käufer */}
+      <ProductReviews
+        productHandle={product.handle}
+        productTitle={product.title}
+        sizeOptions={
+          product.options.find((o) => o.name === "Grösse" || o.name === "Size")?.values ?? []
+        }
+      />
 
       {/* Sticky mobile CTA */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden">

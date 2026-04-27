@@ -278,6 +278,60 @@ export type Database = {
         }
         Relationships: []
       }
+      product_reviews: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          product_handle: string
+          rating: number
+          reviewer_name: string
+          shopify_order_id: string | null
+          size_fit: string | null
+          size_purchased: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+          verified_purchase: boolean
+          would_recommend: boolean
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          product_handle: string
+          rating: number
+          reviewer_name: string
+          shopify_order_id?: string | null
+          size_fit?: string | null
+          size_purchased?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+          verified_purchase?: boolean
+          would_recommend?: boolean
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          product_handle?: string
+          rating?: number
+          reviewer_name?: string
+          shopify_order_id?: string | null
+          size_fit?: string | null
+          size_purchased?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          verified_purchase?: boolean
+          would_recommend?: boolean
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -400,7 +454,20 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      product_review_stats: {
+        Row: {
+          avg_rating: number | null
+          count: number | null
+          count_1: number | null
+          count_2: number | null
+          count_3: number | null
+          count_4: number | null
+          count_5: number | null
+          count_recommend: number | null
+          product_handle: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_club_points: {
