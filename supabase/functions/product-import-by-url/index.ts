@@ -1013,8 +1013,12 @@ Deno.serve(async (req) => {
     // 7) Fire-and-forget: Looks für dieses Produkt generieren lassen
     //    Mit Retry, weil Shopify Storefront-API neue Produkte erst nach
     //    einigen Sekunden indexiert (look-generate würde sonst 404 liefern).
+    //    SKIP wenn Produkt als Draft angelegt wurde — Drafts erscheinen nicht
+    //    in der Storefront-API und Looks würden ohnehin nicht funktionieren.
     let lookGenerationTriggered = false;
-    try {
+    if (productStatus === "draft") {
+      console.log(`[by-url] skipping look-generate for draft product ${handle}`);
+    } else {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const delays = [8000, 20000, 40000]; // 8s, dann +20s, dann +40s
