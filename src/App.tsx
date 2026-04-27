@@ -78,6 +78,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/wunschliste" element={<Wunschliste />} />
+              <Route path="/warenkorb" element={<Warenkorb />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </SizeAdvisorProvider>
