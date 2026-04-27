@@ -327,7 +327,12 @@ Deno.serve(async (req) => {
     console.log("[discover] fetching Venti URLs (categories + sitemap)...");
     const [vtCats, vtSitemap] = await Promise.all([
       discoverBrandUrls("venti", "https://www.venti.com", VENTI_SLUGS, VENTI_PRODUCT_RE),
-      fetchSitemapUrls("venti", "https://www.venti.com/sitemap.xml", VENTI_PRODUCT_RE),
+      fetchSitemapUrls(
+        "venti",
+        "https://www.venti.com",
+        "https://www.venti.com/export/sitemap/sitemap_index.xml",
+        VENTI_PRODUCT_RE,
+      ),
     ]);
     const vtUrls = Array.from(new Set([...vtCats, ...vtSitemap]));
     console.log(`[discover] Venti: ${vtUrls.length} URLs (cats=${vtCats.length}, sitemap=${vtSitemap.length})`);
