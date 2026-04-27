@@ -257,22 +257,26 @@ function titleFromSlug(sourceUrl: string): string {
     .join(" ");
 }
 
-/** Detect fit from URL slug, title, OR <title> tag (Modern/Body/Comfort/Regular/Slim). */
+/** Detect fit from URL slug, title, OR full HTML (Modern/Body/Comfort/Regular/Slim/Tailored). */
 function extractFit(sourceUrl: string, title: string, html?: string): string {
-  let haystack = (sourceUrl + " " + title).toLowerCase();
-  // Venti often hides the fit in the <title> tag (H1 has only the type).
-  // Add the raw <title> too so "Body Fit" is found even if the chosen
-  // displayed title is just "Businesshemd Langarm".
+  // Order matters: Body before Modern (some titles say "Body Fit Modern Cut").
+  // Check small/cheap haystack (URL + title) first, then fall back to full HTML
+  // for sites like Venti where the H1 omits the fit and it lives in the body
+  // (e.g. "fit:Body Fit" in metadata blobs).
+  const small = (sourceUrl + " " + title).toLowerCase();
+  const PATTERNS: Array<[RegExp, string]> = [
+    [/body[- ]?fit/, "Body Fit"],
+    [/modern[- ]?fit/, "Modern Fit"],
+    [/comfort[- ]?fit/, "Comfort Fit"],
+    [/tailored[- ]?fit/, "Tailored Fit"],
+    [/regular[- ]?fit/, "Regular Fit"],
+    [/slim[- ]?fit/, "Slim Fit"],
+  ];
+  for (const [re, label] of PATTERNS) if (re.test(small)) return label;
   if (html) {
-    const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (t) haystack += " " + t[1].toLowerCase();
+    const big = html.toLowerCase();
+    for (const [re, label] of PATTERNS) if (re.test(big)) return label;
   }
-  if (/body[- ]?fit/.test(haystack)) return "Body Fit";
-  if (/modern[- ]?fit/.test(haystack)) return "Modern Fit";
-  if (/comfort[- ]?fit/.test(haystack)) return "Comfort Fit";
-  if (/regular[- ]?fit/.test(haystack)) return "Regular Fit";
-  if (/slim[- ]?fit/.test(haystack)) return "Slim Fit";
-  if (/tailored[- ]?fit/.test(haystack)) return "Tailored Fit";
   return "";
 }
 
