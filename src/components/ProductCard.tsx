@@ -244,7 +244,31 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
             </button>
           </div>
 
-          {!soldOut && (
+          {/* Farb-Swatches unten links: kleine runde Vorschauen anderer Farben */}
+          {otherSwatches.length > 1 && (
+            <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+              {otherSwatches.slice(0, 4).map((s) => (
+                <span
+                  key={s.value}
+                  title={s.value}
+                  className="h-6 w-6 overflow-hidden rounded-full border border-border bg-background shadow-sm"
+                >
+                  {s.image ? (
+                    <img src={s.image} alt={s.value} className="h-full w-full object-cover" loading="lazy" />
+                  ) : (
+                    <span className="block h-full w-full bg-muted" />
+                  )}
+                </span>
+              ))}
+              {otherSwatches.length > 4 && (
+                <span className="ml-1 text-[10px] font-medium text-foreground/70">
+                  +{otherSwatches.length - 4}
+                </span>
+              )}
+            </div>
+          )}
+
+          {!soldOut && !compactCart && (
             <button
               onClick={handleQuickAdd}
               disabled={adding || isLoading}
