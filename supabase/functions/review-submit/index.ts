@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const SHOPIFY_DOMAIN = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN") ?? "";
+    const SHOPIFY_DOMAIN = "style-compass-6nrqi.myshopify.com";
     const SHOPIFY_ADMIN_TOKEN = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? "";
 
     // Auth: User aus JWT lesen
