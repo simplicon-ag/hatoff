@@ -887,19 +887,8 @@ Deno.serve(async (req) => {
     console.log(`[by-url] start brand=${brand} handle=${handle} force=${force} existing=${existing?.id ?? "no"}`);
 
     // 1) Find sibling colour URLs
-    let colorUrls = await discoverColorUrls(sourceUrl, parsed.articleId, brand);
+    const colorUrls = await discoverColorUrls(sourceUrl, parsed.articleId, brand);
     console.log(`[by-url] discovered ${colorUrls.length} colour URLs`);
-
-    // Shopify REST API hard limit: 100 variants per product. With 10 sizes,
-    // that means we can have at most 10 colors. Be conservative: cap at 24
-    // colors so even products with 4 sizes (= 96 variants) stay under the
-    // 100 limit. If a product has more colors, keep the first 24 (which
-    // includes the originally-requested URL since it's pushed first).
-    const MAX_COLORS = 24;
-    if (colorUrls.length > MAX_COLORS) {
-      console.warn(`[by-url] capping ${colorUrls.length} colors to ${MAX_COLORS} (Shopify REST 100-variant limit)`);
-      colorUrls = colorUrls.slice(0, MAX_COLORS);
-    }
 
     // 2) Scrape every colour IN PARALLEL (was sequential — caused 150s timeouts
     //    on products with 5-7 colour variants like Casa Moda Leinenhemden).
