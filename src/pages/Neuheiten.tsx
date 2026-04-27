@@ -12,30 +12,13 @@ const HERO_COUNT = 3;
 const GRID_COUNT = 18;
 const LOOKS_COUNT = 3;
 
-type CategoryId =
-  | "alle"
-  | "freizeithemden"
-  | "polos-tshirts"
-  | "strick-sweat"
-  | "jacken-westen"
-  | "hosen"
-  | "accessoires";
+type CategoryId = string; // entspricht jetzt direkt dem Shopify productType (oder "alle")
 
-const CATEGORIES: Array<{ id: CategoryId; label: string; match: RegExp }> = [
-  { id: "freizeithemden", label: "Freizeithemden", match: /(freizeithemd|hemd|shirt(?!.*t-?shirt)|bluse)/i },
-  { id: "polos-tshirts", label: "Polos & T-Shirts", match: /(polo|t-?shirt|longsleeve)/i },
-  { id: "strick-sweat", label: "Strick & Sweat", match: /(strick|pullover|pulli|sweat|sweater|cardigan|hoodie|kapuzen)/i },
-  { id: "jacken-westen", label: "Jacken & Westen", match: /(jacke|mantel|weste|blazer|sakko|parka|gilet|anorak)/i },
-  { id: "hosen", label: "Hosen", match: /(hose|chino|jeans|bermuda|short|trouser|pant)/i },
-  { id: "accessoires", label: "Accessoires", match: /(g[üu]rtel|krawatte|schal|tuch|m[üu]tze|cap|hut|socke|sock|tasche|geldb[öo]rse|portemonnaie|einstecktuch|fliege|tie|belt|accessoir)/i },
-];
+const ALL_CATEGORY: CategoryId = "alle";
 
-function detectCategory(p: ShopifyProduct): CategoryId | null {
-  const hay = `${p.node.productType ?? ""} ${(p.node.tags ?? []).join(" ")} ${p.node.title}`.toLowerCase();
-  for (const cat of CATEGORIES) {
-    if (cat.match.test(hay)) return cat.id;
-  }
-  return null;
+function getProductType(p: ShopifyProduct): string | null {
+  const t = p.node.productType?.trim();
+  return t && t.length > 0 ? t : null;
 }
 
 const Neuheiten = () => {
