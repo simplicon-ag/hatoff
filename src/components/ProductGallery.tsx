@@ -167,18 +167,16 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
             </div>
           </div>
 
-          {/* Mobile: scroll-snap carousel */}
-          <div
-            ref={trackRef}
-            onScroll={onScroll}
-            className="flex aspect-[4/5] snap-x snap-mandatory overflow-x-auto md:hidden"
-            style={{ scrollbarWidth: "none" }}
-          >
+          {/* Mobile: vertical gallery */}
+          <div ref={trackRef} className="grid gap-3 md:hidden">
             {safeImages.map((img, i) => (
               <button
                 key={img.url + i}
                 onClick={() => setLightbox(true)}
-                className="relative h-full w-full flex-shrink-0 snap-center"
+                className={cn(
+                  "relative aspect-[4/5] w-full overflow-hidden bg-secondary",
+                  i > 2 && "hidden",
+                )}
               >
                 <img
                   src={img.url}

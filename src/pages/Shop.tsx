@@ -566,12 +566,11 @@ const Shop = () => {
       <section className="container-editorial py-10">
         {/* Kategorie-Pills (Produkttypen) */}
         {facets.categories.length > 0 && (
-          <ScrollArea className="-mx-4 mb-6 whitespace-nowrap px-4">
-            <div className="flex justify-center gap-2 pb-2">
+          <div className="mb-6 flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedCategories(new Set())}
                 className={cn(
-                  "shrink-0 border px-5 py-2 text-sm transition",
+                  "min-h-10 border px-4 py-2 text-sm transition",
                   selectedCategories.size === 0
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-background text-foreground/80 hover:border-foreground",
@@ -590,7 +589,7 @@ const Shop = () => {
                       setSelectedCategories(next);
                     }}
                     className={cn(
-                      "shrink-0 border px-5 py-2 text-sm transition",
+                      "min-h-10 border px-4 py-2 text-sm transition",
                       active
                         ? "border-foreground bg-foreground text-background"
                         : "border-border bg-background text-foreground/80 hover:border-foreground",
@@ -601,8 +600,7 @@ const Shop = () => {
                   </button>
                 );
               })}
-            </div>
-          </ScrollArea>
+          </div>
         )}
 
         {/* Horizontale Filter-Toolbar */}
