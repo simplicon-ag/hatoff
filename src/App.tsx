@@ -25,6 +25,7 @@ import ClubAccount from "./pages/ClubAccount.tsx";
 import Auth from "./pages/Auth.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import Wunschliste from "./pages/Wunschliste.tsx";
+import Warenkorb from "./pages/Warenkorb.tsx";
 import { RequireAuth } from "./components/club/RequireAuth.tsx";
 
 const queryClient = new QueryClient();
