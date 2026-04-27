@@ -47,12 +47,11 @@ export const SiteFooter = () => {
           </ul>
         </div>
 
-        <div className="space-y-3 text-sm md:col-span-4">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-6 text-xs uppercase tracking-wider text-muted-foreground/70">
-            <span className="font-display text-[11px]">Admin</span>
-            <Link to="/admin/import" className="hover:text-primary">Produkt-Import</Link>
+        <div className="md:col-span-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/40 pt-4 text-[10px] tracking-wider text-muted-foreground/40">
+            <Link to="/admin/import" className="hover:text-muted-foreground">Admin · Import</Link>
             <span aria-hidden="true">·</span>
-            <Link to="/admin/looks" className="hover:text-primary">Look-Review</Link>
+            <Link to="/admin/looks" className="hover:text-muted-foreground">Looks</Link>
           </div>
         </div>
       </div>
