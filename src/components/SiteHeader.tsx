@@ -4,13 +4,18 @@ import { Heart, Menu, User, X } from "lucide-react";
 import { Logo } from "./Logo";
 import { CartDrawer } from "./CartDrawer";
 import { GlobalSearch } from "./GlobalSearch";
+import { TopTrustBar } from "./TopTrustBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useWishlist } from "@/hooks/useWishlist";
 
 const navItems = [
-  { to: "/looks", label: "Looks" },
+  { to: "/neuheiten", label: "New In" },
   { to: "/shop", label: "Shop" },
-  { to: "/club", label: "CLUB" },
+  { to: "/looks", label: "Looks" },
+  { to: "/marken", label: "Marken" },
+  { to: "/sale", label: "Sale", accent: true },
+  { to: "/magazin", label: "Stories" },
+  { to: "/club", label: "Club" },
 ];
 
 export const SiteHeader = () => {
@@ -27,62 +32,87 @@ export const SiteHeader = () => {
   }, []);
 
   return (
-    <header
-      className={`sticky top-0 z-40 w-full border-b transition-all duration-300 ${
-        scrolled ? "bg-background/85 backdrop-blur-md border-border" : "bg-background border-transparent"
-      }`}
-    >
-      <div className="container-editorial flex h-24 items-center justify-between md:h-32">
-        <Logo />
+    <header className="sticky top-0 z-40 w-full bg-background">
+      <TopTrustBar />
 
-        <nav className="hidden items-center gap-8 md:flex" aria-label="Hauptnavigation">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `text-sm font-medium tracking-wide transition-colors ${
-                  isActive ? "text-primary" : "text-foreground/80 hover:text-primary"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-1 md:gap-2">
-          <GlobalSearch />
-          <Link
-            to="/wunschliste"
-            aria-label="Wunschliste"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-secondary"
-          >
-            <Heart className="h-5 w-5" />
-            {wishlistCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground">
-                {wishlistCount}
-              </span>
-            )}
-          </Link>
-          <Link
-            to={user ? "/club/mein-konto" : "/auth"}
-            aria-label={user ? "Mein Konto" : "Anmelden"}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-secondary"
-          >
-            <User className="h-5 w-5" />
-          </Link>
-          <CartDrawer />
+      {/* Brand-Zeile: Logo zentriert, Icons rechts, Burger links (Mobile) */}
+      <div
+        className={`border-b transition-all duration-300 ${
+          scrolled ? "border-border" : "border-transparent"
+        }`}
+      >
+        <div className="container-editorial relative flex h-16 items-center justify-between md:h-20">
+          {/* Mobile Burger links */}
           <button
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-secondary md:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center text-foreground hover:bg-secondary md:hidden"
             onClick={() => setOpen((s) => !s)}
             aria-label="Menü"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
+
+          {/* Logo zentriert */}
+          <Link
+            to="/"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          >
+            <Logo />
+          </Link>
+
+          {/* Icons rechts */}
+          <div className="ml-auto flex items-center gap-1">
+            <GlobalSearch />
+            <Link
+              to="/wunschliste"
+              aria-label="Wunschliste"
+              className="relative inline-flex h-10 w-10 items-center justify-center text-foreground hover:bg-secondary"
+            >
+              <Heart className="h-5 w-5" />
+              {wishlistCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
+            <Link
+              to={user ? "/club/mein-konto" : "/auth"}
+              aria-label={user ? "Mein Konto" : "Anmelden"}
+              className="inline-flex h-10 w-10 items-center justify-center text-foreground hover:bg-secondary"
+            >
+              <User className="h-5 w-5" />
+            </Link>
+            <CartDrawer />
+          </div>
         </div>
+
+        {/* Desktop-Nav: Zeile darunter, zentriert */}
+        <nav
+          className="hidden border-t border-border md:block"
+          aria-label="Hauptnavigation"
+        >
+          <div className="container-editorial flex h-12 items-center justify-center gap-10">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `text-[13px] font-medium uppercase tracking-[0.12em] transition-colors ${
+                    item.accent
+                      ? "text-destructive hover:text-destructive/80"
+                      : isActive
+                        ? "text-primary"
+                        : "text-foreground/85 hover:text-primary"
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
       </div>
 
+      {/* Mobile Drawer */}
       {open && (
         <div className="border-t border-border bg-background md:hidden">
           <nav className="container-editorial flex flex-col gap-1 py-4">
@@ -91,7 +121,9 @@ export const SiteHeader = () => {
                 key={item.to}
                 to={item.to}
                 onClick={() => setOpen(false)}
-                className="rounded-sm px-2 py-3 text-base font-medium text-foreground/90 hover:bg-secondary"
+                className={`px-2 py-3 text-base font-medium uppercase tracking-wide hover:bg-secondary ${
+                  item.accent ? "text-destructive" : "text-foreground/90"
+                }`}
               >
                 {item.label}
               </Link>
