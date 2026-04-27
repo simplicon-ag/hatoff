@@ -282,28 +282,40 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
             </button>
           )}
         </div>
-        <div className="mt-4 space-y-1">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
-          <h3 className="font-display text-lg leading-tight">
-            {p.title}
-            {initialColor && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                · {initialColor}
-              </span>
+        <div className="mt-4 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
+            <h3 className="font-display text-lg leading-tight">
+              {p.title}
+              {initialColor && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  · {initialColor}
+                </span>
+              )}
+            </h3>
+            {onSale ? (
+              <p className="flex items-baseline gap-2 text-sm">
+                <span className="font-medium text-destructive">{displayPrice}</span>
+                <span className="text-foreground/50 line-through">{originalPrice}</span>
+              </p>
+            ) : (
+              <p className="text-sm text-foreground/80">{displayPrice}</p>
             )}
-          </h3>
-          {onSale ? (
-            <p className="flex items-baseline gap-2 text-sm">
-              <span className="font-medium text-destructive">{displayPrice}</span>
-              <span className="text-foreground/50 line-through">{originalPrice}</span>
-            </p>
-          ) : (
-            <p className="text-sm text-foreground/80">{displayPrice}</p>
-          )}
-          {showColorHint && (
-            <p className="pt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              +{colorCount} {colorCount === 2 ? "Farbe" : "Farben"}
-            </p>
+            {showColorHint && !compactCart && (
+              <p className="pt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                +{colorCount} {colorCount === 2 ? "Farbe" : "Farben"}
+              </p>
+            )}
+          </div>
+          {compactCart && !soldOut && (
+            <button
+              onClick={handleQuickAdd}
+              disabled={adding || isLoading}
+              aria-label="Zum Warenkorb hinzufügen"
+              className="flex h-9 w-9 shrink-0 items-center justify-center border border-border text-foreground/80 transition hover:border-foreground hover:bg-foreground hover:text-background disabled:opacity-60"
+            >
+              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />}
+            </button>
           )}
         </div>
       </Link>
