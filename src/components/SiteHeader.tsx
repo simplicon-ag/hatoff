@@ -9,9 +9,7 @@ import { useWishlist } from "@/hooks/useWishlist";
 
 const navItems = [
   { to: "/looks", label: "Looks" },
-  { to: "/neuheiten", label: "Neuheiten" },
   { to: "/shop", label: "Shop" },
-  { to: "/sale", label: "Sale", highlight: true },
   { to: "/club", label: "CLUB" },
 ];
 
@@ -44,13 +42,7 @@ export const SiteHeader = () => {
               to={item.to}
               className={({ isActive }) =>
                 `text-sm font-medium tracking-wide transition-colors ${
-                  item.highlight
-                    ? isActive
-                      ? "text-destructive"
-                      : "text-destructive/90 hover:text-destructive"
-                    : isActive
-                      ? "text-primary"
-                      : "text-foreground/80 hover:text-primary"
+                  isActive ? "text-primary" : "text-foreground/80 hover:text-primary"
                 }`
               }
             >
@@ -99,9 +91,7 @@ export const SiteHeader = () => {
                 key={item.to}
                 to={item.to}
                 onClick={() => setOpen(false)}
-                className={`rounded-sm px-2 py-3 text-base font-medium hover:bg-secondary ${
-                  item.highlight ? "text-destructive" : "text-foreground/90"
-                }`}
+                className="rounded-sm px-2 py-3 text-base font-medium text-foreground/90 hover:bg-secondary"
               >
                 {item.label}
               </Link>
