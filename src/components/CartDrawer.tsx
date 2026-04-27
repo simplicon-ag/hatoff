@@ -16,6 +16,7 @@ import { formatPrice } from "@/lib/shopify";
 
 export const CartDrawer = () => {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { items, isLoading, isSyncing, updateQuantity, removeItem, getCheckoutUrl, syncCart } = useCartStore();
 
   const totalItems = items.reduce((s, i) => s + i.quantity, 0);
@@ -25,6 +26,11 @@ export const CartDrawer = () => {
   useEffect(() => {
     if (open) syncCart();
   }, [open, syncCart]);
+
+  const handleViewCart = () => {
+    setOpen(false);
+    navigate("/warenkorb");
+  };
 
   const handleCheckout = () => {
     const url = getCheckoutUrl();
