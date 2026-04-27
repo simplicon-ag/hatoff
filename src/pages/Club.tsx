@@ -12,6 +12,7 @@ import {
 import { TierCard } from "@/components/club/TierCard";
 import { CLUB_TIERS } from "@/lib/club-tiers";
 import { useAuth } from "@/hooks/useAuth";
+import clubHero from "@/assets/club-hero.jpg";
 
 const steps = [
   {
@@ -72,14 +73,23 @@ const Club = () => {
   return (
     <SiteLayout>
       {/* Hero */}
-      <section className="bg-foreground text-background">
-        <div className="container-editorial py-20 md:py-28">
+      <section className="relative overflow-hidden bg-foreground text-background">
+        <img
+          src={clubHero}
+          alt="HATOFF Club"
+          width={1600}
+          height={1200}
+          className="absolute inset-0 h-full w-full object-cover opacity-70"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-foreground via-foreground/80 to-foreground/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-foreground/90 via-transparent to-transparent" />
+        <div className="container-editorial relative py-24 md:py-36">
           <div className="max-w-3xl">
-            <p className="text-[11px] uppercase tracking-[0.4em] text-background/60">HATOFF Club</p>
+            <p className="text-[11px] uppercase tracking-[0.4em] text-background/70">HATOFF Club</p>
             <h1 className="mt-4 font-display text-5xl leading-[1.05] md:text-7xl">
               Stil wird<br />belohnt.
             </h1>
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-background/75 md:text-lg">
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-background/80 md:text-lg">
               Sammle mit jedem Einkauf Punkte, steige in höhere Stufen auf — und sichere dir
               dauerhafte Rabatte, Early Access und persönliche Stil-Beratung.
             </p>
@@ -90,7 +100,7 @@ const Club = () => {
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-background/50">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-background/60">
                 Kostenlos · 100 Willkommens-Punkte · Jederzeit kündbar
               </p>
             </div>
