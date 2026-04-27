@@ -1220,7 +1220,73 @@ export const looks: CuratedLook[] = [
     story: "Grünes Hemd, anthrazitfarbene Hose, ruhige Krawatte. Für Räume, in denen Persönlichkeit zählt.",
     highlights: ["Akzent: Grün als seltene Wahl", "Anker: dunkle Hose hält Balance", "Schnitt: präzise, ohne Schmuck"],
   },
+  {
+    slug: "hemden-46",
+    title: "Leinen am Morgen",
+    subtitle: "Stiller Start in einen langen Tag.",
+    welt: "hemden",
+    anlaesse: ["alltag", "ausgang"],
+    productHandles: [
+      "casa-moda-leinenhemd-hellblau",
+      "casa-moda-chinohose-chris-beige",
+    ],
+    story: "Hellblaues Leinen, beige Chino — der Look für Tage, die mit Espresso beginnen und in den Abend gleiten. Leise Eleganz, die niemandem etwas beweisen muss.",
+    highlights: ["Atmungsaktiv: Leinen lebt mit dir", "Tonal: Hellblau auf Beige", "Vielseitig: Frühstück bis Aperitif"],
+  },
+  {
+    slug: "hemden-47",
+    title: "Tiefes Grün, ruhige Jeans",
+    subtitle: "Charakter ohne Lautstärke.",
+    welt: "hemden",
+    anlaesse: ["alltag", "ausgang"],
+    productHandles: [
+      "casa-moda-leinenhemd-dunkelgruen",
+      "casa-moda-jeans-steve-dunkelblau",
+    ],
+    story: "Dunkelgrünes Leinenhemd zur dunkelblauen STEVE-Jeans — eine Kombination, die Naturtöne und Indigo zu einer ruhigen Einheit verschmilzt. Für Männer, die Stil als Haltung verstehen.",
+    highlights: ["Farbtiefe: Tannengrün trifft Indigo", "Material: Leinen weich, Denim robust", "Mood: nachdenklich, souverän"],
+  },
+  {
+    slug: "hemden-48",
+    title: "Weisses Hemd, neue Lesart",
+    subtitle: "Der Klassiker, entspannt getragen.",
+    welt: "hemden",
+    anlaesse: ["alltag", "buero"],
+    productHandles: [
+      "casa-moda-leinenhemd-kurzarm-weiss",
+      "casa-moda-chinohose-chris-dunkelblau",
+    ],
+    story: "Ein weisses Kurzarm-Leinen über einer dunkelblauen CHRIS-Chino. Reduziert auf das Wesentliche — und gerade deshalb so präsent. Für Tage zwischen Büro und Bar.",
+    highlights: ["Reduktion: Weiss als Statement", "Schnitt: kurz, klar, leicht", "Tag zu Nacht: ohne Umziehen"],
+  },
+  {
+    slug: "hemden-49",
+    title: "Salbei und Sand",
+    subtitle: "Naturtöne, die nachklingen.",
+    welt: "hemden",
+    anlaesse: ["alltag", "reisen"],
+    productHandles: [
+      "casa-moda-leinenhemd-hellgruen",
+      "casa-moda-chinohose-chris-champagner-beige",
+    ],
+    story: "Helles Salbeigrün trifft auf champagnerfarbene Chino — eine Palette wie ein Spätsommertag in der Provence. Mühelos, warm, unaufdringlich elegant.",
+    highlights: ["Naturpalette: Salbei und Sand", "Atmungsaktiv: leichtes Leinen", "Stimmung: Süden, Sonne, Stille"],
+  },
+  {
+    slug: "hemden-50",
+    title: "Blaues Hemd, dunkle Hose",
+    subtitle: "Der Code, den jeder lesen kann.",
+    welt: "hemden",
+    anlaesse: ["alltag", "buero", "ausgang"],
+    productHandles: [
+      "casa-moda-leinenhemd-blau",
+      "venti-anzughose-780-anthrazit",
+    ],
+    story: "Blaues Leinenhemd zur anthrazitfarbenen Anzughose — der Beweis, dass Smart Casual nicht kompliziert sein muss. Genug Lockerheit für die Bar, genug Form für den Termin.",
+    highlights: ["Brücke: Leinen trifft Anzugstoff", "Tonal: Blau auf Anthrazit", "Anlass-Range: Termin bis Dinner"],
+  },
 ];
+
 
 // Auto-attach generated lifestyle hero images for looks that don't already have one.
 const generatedHeroes = import.meta.glob<{ default: string }>(
