@@ -890,28 +890,46 @@ Deno.serve(async (req) => {
     const colorUrls = await discoverColorUrls(sourceUrl, parsed.articleId, brand);
     console.log(`[by-url] discovered ${colorUrls.length} colour URLs`);
 
-    // 2) Scrape every colour
+    // 2) Scrape every colour IN PARALLEL (was sequential — caused 150s timeouts
+    //    on products with 5-7 colour variants like Casa Moda Leinenhemden).
+    //    Firecrawl handles concurrent requests fine; we limit to 8 parallel
+    //    just to stay polite. Each color page is ~5-15s, so 7 in parallel
+    //    finishes in ~15s instead of ~70s.
+    const PARALLEL_SCRAPE_LIMIT = 8;
     const colors: ColorData[] = [];
-    for (const cu of colorUrls) {
-      const html = await firecrawlScrape(cu.url, firecrawlKey);
-      if (!html) {
-        console.warn(`[by-url] firecrawl failed for ${cu.url}`);
-        continue;
+    for (let i = 0; i < colorUrls.length; i += PARALLEL_SCRAPE_LIMIT) {
+      const batch = colorUrls.slice(i, i + PARALLEL_SCRAPE_LIMIT);
+      const batchResults = await Promise.all(
+        batch.map(async (cu) => {
+          try {
+            const html = await firecrawlScrape(cu.url, firecrawlKey);
+            if (!html) {
+              console.warn(`[by-url] firecrawl failed for ${cu.url}`);
+              return null;
+            }
+            const sc = extractFromHtml(html, brand, cu.url);
+            if (!sc.title || sc.price_eur === null) {
+              console.warn(`[by-url] incomplete data for ${cu.url}`);
+              return null;
+            }
+            // Colour name: prefer title, fall back to URL slug, then to colorId.
+            let colorName = extractColorFromTitle(sc.title) || "";
+            if (!colorName) {
+              const slug = cu.url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
+              const slugColor = extractColorFromTitle(" " + slug.replace(/-/g, " "));
+              if (slugColor) colorName = slugColor.replace(/\b\w/g, (c) => c.toUpperCase());
+            }
+            if (!colorName) colorName = `Farbe ${cu.colorId}`;
+            return { colorName, colorId: cu.colorId, scraped: sc } as ColorData;
+          } catch (e) {
+            console.warn(`[by-url] scrape error for ${cu.url}:`, e);
+            return null;
+          }
+        }),
+      );
+      for (const r of batchResults) {
+        if (r) colors.push(r);
       }
-      const sc = extractFromHtml(html, brand, cu.url);
-      if (!sc.title || sc.price_eur === null) {
-        console.warn(`[by-url] incomplete data for ${cu.url}`);
-        continue;
-      }
-      // Colour name: prefer title, fall back to URL slug, then to colorId.
-      let colorName = extractColorFromTitle(sc.title) || "";
-      if (!colorName) {
-        const slug = cu.url.replace(/^https?:\/\/[^/]+\/de\/de\//i, "").replace(/-\d+-\d+\/?$/, "");
-        const slugColor = extractColorFromTitle(" " + slug.replace(/-/g, " "));
-        if (slugColor) colorName = slugColor.replace(/\b\w/g, (c) => c.toUpperCase());
-      }
-      if (!colorName) colorName = `Farbe ${cu.colorId}`;
-      colors.push({ colorName, colorId: cu.colorId, scraped: sc });
     }
 
     if (colors.length === 0) {
