@@ -392,9 +392,16 @@ const Shop = () => {
 
       <Accordion
         type="multiple"
-        defaultValue={["Marke", "Kategorie", "Welt"]}
+        defaultValue={["Status", "Marke", "Kategorie", "Welt"]}
         className="w-full"
       >
+        <FacetGroup
+          title="Status"
+          items={facets.status}
+          selected={selectedStatus}
+          onToggle={toggle(selectedStatus, setSelectedStatus)}
+          capitalize
+        />
         <FacetGroup
           title="Marke"
           items={facets.vendors}
