@@ -312,7 +312,7 @@ const ProductDetail = () => {
     );
   }
 
-  const images = product.images.edges.map((e) => e.node);
+  const images = galleryImages;
   const available = selectedVariant?.availableForSale ?? false;
 
   return (
