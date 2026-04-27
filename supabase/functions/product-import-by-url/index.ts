@@ -415,8 +415,8 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     isNew = true;
   }
 
-  // 4) Fit detection
-  const fit = extractFit(sourceUrl, title);
+  // 4) Fit detection (also checks raw <title> for Venti where H1 lacks fit)
+  const fit = extractFit(sourceUrl, title, html);
 
   // 5) Build rich body_html for Shopify
   const parts: string[] = [];
