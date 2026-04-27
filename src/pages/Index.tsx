@@ -12,6 +12,8 @@ import { HeroCarousel } from "@/components/HeroCarousel";
 import { FeaturedLook } from "@/components/FeaturedLook";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
+import { TrustBar } from "@/components/TrustBar";
+import { TestimonialsSection } from "@/components/TestimonialsSection";
 import { magazinArtikel, marken } from "@/data/looks";
 import editorialMorgen from "@/assets/editorial-fs26-morgen.jpg";
 import editorialMittag from "@/assets/editorial-fs26-mittag.jpg";
@@ -70,6 +72,9 @@ const Index = () => {
     <SiteLayout>
       {/* ───────── Hero (Carousel + Live-Counter) ───────── */}
       <HeroCarousel />
+
+      {/* ───────── Trust-Bar (Versprechen) ───────── */}
+      <TrustBar />
 
       {/* ───────── So funktioniert HATOFF ───────── */}
       <section id="so-funktionierts" className="container-editorial py-16 md:py-20">
@@ -309,6 +314,9 @@ const Index = () => {
           </div>
         </section>
       )}
+
+      {/* ───────── Testimonials ───────── */}
+      <TestimonialsSection />
 
       {/* ───────── Magazin Teaser (symmetrisch) ───────── */}
       <section className="container-editorial py-16 md:py-24">
