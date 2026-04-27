@@ -193,8 +193,8 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
             </span>
           )}
 
-          {/* Top-right action stack: Wishlist + Quick-View */}
-          <div className="absolute right-3 top-3 flex flex-col gap-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100 focus-within:opacity-100">
+          {/* Top-right action stack: Wishlist immer sichtbar, Quick-View nur Desktop on hover */}
+          <div className="absolute right-3 top-3 flex flex-col gap-2">
             <WishlistButton
               productHandle={p.handle}
               productTitle={p.title}
@@ -213,24 +213,10 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
                 setQuickOpen(true);
               }}
               aria-label="Schnellansicht"
-              className="hidden h-8 w-8 items-center justify-center border border-border bg-background/90 text-foreground/70 backdrop-blur transition hover:border-primary hover:text-primary md:flex"
+              className="hidden h-8 w-8 items-center justify-center border border-border bg-background/90 text-foreground/70 opacity-0 backdrop-blur transition hover:border-primary hover:text-primary group-hover:opacity-100 md:flex"
             >
               <Eye className="h-3.5 w-3.5" />
             </button>
-          </div>
-
-          {/* Wishlist auch immer sichtbar auf Mobile */}
-          <div className="absolute right-3 top-3 md:hidden">
-            <WishlistButton
-              productHandle={p.handle}
-              productTitle={p.title}
-              productImage={primary?.url ?? null}
-              vendor={p.vendor}
-              priceAmount={parseFloat(price.amount)}
-              priceCurrency={price.currencyCode}
-              size="sm"
-              stopNavigation
-            />
           </div>
 
           {!soldOut && (
