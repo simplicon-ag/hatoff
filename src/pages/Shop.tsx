@@ -120,6 +120,7 @@ const Shop = () => {
     
     const colors = new Map<string, number>();
     const sizes = new Map<string, number>();
+    const status = new Map<string, number>();
     let priceMin = Infinity;
     let priceMax = 0;
 
