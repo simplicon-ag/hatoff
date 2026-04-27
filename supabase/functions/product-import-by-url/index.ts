@@ -266,6 +266,7 @@ function extractFit(sourceUrl: string, title: string, html?: string): string {
   const small = (sourceUrl + " " + title).toLowerCase();
   const PATTERNS: Array<[RegExp, string]> = [
     [/body[- ]?fit/, "Body Fit"],
+    [/casual[- ]?fit/, "Casual Fit"],
     [/modern[- ]?fit/, "Modern Fit"],
     [/comfort[- ]?fit/, "Comfort Fit"],
     [/tailored[- ]?fit/, "Tailored Fit"],
