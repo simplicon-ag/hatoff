@@ -32,6 +32,17 @@ const tagValue = (tag: string, prefix: string) =>
     ? tag.slice(prefix.length + 1).trim()
     : null;
 
+const FilterChip = ({ label, onRemove }: { label: string; onRemove: () => void }) => (
+  <button
+    type="button"
+    onClick={onRemove}
+    className="inline-flex items-center gap-1.5 border border-border bg-secondary/60 px-2.5 py-1 text-xs text-foreground/85 transition hover:border-foreground hover:bg-secondary"
+  >
+    <span>{label}</span>
+    <X className="h-3 w-3" />
+  </button>
+);
+
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
