@@ -1,71 +1,106 @@
+## Wichtiger Hinweis vorab
 
-# Trust-Strategie für HATOFF
+**Fake-Bewertungen baue ich nicht ein.** Erfundene Reviews verstossen in der Schweiz gegen das UWG (Art. 3) und in der EU gegen die Omnibus-Richtlinie / DSA — beides kann zu Abmahnungen, Bussen und Reputationsschäden führen. Für eine Premium-Brand wie Hatoff wäre das ein echter Risiko-Faktor und würde dem Trust-Konzept widersprechen, das wir gerade aufgebaut haben.
 
-Aktuell gibt es Trust-Elemente nur an wenigen Stellen (Hero-Carousel mit "4.9/5", `TrustBadges` auf Produktseiten). Ich schlage vier dezente, aufeinander abgestimmte Bausteine vor — **kein aufdringliches "Trust-Popup"**, sondern editorial-stille Elemente, die sich ins HATOFF-Look-and-Feel einfügen.
-
----
-
-## 1. Neue Trust-Bar als eigene Sektion auf der Startseite
-
-Direkt **nach dem Hero**, vor "So funktioniert HATOFF" — als ruhiger, voller Streifen:
-
-- **Kostenloser CH-Versand ab CHF 100**
-- **30 Tage kostenlose Retoure**
-- **Sichere Zahlung** (Twint, Visa, Mastercard, AmEx, PayPal)
-- **Versand aus der Schweiz**
-- **Persönliche Stilberatung**
-
-Layout: 4–5 Spalten mit Lucide-Icons, sehr leicht (border-y, dezenter bg), passt zum bestehenden Brand-Strip-Stil.
-
-## 2. Kundenstimmen-Sektion ("Was Kunden sagen")
-
-Neue Sektion vor dem Magazin-Teaser auf der Startseite:
-
-- 3 echte Kurz-Testimonials (Name, Stadt, Anlass — z.B. "Marc, Zürich · Hochzeitsgast-Look")
-- Sterne-Rating (5/5)
-- Optional ein kleiner verifizierter Badge ("Verifizierter Kauf")
-- Editorial-Optik: Serifen-Quote, viel Whitespace, keine Sprechblasen
-
-Da noch keine echten Reviews vorliegen, beginnen wir mit **3 plausiblen Beispiel-Stimmen** (klar als solche markierbar, später durch echte ersetzbar — z.B. via Trustpilot/Judge.me-Integration).
-
-## 3. Floating "Vertrauens-Button" unten rechts
-
-Ein kleiner, runder Button (rechts unten, dezent — wie ein Chat-Bubble, aber als Trust-Anker):
-- Icon: ShieldCheck
-- Klick öffnet ein Popover/Sheet mit:
-  - Übersicht aller Garantien (Versand, Retoure, Beratung, sichere Zahlung)
-  - Direkter Link zu Grössentabellen
-  - Kontakt für Stilberatung (Mail/Form)
-- Schliessbar, **merkt sich Status via localStorage** (einmal geschlossen → bleibt zu)
-
-Optisch sehr zurückhaltend (cremefarben mit dünner Border, nicht primary).
-
-## 4. Trust-Verstärkung auf Produktseite
-
-Die bestehende `TrustBadges`-Komponente ergänzen:
-- Zahlungsmethoden-Icons (Twint, Visa, Mastercard, PayPal) als kleine SVG-Reihe unter dem "In den Warenkorb"-Button
-- Mini-Hinweis: "✓ Auf Lager · Versand morgen" (wenn verfügbar)
+**Stattdessen** baue ich einen eleganten Empty-State mit klarer Botschaft (»Nur verifizierte Käufer können bewerten — sei der/die Erste«), der von Anfang an Vertrauen schafft. Sobald echte Kunden bewerten, füllt sich die Sektion organisch.
 
 ---
 
-## Betroffene Dateien
+## Was ich umsetzen werde
 
-- **Neu**: `src/components/TrustBar.tsx` — Streifen-Sektion (Punkt 1)
-- **Neu**: `src/components/TestimonialsSection.tsx` — Kundenstimmen (Punkt 2)
-- **Neu**: `src/components/TrustFloatingButton.tsx` — Floating Button (Punkt 3)
-- **Neu**: `src/components/PaymentMethodsRow.tsx` — Zahlungs-Icons (Punkt 4)
-- **Bearbeitet**: `src/pages/Index.tsx` — TrustBar + Testimonials einbinden
-- **Bearbeitet**: `src/components/SiteLayout.tsx` — Floating Button global einbinden
-- **Bearbeitet**: `src/components/TrustBadges.tsx` — um Payment-Row + Lieferhinweis ergänzen
-- **Bearbeitet**: `src/pages/ProductDetail.tsx` — bei Bedarf nur, falls TrustBadges dort eingebunden ist
+### 1. Datenbankstruktur (neue Migration)
+
+**Tabelle `product_reviews`**
+- `id` (uuid, pk)
+- `product_handle` (text) — Verknüpfung zum Shopify-Produkt
+- `user_id` (uuid → auth.users) — eingeloggter Käufer
+- `rating` (int, 1–5) — Sternewertung
+- `title` (text, max 80 Zeichen) — kurze Headline
+- `body` (text, max 1000 Zeichen) — Freitext
+- `size_purchased` (text, optional) — gewählte Grösse
+- `size_fit` (enum: 'small' | 'true' | 'large') — »Fällt aus wie…«
+- `would_recommend` (boolean) — Weiterempfehlung
+- `verified_purchase` (boolean, default false) — von Edge Function gesetzt
+- `shopify_order_id` (text) — Referenz zur Bestellung
+- `status` (text: 'pending' | 'published' | 'rejected')
+- `created_at`, `updated_at`
+
+**RLS-Policies**
+- Public: SELECT nur wo `status = 'published'`
+- Authenticated: INSERT nur eigene Reviews (mit `auth.uid() = user_id`)
+- Authenticated: UPDATE/DELETE nur eigene Reviews
+
+**View `product_review_stats`** (für schnelle Aggregation)
+- `product_handle`, `avg_rating`, `count`, `count_5`, `count_4`, … `count_1`
+
+### 2. Edge Function: `review-verify-purchase`
+
+Prüft via Shopify Admin API, ob der eingeloggte User das Produkt tatsächlich gekauft hat:
+1. Liest E-Mail des authentifizierten Users
+2. Query an Shopify: `orders.json?email=...&status=any`
+3. Sucht in `line_items` nach passendem `product_handle`
+4. Bei Treffer: setzt `verified_purchase = true` und speichert `shopify_order_id`
+5. Bei Treffer: Review geht direkt auf `status = 'published'`
+6. Ohne Kauf: Review wird abgelehnt mit klarer Meldung
+
+### 3. UI-Komponenten
+
+**`src/components/reviews/ProductReviews.tsx`** — Hauptsektion auf der PDP
+- Zusammenfassung oben: ⭐ Durchschnitt, Anzahl Reviews, Verteilungsbalken (5★ bis 1★)
+- Liste der veröffentlichten Reviews (Avatar/Initialen, Name, Datum, »Verifizierter Kauf«-Badge, Sterne, Titel, Text, Grösse + Passform)
+- Filter/Sortierung: Neueste, Beste, Schlechteste, Mit Bild
+- **Empty-State** (initial — keine Reviews): Editorial-Card mit Text:
+  > »Noch keine Bewertungen. Bei Hatoff kann nur bewerten, wer das Produkt tatsächlich gekauft hat — so bleibt jede Stimme echt. Sei der/die Erste.«
+
+**`src/components/reviews/ReviewForm.tsx`** — Bewertungsformular (Dialog)
+- Sterne-Auswahl (1–5, Pflicht)
+- Titel (Pflicht, max 80)
+- Freitext (Pflicht, mind. 30, max 1000)
+- Grösse (Dropdown aus Produktvarianten)
+- Passform (Radio: »Fällt klein aus / Passt genau / Fällt gross aus«)
+- Weiterempfehlung (Switch)
+- Submit → Edge Function → Verifizierung → Toast
+
+**`src/components/reviews/RatingStars.tsx`** — wiederverwendbare Sterne-Anzeige
+
+### 4. Trust-Hinweis (transparent)
+
+Direkt über dem Bewertungsbereich ein dezenter Info-Hinweis:
+> 🛡️ **Verifizierte Bewertungen** — Bei Hatoff können nur Kund:innen bewerten, die den Artikel auch gekauft haben. Wir prüfen jede Bewertung gegen unsere Bestellhistorie.
+
+### 5. Validierung & Sicherheit
+
+- **Zod-Schema** für Client-Validierung (Länge, Range, Pflichtfelder)
+- **Server-Side**: Edge Function validiert nochmals
+- **Rate Limiting**: max. 1 Review pro User pro Produkt (Unique Constraint auf `(user_id, product_handle)`)
+- Auth-Check vor Submit; nicht eingeloggte User sehen Login-Prompt
+- Keine HTML-Injection (Plain Text only, kein dangerouslySetInnerHTML)
+
+### 6. PDP-Integration
+
+In `src/pages/ProductDetail.tsx` direkt nach dem `TrustBadges`-Block und vor `YouMightAlsoLike` eingefügt. Im Titelbereich oben rechts wird zusätzlich der Durchschnittsstern + Anzahl angezeigt (verlinkt zur Sektion).
 
 ---
 
-## Offene Frage zur Auswahl
+## Dateien (geplant)
 
-Möchtest du **alle 4 Bausteine** umsetzen, oder zunächst nur eine Auswahl? Mein Vorschlag wäre:
-- **Empfohlen (kompletter Schub)**: 1 + 2 + 4 (ohne Floating Button — der kann visuell stören)
-- **Minimal**: 1 + 4 (nur Streifen + Payment-Icons)
-- **Maximal**: alle 4
+**Neu:**
+- `supabase/migrations/<timestamp>_product_reviews.sql`
+- `supabase/functions/review-submit/index.ts` (Verifizierung + Insert)
+- `src/components/reviews/ProductReviews.tsx`
+- `src/components/reviews/ReviewForm.tsx`
+- `src/components/reviews/RatingStars.tsx`
+- `src/components/reviews/ReviewSummary.tsx`
+- `src/hooks/useProductReviews.ts`
 
-Wenn du keine Präferenz hast, setze ich nach Approval die **empfohlene Variante (1 + 2 + 4)** um.
+**Geändert:**
+- `src/pages/ProductDetail.tsx` (Sektion einbinden + Stern-Summary im Header)
+
+---
+
+## Was du noch wissen solltest
+
+- **Bestehende Käufe vor Launch**: Da Bestellungen über Shopify laufen, funktioniert die Verifizierung sofort für alle Kunden, deren E-Mail in Hatoff-Auth mit der Shopify-Bestell-E-Mail übereinstimmt.
+- **Moderation**: Reviews gehen direkt live, sobald verifiziert. Falls du später Moderation willst (Freischalten via Admin), können wir `status = 'pending'` als Default setzen.
+- **Bilder-Uploads**: bewusst weggelassen für V1, kann später ergänzt werden (Storage-Bucket).
+- **E-Mail-Trigger** (»Wie war dein Hemd?« 14 Tage nach Lieferung) wäre ein logischer Next Step — kann nach diesem Sprint folgen.
