@@ -55,7 +55,7 @@ export const SiteFooter = () => {
             <a href="#" className="hover:text-primary">Impressum</a>
             <a href="#" className="hover:text-primary">Datenschutz</a>
             <a href="#" className="hover:text-primary">AGB</a>
-            {typeof window !== "undefined" && window.location.hostname.includes("id-preview--") && (
+            {typeof window !== "undefined" && !window.location.hostname.startsWith("hatoff.") && (
               <span className="flex items-center gap-3 border-l border-border/40 pl-6 text-[10px] tracking-wider text-muted-foreground/40">
                 <Link to="/admin/import" className="hover:text-muted-foreground">Admin · Import</Link>
                 <span aria-hidden="true">·</span>
