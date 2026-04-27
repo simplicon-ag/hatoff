@@ -160,7 +160,7 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
                 alt={primary.altText ?? p.title}
                 loading={priority ? "eager" : "lazy"}
                 className={cn(
-                  "absolute inset-0 h-full w-full object-contain p-4 mix-blend-multiply transition-opacity duration-500",
+                  "absolute inset-0 h-full w-full object-cover transition-opacity duration-500",
                   secondary ? "group-hover:opacity-0" : "",
                 )}
               />
@@ -169,7 +169,7 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
                   src={secondary.url}
                   alt={secondary.altText ?? p.title}
                   loading="lazy"
-                  className="absolute inset-0 h-full w-full object-contain p-4 mix-blend-multiply opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                  className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
                 />
               )}
             </>
