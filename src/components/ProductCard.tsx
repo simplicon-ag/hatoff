@@ -108,6 +108,7 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
   const [adding, setAdding] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
 
   const detailHref = initialColor
     ? `/product/${p.handle}?farbe=${encodeURIComponent(initialColor)}`
