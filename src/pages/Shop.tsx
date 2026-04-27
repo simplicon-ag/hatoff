@@ -79,6 +79,7 @@ const Shop = () => {
   const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [density, setDensity] = useState<3 | 4>(4);
 
   useEffect(() => {
     fetchAllProducts()
