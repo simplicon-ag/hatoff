@@ -167,7 +167,9 @@ const ProductDetail = () => {
     const galleryImgs = product.images.edges.map((e) => e.node);
 
     const detailImageFor = (variantImageUrl: string | null | undefined): string | null => {
-      if (!variantImageUrl) return galleryImgs[2]?.url ?? null;
+      if (!variantImageUrl) return galleryImgs[0]?.url ?? null;
+      // Falls das Variantenbild dem Casa-Moda-Naming folgt (`...-image-N-...`),
+      // bevorzugen wir das Kragen-Detailbild derselben Farbe (image-3 / image-4).
       const prefix = variantImageUrl.match(/\/([^/?]+-image-)\d+-/)?.[1];
       if (prefix) {
         const sameColorCollar = galleryImgs.find((g) => g.url.includes(`/${prefix}3-`));
@@ -175,7 +177,9 @@ const ProductDetail = () => {
         const sameColorDetail = galleryImgs.find((g) => g.url.includes(`/${prefix}4-`));
         if (sameColorDetail) return sameColorDetail.url;
       }
-      return galleryImgs[2]?.url ?? variantImageUrl;
+      // Andernfalls: Variantenbild direkt verwenden — NICHT auf einen festen
+      // Galerie-Index zurückfallen, sonst zeigen alle Farben dasselbe Bild.
+      return variantImageUrl;
     };
 
     const seen = new Map<string, { value: string; variantId: string; image: string | null; available: boolean }>();
