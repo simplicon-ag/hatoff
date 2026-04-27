@@ -722,11 +722,8 @@ const Shop = () => {
 
             {/* Sortieren */}
             <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <SelectTrigger className="h-9 w-40 border-border">
-                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  Sortieren
-                </span>
-                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              <SelectTrigger className="h-9 w-44 border-border">
+                <SelectValue placeholder="Sortieren" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="featured">Empfohlen</SelectItem>
