@@ -23,7 +23,7 @@ interface Props {
   compactCart?: boolean;
 }
 
-export const ProductCard = ({ product, priority, initialColor }: Props) => {
+export const ProductCard = ({ product, priority, initialColor, compactCart = false }: Props) => {
   const p = product.node;
   const price = p.priceRange.minVariantPrice;
   const shopifyAmount = parseFloat(price.amount);
