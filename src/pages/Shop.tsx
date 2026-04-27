@@ -154,6 +154,9 @@ const Shop = () => {
         priceMin = Math.min(priceMin, price);
         priceMax = Math.max(priceMax, price);
       }
+
+      if (isNewProduct(p)) status.set("neu", (status.get("neu") ?? 0) + 1);
+      if (isSaleProduct(p)) status.set("sale", (status.get("sale") ?? 0) + 1);
     });
 
     if (priceMin === Infinity) priceMin = 0;
