@@ -17,6 +17,7 @@ const navItems = [
 
 export const SiteHeader = () => {
   const { user } = useAuth();
+  const { count: wishlistCount } = useWishlist();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -60,6 +61,18 @@ export const SiteHeader = () => {
 
         <div className="flex items-center gap-1 md:gap-2">
           <GlobalSearch />
+          <Link
+            to="/wunschliste"
+            aria-label="Wunschliste"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-secondary"
+          >
+            <Heart className="h-5 w-5" />
+            {wishlistCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground">
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
           <Link
             to={user ? "/club/mein-konto" : "/auth"}
             aria-label={user ? "Mein Konto" : "Anmelden"}

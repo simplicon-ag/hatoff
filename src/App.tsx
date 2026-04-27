@@ -71,6 +71,7 @@ const App = () => (
               <Route path="/club/mein-konto" element={<RequireAuth><ClubAccount /></RequireAuth>} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/wunschliste" element={<Wunschliste />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </SizeAdvisorProvider>
