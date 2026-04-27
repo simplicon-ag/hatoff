@@ -172,7 +172,9 @@ const Shop = () => {
       vendors: Array.from(vendors.entries()).sort(([a], [b]) => a.localeCompare(b)),
       categories: Array.from(categories.entries()).sort(([a], [b]) => a.localeCompare(b)),
       welten: Array.from(welten.entries()).sort(([a], [b]) => a.localeCompare(b)),
-      
+      status: (["neu", "sale"] as const)
+        .filter((k) => (status.get(k) ?? 0) > 0)
+        .map((k) => [k, status.get(k) ?? 0] as [string, number]),
       colors: Array.from(colors.entries()).sort(([a], [b]) => a.localeCompare(b)),
       sizes: Array.from(sizes.entries()).sort(([a], [b]) => sortNum(a, b)),
       priceMin: Math.floor(priceMin),
