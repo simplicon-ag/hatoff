@@ -173,7 +173,7 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
   return (
     <>
       <Link to={detailHref} className="group block">
-        <div className="relative aspect-[4/5] overflow-hidden bg-white">
+        <div className="relative aspect-[4/5] overflow-hidden bg-secondary">
           {primary ? (
             <>
               <img
