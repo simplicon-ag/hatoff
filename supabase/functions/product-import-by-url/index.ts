@@ -495,9 +495,25 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
   else if (/jacke|mantel|parka|weste/.test(t)) product_type = "Jacke";
   else if (/krawatt|fliege|tuch|gürtel|guertel|schal|cap/.test(t)) product_type = "Accessoire";
 
-  const sizes = product_type
-    ? BRAND_DEFAULT_SIZES[product_type] ?? ["S", "M", "L", "XL", "XXL"]
-    : ["S", "M", "L", "XL", "XXL"];
+  // Extract real sizes from page (Casa Moda + Venti both expose them via
+  // <option data-article-variant-size="S">…</option> in the size selector).
+  // Fall back to brand defaults only if nothing is found.
+  const extractedSizes: string[] = [];
+  const seenSize = new Set<string>();
+  const sizeRegex = /data-article-variant-size="([^"]+)"/gi;
+  let sizeMatch: RegExpExecArray | null;
+  while ((sizeMatch = sizeRegex.exec(html)) !== null) {
+    const s = decode(sizeMatch[1]).trim();
+    if (s && !seenSize.has(s)) {
+      seenSize.add(s);
+      extractedSizes.push(s);
+    }
+  }
+  const sizes = extractedSizes.length > 0
+    ? extractedSizes
+    : product_type
+      ? BRAND_DEFAULT_SIZES[product_type] ?? ["S", "M", "L", "XL", "XXL"]
+      : ["S", "M", "L", "XL", "XXL"];
 
   // 9) Tags — brand, type, fit, NEU
   const tags = [brand];
