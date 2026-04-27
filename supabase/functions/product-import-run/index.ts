@@ -143,11 +143,11 @@ async function firecrawlScrape(url: string, apiKey: string): Promise<string | nu
         url,
         formats: ["html"],
         onlyMainContent: false,
-        waitFor: 12000,
+        waitFor: 4000,
         actions: [
-          { type: "wait", milliseconds: 4000 },
+          { type: "wait", milliseconds: 1500 },
           { type: "scroll", direction: "down" },
-          { type: "wait", milliseconds: 3000 },
+          { type: "wait", milliseconds: 1000 },
         ],
       }),
     });
@@ -825,7 +825,9 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const batchSize = Math.max(1, Math.min(5, Number(body.batch_size ?? 3)));
+    // Keep batch tiny: each product scrapes 1-N colour variants via Firecrawl
+    // (slow) + many rate-limited Shopify calls. Bigger batches → 504 IDLE_TIMEOUT.
+    const batchSize = Math.max(1, Math.min(5, Number(body.batch_size ?? 1)));
     const onlyIfRunning = Boolean(body.only_if_running ?? false);
 
     // Cron-safety: skip when no job is running
