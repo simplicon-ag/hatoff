@@ -257,14 +257,26 @@ function titleFromSlug(sourceUrl: string): string {
     .join(" ");
 }
 
-/** Detect fit from the URL slug or title (Modern Fit / Body Fit / Comfort Fit). */
-function extractFit(sourceUrl: string, title: string): string {
-  const haystack = (sourceUrl + " " + title).toLowerCase();
-  if (/body[- ]?fit/.test(haystack)) return "Body Fit";
-  if (/modern[- ]?fit/.test(haystack)) return "Modern Fit";
-  if (/comfort[- ]?fit/.test(haystack)) return "Comfort Fit";
-  if (/regular[- ]?fit/.test(haystack)) return "Regular Fit";
-  if (/slim[- ]?fit/.test(haystack)) return "Slim Fit";
+/** Detect fit from URL slug, title, OR full HTML (Modern/Body/Comfort/Regular/Slim/Tailored). */
+function extractFit(sourceUrl: string, title: string, html?: string): string {
+  // Order matters: Body before Modern (some titles say "Body Fit Modern Cut").
+  // Check small/cheap haystack (URL + title) first, then fall back to full HTML
+  // for sites like Venti where the H1 omits the fit and it lives in the body
+  // (e.g. "fit:Body Fit" in metadata blobs).
+  const small = (sourceUrl + " " + title).toLowerCase();
+  const PATTERNS: Array<[RegExp, string]> = [
+    [/body[- ]?fit/, "Body Fit"],
+    [/modern[- ]?fit/, "Modern Fit"],
+    [/comfort[- ]?fit/, "Comfort Fit"],
+    [/tailored[- ]?fit/, "Tailored Fit"],
+    [/regular[- ]?fit/, "Regular Fit"],
+    [/slim[- ]?fit/, "Slim Fit"],
+  ];
+  for (const [re, label] of PATTERNS) if (re.test(small)) return label;
+  if (html) {
+    const big = html.toLowerCase();
+    for (const [re, label] of PATTERNS) if (re.test(big)) return label;
+  }
   return "";
 }
 
@@ -407,8 +419,8 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     isNew = true;
   }
 
-  // 4) Fit detection
-  const fit = extractFit(sourceUrl, title);
+  // 4) Fit detection (also checks raw <title> for Venti where H1 lacks fit)
+  const fit = extractFit(sourceUrl, title, html);
 
   // 5) Build rich body_html for Shopify
   const parts: string[] = [];
