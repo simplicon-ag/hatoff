@@ -44,16 +44,8 @@ export const HeroCarousel = () => {
   const [paused, setPaused] = useState(false);
   const { looks } = useCuratedLooks();
 
-  // Anzahl neuer Looks der letzten 14 Tage (oder die jüngsten 3 als Fallback)
-  const recentLooksCount = (() => {
-    if (!looks || looks.length === 0) return 0;
-    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
-    const recent = looks.filter((l) => {
-      const t = l.publishedAt ? new Date(l.publishedAt).getTime() : NaN;
-      return Number.isFinite(t) && t >= cutoff;
-    });
-    return recent.length > 0 ? recent.length : Math.min(3, looks.length);
-  })();
+  // Dezenter „Frische"-Indikator: zeigt die Anzahl aktuell kuratierter Looks
+  const recentLooksCount = Math.min(3, looks?.length ?? 0);
 
   useEffect(() => {
     if (paused) return;
