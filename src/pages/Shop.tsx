@@ -32,6 +32,17 @@ const tagValue = (tag: string, prefix: string) =>
     ? tag.slice(prefix.length + 1).trim()
     : null;
 
+const FilterChip = ({ label, onRemove }: { label: string; onRemove: () => void }) => (
+  <button
+    type="button"
+    onClick={onRemove}
+    className="inline-flex items-center gap-1.5 border border-border bg-secondary/60 px-2.5 py-1 text-xs text-foreground/85 transition hover:border-foreground hover:bg-secondary"
+  >
+    <span>{label}</span>
+    <X className="h-3 w-3" />
+  </button>
+);
+
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
@@ -462,6 +473,59 @@ const Shop = () => {
             </Select>
           </div>
         </div>
+
+        {/* Aktive Filter-Chips */}
+        {activeCount > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+              Aktive Filter
+            </span>
+            {search.trim() && (
+              <FilterChip label={`„${search.trim()}"`} onRemove={() => setSearch("")} />
+            )}
+            {Array.from(selectedVendors).map((v) => (
+              <FilterChip key={`v-${v}`} label={v} onRemove={() => {
+                const n = new Set(selectedVendors); n.delete(v); setSelectedVendors(n);
+              }} />
+            ))}
+            {Array.from(selectedCategories).map((c) => (
+              <FilterChip key={`c-${c}`} label={c} onRemove={() => {
+                const n = new Set(selectedCategories); n.delete(c); setSelectedCategories(n);
+              }} />
+            ))}
+            {Array.from(selectedWelten).map((w) => (
+              <FilterChip key={`w-${w}`} label={titleCase(w)} onRemove={() => {
+                const n = new Set(selectedWelten); n.delete(w); setSelectedWelten(n);
+              }} />
+            ))}
+            {Array.from(selectedColors).map((c) => (
+              <FilterChip key={`col-${c}`} label={titleCase(c)} onRemove={() => {
+                const n = new Set(selectedColors); n.delete(c); setSelectedColors(n);
+              }} />
+            ))}
+            {Array.from(selectedSizes).map((s) => (
+              <FilterChip key={`s-${s}`} label={`Grösse ${s}`} onRemove={() => {
+                const n = new Set(selectedSizes); n.delete(s); setSelectedSizes(n);
+              }} />
+            ))}
+            {priceRange &&
+              (priceRange[0] !== facets.priceMin || priceRange[1] !== facets.priceMax) && (
+                <FilterChip
+                  label={`CHF ${priceRange[0]}–${priceRange[1]}`}
+                  onRemove={() => setPriceRange([facets.priceMin, facets.priceMax])}
+                />
+              )}
+            {onlyAvailable && (
+              <FilterChip label="Nur verfügbar" onRemove={() => setOnlyAvailable(false)} />
+            )}
+            <button
+              onClick={clearFilters}
+              className="ml-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
+            >
+              Alle zurücksetzen
+            </button>
+          </div>
+        )}
 
         <div className="grid gap-10 lg:grid-cols-[260px_1fr]">
           {/* Desktop filters */}

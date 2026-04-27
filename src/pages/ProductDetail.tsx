@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Loader2, Minus, Plus, Heart, Share2 } from "lucide-react";
+import { Loader2, Minus, Plus, Share2 } from "lucide-react";
+import { WishlistButton } from "@/components/WishlistButton";
 import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -342,13 +343,15 @@ const ProductDetail = () => {
                   >
                     <Share2 className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    onClick={() => toast("In Wunschliste gespeichert", { position: "top-right" })}
-                    className="flex h-8 w-8 items-center justify-center border border-border text-foreground/70 hover:border-primary hover:text-primary"
-                    aria-label="Zur Wunschliste"
-                  >
-                    <Heart className="h-3.5 w-3.5" />
-                  </button>
+                  <WishlistButton
+                    productHandle={product.handle}
+                    productTitle={product.title}
+                    productImage={product.images.edges[0]?.node.url ?? null}
+                    vendor={product.vendor}
+                    priceAmount={selectedVariant ? parseFloat(selectedVariant.price.amount) : null}
+                    priceCurrency={selectedVariant?.price.currencyCode ?? null}
+                    size="sm"
+                  />
                 </div>
               </div>
             );

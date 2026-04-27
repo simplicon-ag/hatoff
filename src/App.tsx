@@ -24,6 +24,7 @@ import Club from "./pages/Club.tsx";
 import ClubAccount from "./pages/ClubAccount.tsx";
 import Auth from "./pages/Auth.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
+import Wunschliste from "./pages/Wunschliste.tsx";
 import { RequireAuth } from "./components/club/RequireAuth.tsx";
 
 const queryClient = new QueryClient();
@@ -70,6 +71,7 @@ const App = () => (
               <Route path="/club/mein-konto" element={<RequireAuth><ClubAccount /></RequireAuth>} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/wunschliste" element={<Wunschliste />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </SizeAdvisorProvider>
