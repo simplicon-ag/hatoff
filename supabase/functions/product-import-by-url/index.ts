@@ -636,6 +636,7 @@ function buildProductPayload(
   base: ScrapedProduct,
   colors: ColorData[],
   handle: string,
+  opts: { status: "active" | "draft"; categoryTag: string },
 ) {
   const minPriceEur = colors.reduce(
     (m, c) => (c.scraped.price_eur != null && c.scraped.price_eur < m ? c.scraped.price_eur : m),
@@ -675,21 +676,31 @@ function buildProductPayload(
     }
   }
 
+  // Tags zusammenstellen: Basis-Tags + Article-Number-Tags + optional category_tag
+  // Sale-Tag rausfiltern wenn category_tag gesetzt ist (Draft-Import = kein Sale)
+  const baseTags = opts.categoryTag
+    ? base.tags.filter((t) => t.toLowerCase() !== "sale")
+    : base.tags;
+  const allTags = [
+    ...baseTags,
+    ...colors
+      .map((c) => c.scraped.article_number)
+      .filter((n): n is string => !!n)
+      .map((n) => `art:${n}`),
+  ];
+  if (opts.categoryTag && !allTags.map((t) => t.toLowerCase()).includes(opts.categoryTag)) {
+    allTags.push(opts.categoryTag);
+  }
+
   return {
     product: {
       title: base.title || handle,
       body_html: base.description_html || base.description || "",
       vendor: base.vendor,
       product_type: base.product_type ?? "Bekleidung",
-      tags: [
-        ...base.tags,
-        ...colors
-          .map((c) => c.scraped.article_number)
-          .filter((n): n is string => !!n)
-          .map((n) => `art:${n}`),
-      ].join(","),
+      tags: allTags.join(","),
       handle,
-      status: "active",
+      status: opts.status,
       options: [
         { name: "Grösse", values: sizes },
         { name: "Farbe", values: colorNames },
