@@ -1,65 +1,50 @@
-# Vollständiger Produkt-Crawl von Casa Moda + Venti
+## Ziel
+Sale-Artikel raus, fehlende Produkte rein, geänderte aktualisieren — **mit minimalem Credit/Token-Verbrauch**.
 
-## Problem
+## Wo ich Token spare
+- **Kein Firecrawl auf Listing-Seiten** — die Marken-Sites liefern Produkt-URLs direkt via JSON (Casa Moda) bzw. plain HTML (Venti). Ich nutze ein einfaches Edge-Function-Skript mit `fetch`, kein Firecrawl, keine AI.
+- **Kein Firecrawl-JSON-Schema-Modus** (der nutzt LLM intern und ist teuer). Stattdessen pro Detailseite: 1× HTML mit `fetch`, dann **deterministische Regex/Cheerio-Extraktion** (Title, Bilder, Grössen, Material, Beschreibung) — kostet 0 AI-Token.
+- **Cache nutzen**: alles was bereits in `brand_season_products` und `product_price_cache` liegt, wird wiederverwendet, nicht neu gefetcht.
+- **Diff-basiert**: Update nur wenn sich wirklich was geändert hat (Preis, Bilder, Title) — sonst skip.
+- **AI als optionaler Fallback** nur für Felder, die per Regex nicht extrahierbar sind (z.B. uneinheitliche Material-Texte) — und nur falls du das überhaupt willst.
 
-Aktuell findet der Import nur ~18 Hosen, obwohl Casa Moda 72 Artikel hat. Ursache:
+## Workflow
 
-- Die Discover-Funktion ruft pro Kategorie-Slug `…/article_collection/<slug>.json?page=1&size=500` auf.
-- Casa Moda **ignoriert `size=500`** und liefert nur ~13 Artikel pro Seite. Die Pagination wird nicht durchlaufen, deshalb bleibt es bei 1 Seite.
-- Der bestehende Sitemap-Fallback ruft `/sitemap.xml` auf — Casa Moda liefert dort aber eine 404-HTML-Seite. Die echte Sitemap liegt unter `/export/sitemap/sitemap_index.xml` und verweist auf eine **gzip-komprimierte** XML-Datei, die der aktuelle Code nicht entpackt.
+### Schritt 1 — Sale-Cleanup (0 AI-Token)
+Lösche alle 850 Sale-Produkte via `shopify--delete_product` in Batches.
+→ Kostet keine AI-Token, nur Shopify-API-Calls.
 
-## Verifizierte Datenlage
+### Schritt 2 — Live-Discovery (0 AI-Token)
+Direkter `fetch` der Listing-Endpoints beider Marken (Casa Moda JSON + Venti HTML), URL-Extraktion per Regex. Sale/Outlet-Slugs ausgeschlossen.
+→ Resultat: deduplizierte Liste aller aktuell verkauften Handles.
 
-Aus den echten (gzipped) Sitemaps verfügbar:
+### Schritt 3 — Diff gegen Store (0 AI-Token)
+- `list_products` paginiert → bestehende Handles
+- Vergleich Live vs. Store:
+  - **Neu im Live** → anlegen
+  - **Im Store + Live** → nur Detail-Crawl wenn Preis im Cache veraltet (>7 Tage)
+  - **Im Store, nicht Live** → Liste für deine manuelle Prüfung
 
-- Casa Moda: **1709 Farb-URLs → 1046 unique Produkte** (Hosen-relevant: ~100 URLs)
-- Venti: **868 Farb-URLs → 512 unique Produkte**
+### Schritt 4 — Detail-Crawl nur wo nötig (0 AI-Token)
+Pro neuem Produkt: 1× `fetch` auf Detail-URL, Cheerio/Regex-Extraktion:
+- Title, Beschreibung, Bilder, Grössen → aus HTML/JSON-LD
+- Preis → bereits in `product_price_cache` (CHF)
+- Material/Fit/Pflege → aus Produkttext per Regex
 
-## Lösung
+Fallback bei nicht extrahierbaren Feldern: Feld leer lassen, du kannst es manuell ergänzen.
 
-`supabase/functions/product-import-discover/index.ts` umstellen, sodass die Sitemap **die primäre Quelle** ist (Kategorie-JSONs nur noch als Backup für ganz neue Produkte, die noch nicht in der Sitemap sind):
+### Schritt 5 — Anlage/Update via Shopify API (0 AI-Token)
+`shopify--create_product` / `update_product` mit allen Daten. Kein Sale-Tag.
 
-1. **`fetchSitemapUrls`** erweitern:
-   - Aus `robots.txt` die Sitemap-URL lesen (Fallback: `/export/sitemap/sitemap_index.xml`).
-   - Sitemap-Index entpacken, jeden Child-Sitemap-Eintrag laden.
-   - Wenn die URL auf `.gz` endet, Antwort als `gzip` dekomprimieren (Deno: `DecompressionStream("gzip")`).
-   - Produkt-URLs per Regex extrahieren.
-2. **Sitemap-URLs zuerst**, danach die JSON-Kategorien als Ergänzung mergen.
-3. Fortschrittslogs ergänzen, damit man im Edge-Function-Log sieht, wie viele URLs aus Sitemap vs. Kategorien kommen.
+### Schritt 6 — Report
+- Gelöscht: X | Angelegt: Y | Aktualisiert: Z | Übersprungen: W
 
-Der Rest der Pipeline (Gruppierung nach Artikel-ID, Farb-Varianten als `color_urls`, Insert in `product_import_log`, Worker) bleibt unverändert — er bekommt einfach mehr Eingangs-URLs.
+## Geschätzter Token-Verbrauch
+- AI-Token: **~0** (deterministische Extraktion)
+- Firecrawl-Credits: **0** (eigener fetch)
+- Lovable-Build-Credits: standard für die Skript-Erstellung + Tool-Aufrufe (Sale-Löschung & Anlage sind Shopify-Tool-Calls, kein AI)
 
-## Bedienung
-
-Nach dem Deploy in **Admin → Import**:
-1. „Produkte entdecken" klicken (sollte jetzt ~1500 Casa-Moda + ~870 Venti URLs finden).
-2. „Import starten" — der Worker läuft die Liste durch. Bestehende Handles werden übersprungen (oder auf `update_mode` gesetzt, wenn `include_existing` aktiv ist).
-
-## Technische Details
-
-Datei: `supabase/functions/product-import-discover/index.ts`
-
-```text
-robots.txt → Sitemap-URL extrahieren
-   ↓
-sitemap_index.xml → Liste der Child-Sitemaps
-   ↓
-für jede Child-Sitemap (oft .xml.gz):
-   fetch + (falls .gz) DecompressionStream("gzip")
-   → Regex extrahiert Produkt-URLs
-   ↓
-URLs aus Sitemap + Kategorie-JSON deduplizieren
-   ↓
-parseProductUrl + buildBaseHandle (unverändert)
-   ↓
-Insert in product_import_log
-```
-
-Gzip-Decoding in Deno:
-```ts
-const res = await fetch(url, { headers: { "User-Agent": UA } });
-const stream = res.body!.pipeThrough(new DecompressionStream("gzip"));
-const text = await new Response(stream).text();
-```
-
-Erwartung nach dem Lauf: Bei der nächsten Discover-Runde sollten ~1500+ neue/bestehende Casa-Moda-URLs und ~870 Venti-URLs gruppiert werden — danach läuft der bestehende Import-Worker ganz normal über die Liste und legt die fehlenden Produkte (inkl. aller Farben + Grössen-Varianten) in Shopify an.
+## Was ich brauche
+Nur dein Go. Sage mir kurz:
+1. Sale-Löschung jetzt starten? (850 Produkte, irreversibel)
+2. Soll ich vorher eine **Trockenlauf-Liste** der ersten 20 zu löschenden Produkte zeigen?
