@@ -179,25 +179,82 @@ async function discoverBrandUrls(
   return Array.from(all);
 }
 
-async function fetchSitemapUrls(brand: string, sitemapRoot: string, pattern: RegExp): Promise<string[]> {
-  // Reads sitemap.xml (or a sitemap index) and returns every product URL it finds.
+async function fetchSitemapText(url: string): Promise<string | null> {
+  // Handles plain XML and gzipped (.xml.gz) sitemaps. Casa Moda + Venti
+  // ship their real sitemaps gzipped under /export/sitemap/...
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": UA,
+        Accept: "application/xml,text/xml,*/*;q=0.8",
+        "Accept-Encoding": "gzip",
+      },
+    });
+    if (!res.ok || !res.body) return null;
+    const isGz = url.toLowerCase().endsWith(".gz");
+    if (isGz) {
+      const stream = res.body.pipeThrough(new DecompressionStream("gzip"));
+      return await new Response(stream).text();
+    }
+    return await res.text();
+  } catch (e) {
+    console.warn(`[discover] sitemap fetch failed for ${url}:`, e);
+    return null;
+  }
+}
+
+async function resolveSitemapRoots(siteRoot: string, fallback: string): Promise<string[]> {
+  // Try robots.txt first — both brands list their real sitemap there.
+  const roots = new Set<string>();
+  try {
+    const robots = await directFetch(`${siteRoot}/robots.txt`);
+    if (robots) {
+      for (const line of robots.split(/\r?\n/)) {
+        const m = line.match(/^\s*Sitemap:\s*(\S+)/i);
+        if (m) roots.add(m[1].trim());
+      }
+    }
+  } catch (e) {
+    console.warn(`[discover] robots.txt failed for ${siteRoot}:`, e);
+  }
+  if (roots.size === 0) roots.add(fallback);
+  return Array.from(roots);
+}
+
+async function fetchSitemapUrls(brand: string, siteRoot: string, fallbackSitemap: string, pattern: RegExp): Promise<string[]> {
+  // Walks robots.txt → sitemap-index → child sitemaps (gz aware) and
+  // collects every product URL matching the brand pattern.
   const all = new Set<string>();
   try {
-    const root = await directFetch(sitemapRoot);
-    if (!root) return [];
-    // If it's a sitemap index, follow each child sitemap
-    const childMatches = root.match(/<loc>([^<]+\.xml[^<]*)<\/loc>/gi) ?? [];
-    const sitemaps = childMatches.length > 0
-      ? childMatches.map((m) => m.replace(/<\/?loc>/g, ""))
-      : [sitemapRoot];
+    const roots = await resolveSitemapRoots(siteRoot, fallbackSitemap);
+    console.log(`[discover] ${brand} sitemap roots:`, roots);
 
-    for (const sm of sitemaps.slice(0, 30)) {
-      const body = await directFetch(sm);
+    const visited = new Set<string>();
+    const queue: string[] = [...roots];
+
+    while (queue.length > 0 && visited.size < 50) {
+      const sm = queue.shift()!;
+      if (visited.has(sm)) continue;
+      visited.add(sm);
+
+      const body = await fetchSitemapText(sm);
       if (!body) continue;
+
+      // If this is a sitemap-index, enqueue its children
+      const childMatches = body.match(/<loc>\s*([^<\s]+\.xml(?:\.gz)?)\s*<\/loc>/gi) ?? [];
+      const children = childMatches
+        .map((m) => m.replace(/<\/?loc>/gi, "").trim())
+        .filter((u) => u.includes("/sitemap"));
+      if (children.length > 0) {
+        for (const c of children) queue.push(c);
+      }
+
+      // Also pull product URLs out of THIS document directly (works for both
+      // sitemap-index docs that accidentally contain product locs and for leaf sitemaps)
       for (const u of extractUrls(body, pattern)) all.add(u);
     }
   } catch (e) {
-    console.warn(`[discover] sitemap fetch failed for ${brand}:`, e);
+    console.warn(`[discover] sitemap walk failed for ${brand}:`, e);
   }
   return Array.from(all);
 }
@@ -257,7 +314,12 @@ Deno.serve(async (req) => {
     console.log("[discover] fetching Casa Moda URLs (categories + sitemap)...");
     const [cmCats, cmSitemap] = await Promise.all([
       discoverBrandUrls("casa-moda", "https://www.casamoda.com", CASAMODA_SLUGS, CASAMODA_PRODUCT_RE),
-      fetchSitemapUrls("casa-moda", "https://www.casamoda.com/sitemap.xml", CASAMODA_PRODUCT_RE),
+      fetchSitemapUrls(
+        "casa-moda",
+        "https://www.casamoda.com",
+        "https://www.casamoda.com/export/sitemap/sitemap_index.xml",
+        CASAMODA_PRODUCT_RE,
+      ),
     ]);
     const cmUrls = Array.from(new Set([...cmCats, ...cmSitemap]));
     console.log(`[discover] Casa Moda: ${cmUrls.length} URLs (cats=${cmCats.length}, sitemap=${cmSitemap.length})`);
@@ -265,7 +327,12 @@ Deno.serve(async (req) => {
     console.log("[discover] fetching Venti URLs (categories + sitemap)...");
     const [vtCats, vtSitemap] = await Promise.all([
       discoverBrandUrls("venti", "https://www.venti.com", VENTI_SLUGS, VENTI_PRODUCT_RE),
-      fetchSitemapUrls("venti", "https://www.venti.com/sitemap.xml", VENTI_PRODUCT_RE),
+      fetchSitemapUrls(
+        "venti",
+        "https://www.venti.com",
+        "https://www.venti.com/export/sitemap/sitemap_index.xml",
+        VENTI_PRODUCT_RE,
+      ),
     ]);
     const vtUrls = Array.from(new Set([...vtCats, ...vtSitemap]));
     console.log(`[discover] Venti: ${vtUrls.length} URLs (cats=${vtCats.length}, sitemap=${vtSitemap.length})`);
