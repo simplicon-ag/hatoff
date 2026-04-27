@@ -257,26 +257,40 @@ function titleFromSlug(sourceUrl: string): string {
     .join(" ");
 }
 
-/** Detect fit from URL slug, title, OR full HTML (Modern/Body/Comfort/Regular/Slim/Tailored). */
+/** Detect fit from URL slug, title, or product bullet list (Body/Casual/Modern/Comfort/Tailored/Regular/Slim). */
 function extractFit(sourceUrl: string, title: string, html?: string): string {
-  // Order matters: Body before Modern (some titles say "Body Fit Modern Cut").
-  // Check small/cheap haystack (URL + title) first, then fall back to full HTML
-  // for sites like Venti where the H1 omits the fit and it lives in the body
-  // (e.g. "fit:Body Fit" in metadata blobs).
-  const small = (sourceUrl + " " + title).toLowerCase();
   const PATTERNS: Array<[RegExp, string]> = [
-    [/body[- ]?fit/, "Body Fit"],
-    [/casual[- ]?fit/, "Casual Fit"],
-    [/modern[- ]?fit/, "Modern Fit"],
-    [/comfort[- ]?fit/, "Comfort Fit"],
-    [/tailored[- ]?fit/, "Tailored Fit"],
-    [/regular[- ]?fit/, "Regular Fit"],
-    [/slim[- ]?fit/, "Slim Fit"],
+    [/body[- ]?fit/i, "Body Fit"],
+    [/casual[- ]?fit/i, "Casual Fit"],
+    [/modern[- ]?fit/i, "Modern Fit"],
+    [/comfort[- ]?fit/i, "Comfort Fit"],
+    [/tailored[- ]?fit/i, "Tailored Fit"],
+    [/regular[- ]?fit/i, "Regular Fit"],
+    [/slim[- ]?fit/i, "Slim Fit"],
   ];
+  // 1) URL + title (cheap, reliable when present)
+  const small = sourceUrl + " " + title;
   for (const [re, label] of PATTERNS) if (re.test(small)) return label;
-  if (html) {
-    const big = html.toLowerCase();
-    for (const [re, label] of PATTERNS) if (re.test(big)) return label;
+
+  if (!html) return "";
+
+  // 2) Scan only <li> bullet items (Venti puts fit in product bullets like
+  //    "<li>Modern Fit / Moderne, schlanke Passform</li>"). This avoids
+  //    false matches from filter sidebars or tracking metadata that may
+  //    list ALL fits the brand sells.
+  const liRegex = /<li[^>]*>([\s\S]{0,300}?)<\/li>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = liRegex.exec(html)) !== null) {
+    const text = m[1].replace(/<[^>]+>/g, " ");
+    for (const [re, label] of PATTERNS) {
+      if (re.test(text)) return label;
+    }
+  }
+
+  // 3) Last resort: scan the <title> tag (Venti includes fit there too).
+  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleTag) {
+    for (const [re, label] of PATTERNS) if (re.test(titleTag[1])) return label;
   }
   return "";
 }
