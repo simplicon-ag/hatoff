@@ -191,7 +191,7 @@ export const WeeklyEditions = () => {
               Archiv
             </p>
             <div
-              className="flex max-h-[600px] flex-row gap-1 overflow-x-auto overflow-y-hidden lg:flex-col lg:gap-0 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-2 lg:[scrollbar-width:thin]"
+              className="grid max-h-[260px] grid-cols-2 gap-1 overflow-y-auto pr-1 sm:grid-cols-3 lg:flex lg:max-h-[600px] lg:flex-col lg:gap-0 lg:overflow-x-hidden lg:pr-2 lg:[scrollbar-width:thin]"
               role="tablist"
               aria-label="Wochenausgaben-Archiv"
             >
@@ -204,7 +204,7 @@ export const WeeklyEditions = () => {
                     aria-selected={active}
                     onClick={() => setActiveIdx(idx)}
                     className={cn(
-                      "group flex shrink-0 items-baseline gap-3 border-l-2 px-3 py-2.5 text-left transition-colors lg:w-[180px]",
+                      "group flex items-baseline gap-3 border-l-2 px-3 py-2.5 text-left transition-colors lg:w-[180px]",
                       active
                         ? "border-foreground"
                         : "border-transparent hover:border-border",
