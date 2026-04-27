@@ -34,8 +34,17 @@ export const ProductGallery = ({ images, title, activeIndex }: Props) => {
   }, [activeIndex, images.length]);
 
   const safeImages = images.length > 0 ? images : [];
-  const current = safeImages[active];
+  // Clamp active to a valid index — when the image list shrinks (e.g. after
+  // a colour swatch filters the gallery), the previous index can point past
+  // the end, which would crash on `current.url`.
+  const safeActive = Math.min(Math.max(0, active), Math.max(0, safeImages.length - 1));
+  const current = safeImages[safeActive];
   const maxStart = Math.max(0, safeImages.length - THUMBS_VISIBLE);
+
+  // Reset active when out of range
+  useEffect(() => {
+    if (active !== safeActive) setActive(safeActive);
+  }, [active, safeActive]);
 
   // Keep the active thumbnail visible inside the window
   useEffect(() => {
