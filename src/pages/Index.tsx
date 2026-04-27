@@ -80,7 +80,7 @@ const Index = () => {
       {/* ───────── So funktioniert HATOFF ───────── */}
       <section id="so-funktionierts" className="container-editorial py-16 md:py-20">
         <div className="mx-auto mb-12 max-w-2xl text-center">
-          <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">So einfach</p>
+          <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">So einfach</p>
           <h2 className="mt-2 font-display text-3xl md:text-4xl">In drei Schritten gut angezogen.</h2>
         </div>
         <div className="grid gap-10 md:grid-cols-3 md:gap-12">
@@ -119,7 +119,7 @@ const Index = () => {
       <section className="container-editorial py-16 md:py-24">
         <div className="mb-12 flex items-end justify-between gap-6">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Aktuelle Looks</p>
+            <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">Aktuelle Looks</p>
             <h2 className="mt-2 font-display text-4xl md:text-5xl">Diese Woche im Spotlight.</h2>
             <p className="mt-3 max-w-xl text-muted-foreground">
               Echte Stücke aus dem Shop — klick aufs Bild zum Einzelteil oder hol dir den ganzen Look mit einem Tap.
@@ -163,7 +163,7 @@ const Index = () => {
         <section className="container-editorial py-16 md:py-24">
           <div className="mb-10 flex items-end justify-between gap-6">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Aus dem Look-Universum</p>
+              <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">Aus dem Look-Universum</p>
               <h2 className="mt-2 font-display text-4xl md:text-5xl">So tragen sie HATOFF.</h2>
               <p className="mt-3 max-w-xl text-muted-foreground">
                 Echte Outfits, echte Kombinationen — direkt in deinen Warenkorb.
@@ -199,7 +199,7 @@ const Index = () => {
       <section className="container-editorial py-16 md:py-24">
         <div className="mb-12 flex items-end justify-between">
           <div>
-            <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+            <p className="flex items-center gap-2 text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">
               <Sparkles className="h-3 w-3" /> Neu eingetroffen
             </p>
             <h2 className="mt-2 font-display text-4xl md:text-5xl">Frisch im Sortiment.</h2>
@@ -225,7 +225,7 @@ const Index = () => {
           <div className="container-editorial py-16 md:py-24">
             <div className="mb-12 flex items-end justify-between gap-6">
               <div>
-                <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+                <p className="flex items-center gap-2 text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">
                   <Flame className="h-3 w-3" /> Aktuelle Deals
                 </p>
                 <h2 className="mt-2 font-display text-4xl md:text-5xl">Sale-Highlights.</h2>
@@ -257,7 +257,7 @@ const Index = () => {
       {/* ───────── Magazin Teaser (symmetrisch) ───────── */}
       <section className="container-editorial py-16 md:py-24">
         <div className="mb-12">
-          <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Magazin</p>
+          <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">Magazin</p>
           <h2 className="mt-2 font-display text-4xl md:text-5xl">Lesen, lernen, besser kombinieren.</h2>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
@@ -271,7 +271,7 @@ const Index = () => {
                   className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
               </div>
-              <p className="mt-4 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="mt-4 text-xs sm:text-[11px] uppercase tracking-[0.18em] sm:tracking-[0.2em] text-muted-foreground">
                 {a.readingTime} · HATOFF Redaktion
               </p>
               <h3 className="mt-1 font-display text-2xl leading-tight transition-colors group-hover:text-primary">

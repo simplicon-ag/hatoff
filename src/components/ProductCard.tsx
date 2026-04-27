@@ -201,19 +201,19 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
           )}
 
           {soldOut && (
-            <span className="absolute left-3 top-3 bg-foreground/90 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-background">
+            <span className="absolute left-3 top-3 bg-foreground/90 px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-background sm:text-[10px]">
               Ausverkauft
             </span>
           )}
 
           {!soldOut && !onSale && isNew && (
-            <span className="absolute left-3 top-3 bg-foreground px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-background">
+            <span className="absolute left-3 top-3 bg-foreground px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-background sm:text-[10px]">
               Neu
             </span>
           )}
 
           {!soldOut && onSale && discount && (
-            <span className="absolute left-3 top-3 bg-destructive px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground">
+            <span className="absolute left-3 top-3 bg-destructive px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-destructive-foreground sm:text-[10px]">
               -{discount}%
             </span>
           )}
@@ -284,25 +284,25 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
         </div>
         <div className="mt-4 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-1">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{p.vendor}</p>
-            <h3 className="font-display text-lg leading-tight">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground sm:text-[11px]">{p.vendor}</p>
+            <h3 className="font-display text-xl leading-tight sm:text-lg">
               {p.title}
               {initialColor && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                <span className="ml-2 text-base font-normal text-muted-foreground sm:text-sm">
                   · {initialColor}
                 </span>
               )}
             </h3>
             {onSale ? (
-              <p className="flex items-baseline gap-2 text-sm">
+              <p className="flex items-baseline gap-2 text-base sm:text-sm">
                 <span className="font-medium text-destructive">{displayPrice}</span>
                 <span className="text-foreground/50 line-through">{originalPrice}</span>
               </p>
             ) : (
-              <p className="text-sm text-foreground/80">{displayPrice}</p>
+              <p className="text-base text-foreground/80 sm:text-sm">{displayPrice}</p>
             )}
             {showColorHint && !compactCart && (
-              <p className="pt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="pt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground sm:text-[11px]">
                 +{colorCount} {colorCount === 2 ? "Farbe" : "Farben"}
               </p>
             )}

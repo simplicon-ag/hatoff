@@ -92,7 +92,7 @@ export const HeroCarousel = () => {
       {/* Content */}
       <div className="container-editorial relative flex h-full flex-col justify-end pb-16 text-primary-foreground md:pb-20">
         <div key={active} className="animate-fade-up">
-          <p className="text-[11px] uppercase tracking-[0.3em] opacity-90">
+          <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] opacity-90">
             {SLIDES[active].eyebrow} · Kuratiertes Outfit-Universum
           </p>
         </div>
