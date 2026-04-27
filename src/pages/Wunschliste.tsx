@@ -57,7 +57,7 @@ const Wunschliste = () => {
                         src={it.product_image}
                         alt={it.product_title}
                         loading="lazy"
-                        className="absolute inset-0 h-full w-full object-contain p-4 mix-blend-multiply"
+                        className="absolute inset-0 h-full w-full object-contain p-4"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
