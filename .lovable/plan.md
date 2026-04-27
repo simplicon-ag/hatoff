@@ -1,50 +1,64 @@
 ## Ziel
-Sale-Artikel raus, fehlende Produkte rein, geänderte aktualisieren — **mit minimalem Credit/Token-Verbrauch**.
+Du löschst alle aktuellen Produkte im Shopify Admin. Danach importieren wir **kategorie für kategorie**, indem du mir jeweils eine Listing-URL gibst. Alle neuen Produkte werden zuerst als **Draft** angelegt, damit du sie prüfen kannst, bevor sie live gehen.
 
-## Wo ich Token spare
-- **Kein Firecrawl auf Listing-Seiten** — die Marken-Sites liefern Produkt-URLs direkt via JSON (Casa Moda) bzw. plain HTML (Venti). Ich nutze ein einfaches Edge-Function-Skript mit `fetch`, kein Firecrawl, keine AI.
-- **Kein Firecrawl-JSON-Schema-Modus** (der nutzt LLM intern und ist teuer). Stattdessen pro Detailseite: 1× HTML mit `fetch`, dann **deterministische Regex/Cheerio-Extraktion** (Title, Bilder, Grössen, Material, Beschreibung) — kostet 0 AI-Token.
-- **Cache nutzen**: alles was bereits in `brand_season_products` und `product_price_cache` liegt, wird wiederverwendet, nicht neu gefetcht.
-- **Diff-basiert**: Update nur wenn sich wirklich was geändert hat (Preis, Bilder, Title) — sonst skip.
-- **AI als optionaler Fallback** nur für Felder, die per Regex nicht extrahierbar sind (z.B. uneinheitliche Material-Texte) — und nur falls du das überhaupt willst.
+## Workflow pro Kategorie
 
-## Workflow
+### 1. Du gibst mir eine Listing-URL
+Beispiel: `https://www.venti.de/de/herren/hemden/business-hemden/`
+oder: `https://www.casamoda.com/de/herren/hemden/`
 
-### Schritt 1 — Sale-Cleanup (0 AI-Token)
-Lösche alle 850 Sale-Produkte via `shopify--delete_product` in Batches.
-→ Kostet keine AI-Token, nur Shopify-API-Calls.
+Sag mir dazu kurz:
+- **Brand-Tag** (z.B. `Venti`, `Casa Moda`) — falls nicht aus URL erkennbar
+- **Shopify Collection / Tag** den ich setzen soll (z.B. `hemden`, `business`, `neuheiten`)
 
-### Schritt 2 — Live-Discovery (0 AI-Token)
-Direkter `fetch` der Listing-Endpoints beider Marken (Casa Moda JSON + Venti HTML), URL-Extraktion per Regex. Sale/Outlet-Slugs ausgeschlossen.
-→ Resultat: deduplizierte Liste aller aktuell verkauften Handles.
+### 2. Discovery (0 AI-Token, 0 Firecrawl-Credits)
+- `fetch` der Listing-Seite
+- Regex-Extraktion aller Produkt-Detail-URLs
+- Sale/Outlet-URLs werden gefiltert (Slug-Pattern: `/sale/`, `/outlet/`, `?reduziert`)
+- Dedup gegen bereits in Shopify vorhandene Handles → ich zeige dir die Liste der gefundenen URLs zur Bestätigung
 
-### Schritt 3 — Diff gegen Store (0 AI-Token)
-- `list_products` paginiert → bestehende Handles
-- Vergleich Live vs. Store:
-  - **Neu im Live** → anlegen
-  - **Im Store + Live** → nur Detail-Crawl wenn Preis im Cache veraltet (>7 Tage)
-  - **Im Store, nicht Live** → Liste für deine manuelle Prüfung
+### 3. Detail-Crawl (0 AI-Token)
+Pro Produkt-URL: 1× `fetch`, dann Cheerio/Regex extrahiert:
+- **Title**
+- **Beschreibung** (HTML, sauber)
+- **Bilder** (alle aus Galerie)
+- **Grössen** als Variant-Optionen
+- **Farben** als Variant-Optionen (falls Mehrfarb)
+- **Preis EUR → CHF** (über `product_price_cache` falls vorhanden, sonst frisch + Aufschlag)
+- **Metafelder** (Standard-Set):
+  - `custom.material`
+  - `custom.fit`
+  - `custom.pflege`
+  - `custom.herkunft`
+  - `custom.saison`
 
-### Schritt 4 — Detail-Crawl nur wo nötig (0 AI-Token)
-Pro neuem Produkt: 1× `fetch` auf Detail-URL, Cheerio/Regex-Extraktion:
-- Title, Beschreibung, Bilder, Grössen → aus HTML/JSON-LD
-- Preis → bereits in `product_price_cache` (CHF)
-- Material/Fit/Pflege → aus Produkttext per Regex
+### 4. Anlage als Draft in Shopify
+- `shopify--create_product` mit `status: "draft"`
+- Vendor = Brand
+- Tags = Brand + Kategorie-Tag den du angibst (kein `sale`)
+- Alle Bilder, Varianten, Preise, Metafelder gesetzt
 
-Fallback bei nicht extrahierbaren Feldern: Feld leer lassen, du kannst es manuell ergänzen.
+### 5. Report nach jeder Kategorie
+```text
+Kategorie: hemden (Venti)
+Gefundene URLs:    24
+Bereits im Store:   3 (übersprungen)
+Neu als Draft:     21
+Fehlgeschlagen:     0
 
-### Schritt 5 — Anlage/Update via Shopify API (0 AI-Token)
-`shopify--create_product` / `update_product` mit allen Daten. Kein Sale-Tag.
+Drafts in Shopify Admin:
+https://admin.shopify.com/.../products?status=draft
+```
 
-### Schritt 6 — Report
-- Gelöscht: X | Angelegt: Y | Aktualisiert: Z | Übersprungen: W
+Du prüfst die Drafts, schaltest sie auf `Active` wenn ok, und wir gehen zur nächsten Kategorie.
 
-## Geschätzter Token-Verbrauch
-- AI-Token: **~0** (deterministische Extraktion)
-- Firecrawl-Credits: **0** (eigener fetch)
-- Lovable-Build-Credits: standard für die Skript-Erstellung + Tool-Aufrufe (Sale-Löschung & Anlage sind Shopify-Tool-Calls, kein AI)
+## Was ich brauche jetzt
 
-## Was ich brauche
-Nur dein Go. Sage mir kurz:
-1. Sale-Löschung jetzt starten? (850 Produkte, irreversibel)
-2. Soll ich vorher eine **Trockenlauf-Liste** der ersten 20 zu löschenden Produkte zeigen?
+1. **Bestätigung** dass du im Shopify Admin alle aktuellen Produkte löschst (manuell, 0 Credits)
+2. **Sag mir Bescheid wenn fertig**
+3. **Erste Kategorie-URL** mit der wir starten
+
+## Technische Notizen
+- Edge Function `product-import-by-url` existiert bereits und kann erweitert werden, oder wir bauen eine neue, schlankere `category-draft-import` Function. Ich würde die bestehende Function mit einem `status: 'draft'` und `category_tag` Parameter erweitern — weniger Code, weniger Build-Credits.
+- Cache (`product_price_cache`, `brand_season_products`) wird wiederverwendet wo möglich.
+- Kein AI, kein Firecrawl-LLM-Modus, nur deterministische Extraktion.
