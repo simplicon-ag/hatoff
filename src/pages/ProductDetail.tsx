@@ -375,6 +375,14 @@ const ProductDetail = () => {
           {/* Titel */}
           <h1 className="mt-2 font-display text-4xl leading-tight md:text-5xl">{product.title}</h1>
 
+          {/* Reviews summary (compact) */}
+          {reviewStats && reviewStats.count > 0 && (
+            <a href="#bewertungen" className="mt-3 inline-flex items-center gap-2 text-xs text-foreground/70 hover:text-foreground">
+              <RatingStars value={Number(reviewStats.avg_rating)} size="xs" />
+              <span>{Number(reviewStats.avg_rating).toFixed(1)} · {reviewStats.count} {reviewStats.count === 1 ? "Bewertung" : "Bewertungen"}</span>
+            </a>
+          )}
+
           {/* Preisblock */}
           {selectedVariant && (
             <div className="mt-4">
