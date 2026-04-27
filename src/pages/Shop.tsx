@@ -358,6 +358,82 @@ const Shop = () => {
     );
   };
 
+  /** Inline-Popover-Filter wie auf klassischen Shop-Toolbars (Farbe ▾, Grösse ▾, …). */
+  const FacetPopover = ({
+    label,
+    items,
+    selected,
+    onToggle,
+    capitalize = false,
+    columns = 1,
+  }: {
+    label: string;
+    items: Array<[string, number]>;
+    selected: Set<string>;
+    onToggle: (v: string) => void;
+    capitalize?: boolean;
+    columns?: 1 | 2;
+  }) => {
+    if (items.length === 0) return null;
+    const count = selected.size;
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 text-sm transition",
+              count > 0
+                ? "text-foreground"
+                : "text-foreground/75 hover:text-foreground",
+            )}
+          >
+            <span>{label}</span>
+            {count > 0 && (
+              <span className="rounded-full bg-foreground px-1.5 text-[10px] font-medium text-background">
+                {count}
+              </span>
+            )}
+            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-72 p-0">
+          <div className="border-b border-border px-4 py-2.5 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            {label}
+          </div>
+          <ScrollArea className="max-h-72">
+            <div className={cn("p-3", columns === 2 ? "grid grid-cols-2 gap-y-2" : "space-y-2")}>
+              {items.map(([v, c]) => (
+                <label
+                  key={v}
+                  className="flex cursor-pointer items-center justify-between gap-3 px-1.5 py-1 text-sm hover:bg-muted/50"
+                >
+                  <span className="flex items-center gap-2">
+                    <Checkbox checked={selected.has(v)} onCheckedChange={() => onToggle(v)} />
+                    <span>{capitalize ? titleCase(v) : v}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">{c}</span>
+                </label>
+              ))}
+            </div>
+          </ScrollArea>
+          {count > 0 && (
+            <div className="border-t border-border p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => Array.from(selected).forEach(onToggle)}
+              >
+                <X className="h-3.5 w-3.5" /> Auswahl zurücksetzen
+              </Button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
   const FilterPanel = () => (
     <div className="space-y-6">
       <div>
