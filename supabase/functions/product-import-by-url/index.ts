@@ -902,6 +902,7 @@ Deno.serve(async (req) => {
           vendor: payload.product.vendor,
           product_type: payload.product.product_type,
           tags: payload.product.tags,
+          status: payload.product.status,
           options: payload.product.options,
           variants: payload.product.variants,
         },
