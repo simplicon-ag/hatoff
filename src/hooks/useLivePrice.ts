@@ -18,6 +18,63 @@ export interface LivePrice {
 const memCache = new Map<string, LivePrice>();
 const inflight = new Map<string, Promise<LivePrice | null>>();
 
+// Coalescing: sammle Handle-Anfragen über kurze Zeitfenster und bündle sie
+// in einen einzigen Edge-Function-Aufruf. Verhindert, dass z. B. 18 ProductCards
+// auf einer Seite gleichzeitig 18 Edge-Calls auslösen → 503.
+const pending = new Set<string>();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let flushPromise: Promise<void> | null = null;
+let flushResolve: (() => void) | null = null;
+const COALESCE_MS = 50;
+
+function scheduleFlush(): Promise<void> {
+  if (!flushPromise) {
+    flushPromise = new Promise<void>((resolve) => {
+      flushResolve = resolve;
+    });
+  }
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = setTimeout(runFlush, COALESCE_MS);
+  return flushPromise;
+}
+
+async function runFlush() {
+  flushTimer = null;
+  const handles = Array.from(pending);
+  pending.clear();
+  const resolve = flushResolve;
+  flushPromise = null;
+  flushResolve = null;
+  if (handles.length === 0) {
+    resolve?.();
+    return;
+  }
+  // In Server-Batches à 4 splitten, parallel max. 2 Requests an den Edge schicken.
+  const chunks: string[][] = [];
+  for (let i = 0; i < handles.length; i += BATCH_SIZE) {
+    chunks.push(handles.slice(i, i + BATCH_SIZE));
+  }
+  const REQUEST_CONCURRENCY = 2;
+  for (let i = 0; i < chunks.length; i += REQUEST_CONCURRENCY) {
+    const batch = chunks.slice(i, i + REQUEST_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (chunk) => {
+        try {
+          const { data, error } = await supabase.functions.invoke("product-price", {
+            body: { handles: chunk },
+          });
+          if (error) throw error;
+          const rawPrices: LivePrice[] = data?.prices ?? [];
+          for (const p of rawPrices) memCache.set(p.handle, normalizeLivePrice(p));
+        } catch (err) {
+          console.warn("product-price chunk failed", err);
+        }
+      }),
+    );
+  }
+  resolve?.();
+}
+
 function normalizeLivePrice(price: LivePrice): LivePrice {
   return {
     ...price,
