@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { fetchAllProducts, expandProductsByColor, type ShopifyProduct } from "@/lib/shopify";
@@ -556,301 +556,211 @@ const Shop = () => {
 
   return (
     <SiteLayout>
-      <section className="container-editorial pt-16 md:pt-24">
-        <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Shop</p>
-        <h1 className="mt-2 max-w-2xl font-display text-5xl leading-[1.05] md:text-6xl">
-          Einzelne Stücke.
-        </h1>
-      </section>
+      {/* Breadcrumb + Title — schmal & retail-like */}
+      <div className="border-b border-border bg-secondary/30">
+        <div className="container-editorial py-3 text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <Link to="/" className="hover:text-foreground">Home</Link>
+          <span className="mx-2">/</span>
+          <span className="text-foreground/80">Shop</span>
+        </div>
+      </div>
 
-      <section className="container-editorial py-10">
-        {/* Kategorie-Pills (Produkttypen) */}
-        {facets.categories.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2">
-              <button
-                onClick={() => setSelectedCategories(new Set())}
-                className={cn(
-                  "min-h-10 border px-4 py-2 text-sm transition",
-                  selectedCategories.size === 0
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border bg-background text-foreground/80 hover:border-foreground",
+      <section className="container-editorial py-6 md:py-8">
+        {/* 2-spaltiges Layout: feste Filter-Sidebar links + Produkte rechts (PKZ-Stil) */}
+        <div className="grid gap-8 lg:grid-cols-[260px_1fr] lg:gap-10">
+          {/* ───────── Sidebar (Desktop) ───────── */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-[180px] max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
+              <h2 className="mb-4 text-sm font-bold uppercase tracking-[0.15em] text-foreground">
+                Kategorie filtern
+              </h2>
+              <FilterPanel />
+            </div>
+          </aside>
+
+          {/* ───────── Hauptbereich ───────── */}
+          <div className="min-w-0">
+            {/* Header-Zeile: Titel + Trefferzahl + Sortierung */}
+            <div className="mb-6 flex items-end justify-between gap-4 border-b border-border pb-4">
+              <div>
+                <h1 className="text-2xl font-bold uppercase tracking-wide text-foreground md:text-3xl">
+                  Shop
+                </h1>
+                {!loading && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {filtered.length} {filtered.length === 1 ? "Artikel" : "Artikel"}
+                  </p>
                 )}
-              >
-                Alle
-              </button>
-              {facets.categories.map(([cat, count]) => {
-                const active = selectedCategories.has(cat);
-                return (
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Mobile-Filter-Button */}
+                <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" className="lg:hidden">
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      Filter
+                      {activeCount > 0 && (
+                        <span className="ml-1 rounded-full bg-foreground px-1.5 text-[10px] text-background">
+                          {activeCount}
+                        </span>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-80 overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle>Kategorie filtern</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-6">
+                      <FilterPanel />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                {/* Density-Toggle (Desktop) */}
+                <div className="hidden items-center border border-border lg:flex">
                   <button
-                    key={cat}
-                    onClick={() => {
-                      const next = new Set(selectedCategories);
-                      next.has(cat) ? next.delete(cat) : next.add(cat);
-                      setSelectedCategories(next);
-                    }}
+                    type="button"
+                    aria-label="4 Spalten"
+                    onClick={() => setDensity(4)}
                     className={cn(
-                      "min-h-10 border px-4 py-2 text-sm transition",
-                      active
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border bg-background text-foreground/80 hover:border-foreground",
+                      "flex h-9 w-9 items-center justify-center transition",
+                      density === 4 ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground",
                     )}
                   >
-                    {cat}
-                    <span className="ml-1.5 text-xs opacity-60">{count}</span>
+                    <LayoutGrid className="h-4 w-4" />
                   </button>
-                );
-              })}
-          </div>
-        )}
-
-        {/* Horizontale Filter-Toolbar */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-y border-border py-3">
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="hidden items-center gap-2 pr-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground md:inline-flex">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Filtern nach:
-            </span>
-
-            {/* Mobile: gesamtes Filter-Sheet */}
-            <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="md:hidden">
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                  Filter{" "}
-                  {activeCount > 0 && (
-                    <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
-                      {activeCount}
-                    </span>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-80 overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>Filter</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6">
-                  <FilterPanel />
+                  <button
+                    type="button"
+                    aria-label="3 Spalten"
+                    onClick={() => setDensity(3)}
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center transition",
+                      density === 3 ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground",
+                    )}
+                  >
+                    <Grid2X2 className="h-4 w-4" />
+                  </button>
                 </div>
-              </SheetContent>
-            </Sheet>
 
-            {/* Desktop: einzelne Popover-Filter */}
-            <div className="hidden flex-wrap items-center md:flex">
-              <FacetPopover
-                label="Marke"
-                items={facets.vendors}
-                selected={selectedVendors}
-                onToggle={toggle(selectedVendors, setSelectedVendors)}
-              />
-              <FacetPopover
-                label="Farbe"
-                items={facets.colors}
-                selected={selectedColors}
-                onToggle={toggle(selectedColors, setSelectedColors)}
-                capitalize
-              />
-              <FacetPopover
-                label="Grösse"
-                items={facets.sizes}
-                selected={selectedSizes}
-                onToggle={toggle(selectedSizes, setSelectedSizes)}
-                columns={2}
-              />
-              <FacetPopover
-                label="Welt"
-                items={facets.welten}
-                selected={selectedWelten}
-                onToggle={toggle(selectedWelten, setSelectedWelten)}
-                capitalize
-              />
-              <FacetPopover
-                label="Status"
-                items={facets.status}
-                selected={selectedStatus}
-                onToggle={toggle(selectedStatus, setSelectedStatus)}
-                capitalize
-              />
-
-              {/* Preis als eigener Popover */}
-              {priceRange && facets.priceMax > facets.priceMin && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-3 text-sm transition",
-                        priceRange[0] !== facets.priceMin || priceRange[1] !== facets.priceMax
-                          ? "text-foreground"
-                          : "text-foreground/75 hover:text-foreground",
-                      )}
-                    >
-                      <span>Preis</span>
-                      <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-72">
-                    <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                      Preis
-                    </p>
-                    <Slider
-                      min={facets.priceMin}
-                      max={facets.priceMax}
-                      step={5}
-                      value={priceRange}
-                      onValueChange={(v) => setPriceRange([v[0], v[1]] as [number, number])}
-                    />
-                    <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-                      <span>CHF {priceRange[0]}</span>
-                      <span>CHF {priceRange[1]}</span>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              )}
+                {/* Sortierung */}
+                <div className="flex items-center gap-2">
+                  <span className="hidden text-xs uppercase tracking-wider text-muted-foreground sm:inline">
+                    Sortierung
+                  </span>
+                  <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+                    <SelectTrigger className="h-9 w-44 border-border">
+                      <SelectValue placeholder="Sortieren" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="featured">Empfohlen</SelectItem>
+                      <SelectItem value="newest">Neuheiten</SelectItem>
+                      <SelectItem value="price-asc">Preis aufsteigend</SelectItem>
+                      <SelectItem value="price-desc">Preis absteigend</SelectItem>
+                      <SelectItem value="title-asc">A – Z</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            {/* Suche */}
-            <div className="relative hidden w-48 sm:block">
+            {/* Suche (kompakt, immer sichtbar) */}
+            <div className="relative mb-6 max-w-md">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Suche…"
+                placeholder="Suche nach Artikel, Marke …"
                 className="h-9 pl-9 text-sm"
               />
             </div>
 
-            {/* Density-Toggle (Desktop) */}
-            <div className="hidden items-center border border-border lg:flex">
-              <button
-                type="button"
-                aria-label="4 Spalten"
-                onClick={() => setDensity(4)}
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center transition",
-                  density === 4 ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground",
+            {/* Aktive Filter-Chips */}
+            {activeCount > 0 && (
+              <div className="mb-6 flex flex-wrap items-center gap-2">
+                {search.trim() && (
+                  <FilterChip label={`„${search.trim()}"`} onRemove={() => setSearch("")} />
                 )}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                aria-label="3 Spalten"
-                onClick={() => setDensity(3)}
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center transition",
-                  density === 3 ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground",
+                {Array.from(selectedVendors).map((v) => (
+                  <FilterChip key={`v-${v}`} label={v} onRemove={() => {
+                    const n = new Set(selectedVendors); n.delete(v); setSelectedVendors(n);
+                  }} />
+                ))}
+                {Array.from(selectedCategories).map((c) => (
+                  <FilterChip key={`c-${c}`} label={c} onRemove={() => {
+                    const n = new Set(selectedCategories); n.delete(c); setSelectedCategories(n);
+                  }} />
+                ))}
+                {Array.from(selectedWelten).map((w) => (
+                  <FilterChip key={`w-${w}`} label={titleCase(w)} onRemove={() => {
+                    const n = new Set(selectedWelten); n.delete(w); setSelectedWelten(n);
+                  }} />
+                ))}
+                {Array.from(selectedStatus).map((s) => (
+                  <FilterChip key={`st-${s}`} label={STATUS_LABELS[s] ?? titleCase(s)} onRemove={() => {
+                    const n = new Set(selectedStatus); n.delete(s); setSelectedStatus(n);
+                  }} />
+                ))}
+                {Array.from(selectedColors).map((c) => (
+                  <FilterChip key={`col-${c}`} label={titleCase(c)} onRemove={() => {
+                    const n = new Set(selectedColors); n.delete(c); setSelectedColors(n);
+                  }} />
+                ))}
+                {Array.from(selectedSizes).map((s) => (
+                  <FilterChip key={`s-${s}`} label={`Grösse ${s}`} onRemove={() => {
+                    const n = new Set(selectedSizes); n.delete(s); setSelectedSizes(n);
+                  }} />
+                ))}
+                {priceRange &&
+                  (priceRange[0] !== facets.priceMin || priceRange[1] !== facets.priceMax) && (
+                    <FilterChip
+                      label={`CHF ${priceRange[0]}–${priceRange[1]}`}
+                      onRemove={() => setPriceRange([facets.priceMin, facets.priceMax])}
+                    />
+                  )}
+                {onlyAvailable && (
+                  <FilterChip label="Nur verfügbar" onRemove={() => setOnlyAvailable(false)} />
                 )}
-              >
-                <Grid2X2 className="h-4 w-4" />
-              </button>
-            </div>
+                <button
+                  onClick={clearFilters}
+                  className="ml-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground underline hover:text-foreground"
+                >
+                  Alle zurücksetzen
+                </button>
+              </div>
+            )}
 
-            {/* Sortieren */}
-            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <SelectTrigger className="h-9 w-44 border-border">
-                <SelectValue placeholder="Sortieren" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="featured">Empfohlen</SelectItem>
-                <SelectItem value="newest">Neueste zuerst</SelectItem>
-                <SelectItem value="price-asc">Preis aufsteigend</SelectItem>
-                <SelectItem value="price-desc">Preis absteigend</SelectItem>
-                <SelectItem value="title-asc">A – Z</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Produktraster */}
+            {loading ? (
+              <p className="py-16 text-center text-muted-foreground">Produkte werden geladen …</p>
+            ) : filtered.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className="text-muted-foreground">Keine Produkte gefunden.</p>
+                {activeCount > 0 && (
+                  <Button variant="link" onClick={clearFilters} className="mt-2">
+                    Filter zurücksetzen
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div
+                className={cn(
+                  "grid gap-x-4 gap-y-10 grid-cols-2 md:grid-cols-3",
+                  density === 4 ? "lg:grid-cols-3 xl:grid-cols-4" : "lg:grid-cols-3",
+                )}
+              >
+                {expandProductsByColor(filtered).map((p, i) => (
+                  <ProductCard
+                    key={`${p.node.id}-${p.initialColor ?? "default"}`}
+                    product={p}
+                    initialColor={p.initialColor}
+                    priority={i < 6}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Aktive Filter-Chips */}
-        {activeCount > 0 && (
-          <div className="mb-6 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-              {loading ? "—" : `${filtered.length} Artikel`}
-            </span>
-            {search.trim() && (
-              <FilterChip label={`„${search.trim()}"`} onRemove={() => setSearch("")} />
-            )}
-            {Array.from(selectedVendors).map((v) => (
-              <FilterChip key={`v-${v}`} label={v} onRemove={() => {
-                const n = new Set(selectedVendors); n.delete(v); setSelectedVendors(n);
-              }} />
-            ))}
-            {Array.from(selectedCategories).map((c) => (
-              <FilterChip key={`c-${c}`} label={c} onRemove={() => {
-                const n = new Set(selectedCategories); n.delete(c); setSelectedCategories(n);
-              }} />
-            ))}
-            {Array.from(selectedWelten).map((w) => (
-              <FilterChip key={`w-${w}`} label={titleCase(w)} onRemove={() => {
-                const n = new Set(selectedWelten); n.delete(w); setSelectedWelten(n);
-              }} />
-            ))}
-            {Array.from(selectedStatus).map((s) => (
-              <FilterChip key={`st-${s}`} label={STATUS_LABELS[s] ?? titleCase(s)} onRemove={() => {
-                const n = new Set(selectedStatus); n.delete(s); setSelectedStatus(n);
-              }} />
-            ))}
-            {Array.from(selectedColors).map((c) => (
-              <FilterChip key={`col-${c}`} label={titleCase(c)} onRemove={() => {
-                const n = new Set(selectedColors); n.delete(c); setSelectedColors(n);
-              }} />
-            ))}
-            {Array.from(selectedSizes).map((s) => (
-              <FilterChip key={`s-${s}`} label={`Grösse ${s}`} onRemove={() => {
-                const n = new Set(selectedSizes); n.delete(s); setSelectedSizes(n);
-              }} />
-            ))}
-            {priceRange &&
-              (priceRange[0] !== facets.priceMin || priceRange[1] !== facets.priceMax) && (
-                <FilterChip
-                  label={`CHF ${priceRange[0]}–${priceRange[1]}`}
-                  onRemove={() => setPriceRange([facets.priceMin, facets.priceMax])}
-                />
-              )}
-            {onlyAvailable && (
-              <FilterChip label="Nur verfügbar" onRemove={() => setOnlyAvailable(false)} />
-            )}
-            <button
-              onClick={clearFilters}
-              className="ml-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
-            >
-              Alle zurücksetzen
-            </button>
-          </div>
-        )}
-
-        {/* Produktraster */}
-        {loading ? (
-          <p className="py-16 text-center text-muted-foreground">Produkte werden geladen …</p>
-        ) : filtered.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-muted-foreground">Keine Produkte gefunden.</p>
-            {activeCount > 0 && (
-              <Button variant="link" onClick={clearFilters} className="mt-2">
-                Filter zurücksetzen
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div
-            className={cn(
-              "grid gap-x-4 gap-y-10 sm:grid-cols-2 md:grid-cols-3",
-              density === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3",
-            )}
-          >
-            {expandProductsByColor(filtered).map((p, i) => (
-              <ProductCard
-                key={`${p.node.id}-${p.initialColor ?? "default"}`}
-                product={p}
-                initialColor={p.initialColor}
-                priority={i < 6}
-                compactCart
-              />
-            ))}
-          </div>
-        )}
       </section>
     </SiteLayout>
   );
