@@ -41,7 +41,7 @@ export const SiteHeader = () => {
           scrolled ? "border-border" : "border-transparent"
         }`}
       >
-        <div className="container-editorial relative flex h-20 items-center justify-between md:h-28">
+        <div className="container-editorial relative flex h-28 items-center justify-between md:h-40">
           {/* Mobile Burger links */}
           <button
             className="inline-flex h-10 w-10 items-center justify-center text-foreground hover:bg-secondary md:hidden"
