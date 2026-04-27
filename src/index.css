@@ -104,12 +104,17 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Mobile: hartes Limit gegen versehentlichen horizontalen Scroll
+       (z. B. durch breite Headlines, Hero-Bilder mit ken-burns-Animation,
+       horizontale Scroll-Carousels). */
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, sans-serif;
     font-feature-settings: 'ss01', 'cv11';
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, .font-display {
