@@ -636,6 +636,7 @@ function buildProductPayload(
   base: ScrapedProduct,
   colors: ColorData[],
   handle: string,
+  opts: { status: "active" | "draft"; categoryTag: string },
 ) {
   const minPriceEur = colors.reduce(
     (m, c) => (c.scraped.price_eur != null && c.scraped.price_eur < m ? c.scraped.price_eur : m),
@@ -675,21 +676,31 @@ function buildProductPayload(
     }
   }
 
+  // Tags zusammenstellen: Basis-Tags + Article-Number-Tags + optional category_tag
+  // Sale-Tag rausfiltern wenn category_tag gesetzt ist (Draft-Import = kein Sale)
+  const baseTags = opts.categoryTag
+    ? base.tags.filter((t) => t.toLowerCase() !== "sale")
+    : base.tags;
+  const allTags = [
+    ...baseTags,
+    ...colors
+      .map((c) => c.scraped.article_number)
+      .filter((n): n is string => !!n)
+      .map((n) => `art:${n}`),
+  ];
+  if (opts.categoryTag && !allTags.map((t) => t.toLowerCase()).includes(opts.categoryTag)) {
+    allTags.push(opts.categoryTag);
+  }
+
   return {
     product: {
       title: base.title || handle,
       body_html: base.description_html || base.description || "",
       vendor: base.vendor,
       product_type: base.product_type ?? "Bekleidung",
-      tags: [
-        ...base.tags,
-        ...colors
-          .map((c) => c.scraped.article_number)
-          .filter((n): n is string => !!n)
-          .map((n) => `art:${n}`),
-      ].join(","),
+      tags: allTags.join(","),
       handle,
-      status: "active",
+      status: opts.status,
       options: [
         { name: "Grösse", values: sizes },
         { name: "Farbe", values: colorNames },
@@ -737,6 +748,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const rawUrl = String(body.url ?? "").trim();
     const force = Boolean(body.force);
+    // NEU: Draft-Modus, zusätzlicher Kategorie-Tag, Sale-Filter
+    const productStatus: "active" | "draft" =
+      String(body.status ?? "").toLowerCase() === "draft" ? "draft" : "active";
+    const categoryTag = String(body.category_tag ?? "").trim().toLowerCase();
+    const excludeSale = Boolean(body.exclude_sale);
     if (!rawUrl) {
       return new Response(
         JSON.stringify({ success: false, error: "url required" }),
@@ -749,6 +765,14 @@ Deno.serve(async (req) => {
     if (!brand) {
       return new Response(
         JSON.stringify({ success: false, error: "Nur casamoda.com oder venti.com URLs werden unterstützt" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Sale/Outlet-URLs ablehnen wenn excludeSale gesetzt ist
+    if (excludeSale && /\/(?:sale|outlet|reduziert)(?:\/|$|\?)/i.test(sourceUrl)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Sale/Outlet-URL übersprungen (exclude_sale=true)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -859,7 +883,10 @@ Deno.serve(async (req) => {
     // 4) Upsert: re-use the existence result from the early check.
     //    With force=true we update the matched product (by handle or by article number).
     const existingId = existing?.id ?? null;
-    const payload = buildProductPayload(base, colors, handle);
+    const payload = buildProductPayload(base, colors, handle, {
+      status: productStatus,
+      categoryTag,
+    });
 
     let productId: string;
     let action: "created" | "updated";
@@ -875,6 +902,7 @@ Deno.serve(async (req) => {
           vendor: payload.product.vendor,
           product_type: payload.product.product_type,
           tags: payload.product.tags,
+          status: payload.product.status,
           options: payload.product.options,
           variants: payload.product.variants,
         },
@@ -985,8 +1013,12 @@ Deno.serve(async (req) => {
     // 7) Fire-and-forget: Looks für dieses Produkt generieren lassen
     //    Mit Retry, weil Shopify Storefront-API neue Produkte erst nach
     //    einigen Sekunden indexiert (look-generate würde sonst 404 liefern).
+    //    SKIP wenn Produkt als Draft angelegt wurde — Drafts erscheinen nicht
+    //    in der Storefront-API und Looks würden ohnehin nicht funktionieren.
     let lookGenerationTriggered = false;
-    try {
+    if (productStatus === "draft") {
+      console.log(`[by-url] skipping look-generate for draft product ${handle}`);
+    } else {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const delays = [8000, 20000, 40000]; // 8s, dann +20s, dann +40s
@@ -1022,8 +1054,6 @@ Deno.serve(async (req) => {
         }
       } catch { /* noop */ }
       lookGenerationTriggered = true;
-    } catch (e) {
-      console.warn(`[by-url] look-generate trigger failed for ${handle}:`, e);
     }
 
     return new Response(
@@ -1048,6 +1078,8 @@ Deno.serve(async (req) => {
         description_length: base.description.length,
         missing_fields: missing,
         look_generation_triggered: lookGenerationTriggered,
+        product_status: productStatus,
+        category_tag: categoryTag || null,
         shopify_admin_url: `https://${SHOPIFY_DOMAIN.replace(".myshopify.com","")}.myshopify.com/admin/products/${productId}`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
