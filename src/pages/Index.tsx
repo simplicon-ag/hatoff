@@ -1,37 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Flame,
-  Sparkles,
-  Compass,
-  MousePointerClick,
-  ShoppingBag,
-} from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { FeaturedLook } from "@/components/FeaturedLook";
 import { ProductCard } from "@/components/ProductCard";
-import { Button } from "@/components/ui/button";
-import { TrustBar } from "@/components/TrustBar";
 import { TestimonialsSection } from "@/components/TestimonialsSection";
-import { WeeklyEditions } from "@/components/WeeklyEditions";
 import { magazinArtikel, marken } from "@/data/looks";
-import editorialMorgen from "@/assets/editorial-fs26-morgen.jpg";
-import editorialMittag from "@/assets/editorial-fs26-mittag.jpg";
-import editorialAbend from "@/assets/editorial-fs26-abend.jpg";
 import { useCuratedLooks } from "@/hooks/useCuratedLooks";
 import { fetchProducts, fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
 import { supabase } from "@/integrations/supabase/client";
-
-const weltLabel: Record<string, string> = {
-  business: "Für's Büro",
-  hemden: "Smart Casual",
-  jacken: "Weekend",
-  sommer: "Sommer",
-  freizeit: "Alltag",
-  "smart-casual": "Date Night",
-  abend: "Abend",
-};
 
 const Index = () => {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
@@ -67,203 +44,152 @@ const Index = () => {
 
   const { looks } = useCuratedLooks();
   const featuredLooks = looks.slice(0, 3);
-  const wallLooks = looks.filter((l) => l.hero).slice(0, 8);
 
   return (
     <SiteLayout>
-      {/* ───────── Hero (Carousel + Live-Counter) ───────── */}
+      {/* ───────── Hero ───────── */}
       <HeroCarousel />
 
-      {/* ───────── Trust-Bar (Versprechen) ───────── */}
-      <TrustBar />
-
-      {/* ───────── So funktioniert HATOFF ───────── */}
-      <section id="so-funktionierts" className="container-editorial py-16 md:py-20">
-        <div className="mx-auto mb-12 max-w-2xl text-center">
-          <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">So einfach</p>
-          <h2 className="mt-2 font-display text-3xl md:text-4xl">In drei Schritten gut angezogen.</h2>
-        </div>
-        <div className="grid gap-10 md:grid-cols-3 md:gap-12">
+      {/* ───────── Schnell-Kategorien (PKZ-artige Tiles) ───────── */}
+      <section className="container-editorial py-10 md:py-14">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
           {[
-            {
-              icon: Compass,
-              title: "Look entdecken",
-              text: "Kuratiert für jeden Anlass — Büro, Wochenende, Date.",
-            },
-            {
-              icon: MousePointerClick,
-              title: "Mit einem Tap kombinieren",
-              text: "Ganzes Outfit in den Warenkorb. Keine Stilfragen offen.",
-            },
-            {
-              icon: ShoppingBag,
-              title: "Stilvoll tragen",
-              text: "Schweizer Versand, kostenlose Retoure, jederzeit Beratung.",
-            },
-          ].map((step) => (
-            <div key={step.title}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted-foreground">
-                <step.icon className="h-4.5 w-4.5" />
-              </div>
-              <h3 className="mt-5 font-display text-xl">{step.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ───────── Wochenausgaben — 7 Tage, 7 Looks ───────── */}
-      <WeeklyEditions />
-
-      {/* ───────── Featured Looks (gleichwertig, dezente Anlass-Hinweise) ───────── */}
-      <section className="container-editorial py-16 md:py-24">
-        <div className="mb-12 flex items-end justify-between gap-6">
-          <div>
-            <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">Aktuelle Looks</p>
-            <h2 className="mt-2 font-display text-4xl md:text-5xl">Diese Woche im Spotlight.</h2>
-            <p className="mt-3 max-w-xl text-muted-foreground">
-              Echte Stücke aus dem Shop — klick aufs Bild zum Einzelteil oder hol dir den ganzen Look mit einem Tap.
-            </p>
-          </div>
-          <Link to="/looks" className="hidden text-sm text-primary hover:underline md:inline">
-            Alle Looks →
-          </Link>
-        </div>
-        <div className="grid gap-x-8 gap-y-12 md:grid-cols-3">
-          {featuredLooks.map((l) => (
-            <div key={l.slug}>
-              {weltLabel[l.welt] && (
-                <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                  {weltLabel[l.welt]}
-                </p>
-              )}
-              <FeaturedLook look={l} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ───────── Brand Strip ───────── */}
-      <section className="border-y border-border bg-background">
-        <div className="container-editorial flex flex-wrap items-center justify-center gap-x-12 gap-y-4 py-10 text-muted-foreground">
-          {marken.map((m) => (
+            { label: "New In", to: "/neuheiten" },
+            { label: "Hemden", to: "/shop?kategorie=Hemden" },
+            { label: "Looks", to: "/looks" },
+            { label: "Sale", to: "/sale", accent: true },
+          ].map((tile) => (
             <Link
-              key={m.slug}
-              to={`/marken/${m.slug}`}
-              className="font-display text-lg tracking-wide transition-colors hover:text-primary"
+              key={tile.label}
+              to={tile.to}
+              className={`flex h-20 items-center justify-center border text-sm font-bold uppercase tracking-[0.15em] transition md:h-28 md:text-base ${
+                tile.accent
+                  ? "border-destructive bg-destructive/5 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  : "border-border bg-secondary/40 text-foreground hover:border-foreground hover:bg-secondary"
+              }`}
             >
-              {m.name}
+              {tile.label}
             </Link>
           ))}
         </div>
       </section>
 
-      {/* ───────── Social Proof Wall ───────── */}
-      {wallLooks.length >= 4 && (
-        <section className="container-editorial py-16 md:py-24">
-          <div className="mb-10 flex items-end justify-between gap-6">
-            <div>
-              <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">Aus dem Look-Universum</p>
-              <h2 className="mt-2 font-display text-4xl md:text-5xl">So tragen sie HATOFF.</h2>
-              <p className="mt-3 max-w-xl text-muted-foreground">
-                Echte Outfits, echte Kombinationen — direkt in deinen Warenkorb.
-              </p>
-            </div>
-            <Link to="/looks" className="hidden text-sm text-primary hover:underline md:inline">
-              Alle Looks →
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-            {wallLooks.map((l) => (
-              <Link
-                key={l.slug}
-                to={`/looks/${l.slug}`}
-                className="group relative aspect-square overflow-hidden bg-secondary"
-              >
-                <img
-                  src={l.hero}
-                  alt={l.title}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-foreground/70 to-transparent p-3 text-primary-foreground">
-                  <h3 className="font-display text-sm leading-tight md:text-base">{l.title}</h3>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ───────── Neu eingetroffen ───────── */}
-      <section className="container-editorial py-16 md:py-24">
-        <div className="mb-12 flex items-end justify-between">
-          <div>
-            <p className="flex items-center gap-2 text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">
-              <Sparkles className="h-3 w-3" /> Neu eingetroffen
-            </p>
-            <h2 className="mt-2 font-display text-4xl md:text-5xl">Frisch im Sortiment.</h2>
-          </div>
-          <Link to="/shop" className="hidden text-sm text-primary hover:underline md:inline">
-            Alle Produkte →
+      {/* ───────── New In Produktraster ───────── */}
+      <section className="container-editorial py-8 md:py-12">
+        <div className="mb-6 flex items-end justify-between border-b border-border pb-4">
+          <h2 className="text-xl font-bold uppercase tracking-[0.15em] text-foreground md:text-2xl">
+            New In
+          </h2>
+          <Link
+            to="/neuheiten"
+            className="text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground"
+          >
+            Alle Neuheiten →
           </Link>
         </div>
         {products.length === 0 ? (
           <p className="py-12 text-center text-muted-foreground">Produkte werden geladen …</p>
         ) : (
-          <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
             {products.slice(0, 4).map((p) => (
-              <ProductCard key={p.node.id} product={p} />
+              <ProductCard key={p.node.id} product={p} priority />
             ))}
           </div>
         )}
       </section>
 
-      {/* ───────── Sale-Highlights (warmer Sand, ruhig) ───────── */}
+      {/* ───────── Brand Strip ───────── */}
+      <section className="border-y border-border bg-secondary/40">
+        <div className="container-editorial py-8">
+          <p className="mb-6 text-center text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            Unsere Marken
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-foreground/70">
+            {marken.map((m) => (
+              <Link
+                key={m.slug}
+                to={`/marken/${m.slug}`}
+                className="font-display text-base tracking-wide transition-colors hover:text-foreground md:text-lg"
+              >
+                {m.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ───────── Sale ───────── */}
       {saleProducts.length > 0 && (
-        <section className="border-y border-border bg-secondary/60">
-          <div className="container-editorial py-16 md:py-24">
-            <div className="mb-12 flex items-end justify-between gap-6">
-              <div>
-                <p className="flex items-center gap-2 text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">
-                  <Flame className="h-3 w-3" /> Aktuelle Deals
-                </p>
-                <h2 className="mt-2 font-display text-4xl md:text-5xl">Sale-Highlights.</h2>
-                <p className="mt-3 max-w-xl text-muted-foreground">
-                  Die grössten Ersparnisse aus den aktuellen Aktionen unserer Marken — solange Vorrat reicht.
-                </p>
-              </div>
-              <Link to="/sale" className="hidden text-sm font-medium text-primary hover:underline md:inline">
-                Alle Sale-Stücke →
-              </Link>
+        <section className="container-editorial py-8 md:py-12">
+          <div className="mb-6 flex items-end justify-between border-b border-border pb-4">
+            <div>
+              <h2 className="text-xl font-bold uppercase tracking-[0.15em] text-destructive md:text-2xl">
+                Sale
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Die grössten Deals — solange Vorrat reicht.
+              </p>
             </div>
-            <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-              {saleProducts.map((p) => (
-                <ProductCard key={p.node.id} product={p} />
-              ))}
-            </div>
-            <div className="mt-10 text-center md:hidden">
-              <Link to="/sale" className="text-sm font-medium text-primary hover:underline">
-                Alle Sale-Stücke →
-              </Link>
-            </div>
+            <Link
+              to="/sale"
+              className="text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            >
+              Alle Sale-Stücke →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
+            {saleProducts.map((p) => (
+              <ProductCard key={p.node.id} product={p} />
+            ))}
           </div>
         </section>
       )}
 
+      {/* ───────── Looks ───────── */}
+      <section className="container-editorial py-8 md:py-12">
+        <div className="mb-6 flex items-end justify-between border-b border-border pb-4">
+          <div>
+            <h2 className="text-xl font-bold uppercase tracking-[0.15em] text-foreground md:text-2xl">
+              Looks der Woche
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Komplette Outfits — ein Tap, fertig.
+            </p>
+          </div>
+          <Link
+            to="/looks"
+            className="text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground"
+          >
+            Alle Looks →
+          </Link>
+        </div>
+        <div className="grid gap-x-6 gap-y-10 md:grid-cols-3">
+          {featuredLooks.map((l) => (
+            <FeaturedLook key={l.slug} look={l} />
+          ))}
+        </div>
+      </section>
+
       {/* ───────── Testimonials ───────── */}
       <TestimonialsSection />
 
-      {/* ───────── Magazin Teaser (symmetrisch) ───────── */}
-      <section className="container-editorial py-16 md:py-24">
-        <div className="mb-12">
-          <p className="text-xs sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground">Magazin</p>
-          <h2 className="mt-2 font-display text-4xl md:text-5xl">Lesen, lernen, besser kombinieren.</h2>
+      {/* ───────── Magazin ───────── */}
+      <section className="container-editorial py-8 md:py-12">
+        <div className="mb-6 flex items-end justify-between border-b border-border pb-4">
+          <h2 className="text-xl font-bold uppercase tracking-[0.15em] text-foreground md:text-2xl">
+            Stories
+          </h2>
+          <Link
+            to="/magazin"
+            className="text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground"
+          >
+            Zum Magazin →
+          </Link>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           {magazinArtikel.map((a) => (
             <Link key={a.slug} to={`/magazin/${a.slug}`} className="group block">
-              <div className="aspect-[4/3] overflow-hidden bg-secondary">
+              <div className="aspect-[4/3] overflow-hidden bg-secondary/70">
                 <img
                   src={a.image}
                   alt={a.title}
@@ -271,10 +197,10 @@ const Index = () => {
                   className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
               </div>
-              <p className="mt-4 text-xs sm:text-[11px] uppercase tracking-[0.18em] sm:tracking-[0.2em] text-muted-foreground">
+              <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                 {a.readingTime} · HATOFF Redaktion
               </p>
-              <h3 className="mt-1 font-display text-2xl leading-tight transition-colors group-hover:text-primary">
+              <h3 className="mt-1 font-display text-xl leading-tight transition-colors group-hover:text-primary">
                 {a.title}
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">{a.teaser}</p>
