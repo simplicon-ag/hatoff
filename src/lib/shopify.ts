@@ -137,24 +137,52 @@ export async function fetchProducts(first = 50, query?: string): Promise<Shopify
 /**
  * Fetch ALL products from Shopify, paginating through the Storefront API.
  * Storefront API caps `first` at 250 per request, so we loop until hasNextPage is false.
+ *
+ * Ergebnisse werden für die Lebensdauer des Tabs im Modul-Cache gehalten,
+ * damit Navigation (z.B. Produkt → Zurück zum Shop) nicht jedes Mal alle
+ * Produkte neu lädt. Parallele Aufrufe teilen sich dieselbe In-Flight-Promise.
  */
+const productListCache = new Map<string, ShopifyProduct[]>();
+const productListInFlight = new Map<string, Promise<ShopifyProduct[]>>();
+
+export function clearProductListCache() {
+  productListCache.clear();
+  productListInFlight.clear();
+}
+
 export async function fetchAllProducts(query?: string, pageSize = 250): Promise<ShopifyProduct[]> {
-  const all: ShopifyProduct[] = [];
-  let after: string | null = null;
-  // Hard safety cap to prevent runaway loops
-  for (let i = 0; i < 50; i++) {
-    const data = await storefrontApiRequest(PRODUCTS_QUERY, {
-      first: pageSize,
-      query: query ?? null,
-      after,
-    });
-    const products = data?.data?.products;
-    if (!products) break;
-    all.push(...(products.edges ?? []));
-    if (!products.pageInfo?.hasNextPage) break;
-    after = products.pageInfo.endCursor;
-  }
-  return all;
+  const cacheKey = `${query ?? ""}::${pageSize}`;
+  const cached = productListCache.get(cacheKey);
+  if (cached) return cached;
+  const inFlight = productListInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const promise = (async () => {
+    const all: ShopifyProduct[] = [];
+    let after: string | null = null;
+    // Hard safety cap to prevent runaway loops
+    for (let i = 0; i < 50; i++) {
+      const data = await storefrontApiRequest(PRODUCTS_QUERY, {
+        first: pageSize,
+        query: query ?? null,
+        after,
+      });
+      const products = data?.data?.products;
+      if (!products) break;
+      all.push(...(products.edges ?? []));
+      if (!products.pageInfo?.hasNextPage) break;
+      after = products.pageInfo.endCursor;
+    }
+    productListCache.set(cacheKey, all);
+    productListInFlight.delete(cacheKey);
+    return all;
+  })().catch((err) => {
+    productListInFlight.delete(cacheKey);
+    throw err;
+  });
+
+  productListInFlight.set(cacheKey, promise);
+  return promise;
 }
 
 export async function fetchProductByHandle(handle: string) {
