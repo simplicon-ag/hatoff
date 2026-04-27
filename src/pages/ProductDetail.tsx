@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Loader2, Minus, Plus, Heart, Share2 } from "lucide-react";
+import { Loader2, Minus, Plus, Share2 } from "lucide-react";
+import { WishlistButton } from "@/components/WishlistButton";
 import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
