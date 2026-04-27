@@ -131,33 +131,86 @@ async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
   return handles.map((h) => memCache.get(h)!).filter(Boolean).map(normalizeLivePrice);
 }
 
+/** Erzeugt einen synthetischen LivePrice aus einem gültigen Shopify-Preis. */
+function shopifyAsLivePrice(handle: string, amount: number): LivePrice {
+  return {
+    handle,
+    brand: "shopify",
+    source_url: null,
+    raw_price_eur: null,
+    display_price_chf: amount,
+    original_price_eur: null,
+    original_price_chf: null,
+    on_sale: false,
+    status: "ok",
+    fetched_at: new Date().toISOString(),
+  };
+}
+
 /**
  * Hook: Live-Preise für mehrere Produkt-Handles.
+ * - Wenn `shopifyPrices[handle] > 0` übergeben wird, wird dieser Preis bevorzugt
+ *   und kein Edge-Call ausgelöst (Shopify ist Source of Truth).
+ * - Sonst wird der Preis von der Edge-Function (Brand-Scrape) geholt.
  * Gibt eine Map zurück: handle → LivePrice
  */
-export function useLivePrices(handles: string[]) {
+export function useLivePrices(
+  handles: string[],
+  shopifyPrices?: Record<string, number>,
+) {
   const key = handles.join("|");
+  const shopifyKey = shopifyPrices
+    ? handles.map((h) => `${h}:${shopifyPrices[h] ?? ""}`).join("|")
+    : "";
   const stableHandles = useMemo(() => handles, [key]);
-  const [prices, setPrices] = useState<Record<string, LivePrice>>(() => {
+
+  // Handles, die NICHT vom Shopify-Preis abgedeckt sind → brauchen Edge-Call
+  const handlesNeedingFetch = useMemo(
+    () =>
+      stableHandles.filter((h) => {
+        const sp = shopifyPrices?.[h];
+        return !(typeof sp === "number" && sp > 0);
+      }),
+    [stableHandles, shopifyKey],
+  );
+
+  const buildInitial = (): Record<string, LivePrice> => {
     const out: Record<string, LivePrice> = {};
     for (const h of stableHandles) {
+      const sp = shopifyPrices?.[h];
+      if (typeof sp === "number" && sp > 0) {
+        out[h] = shopifyAsLivePrice(h, sp);
+        continue;
+      }
       const cached = memCache.get(h);
       if (cached) out[h] = normalizeLivePrice(cached);
     }
     return out;
-  });
+  };
+
+  const [prices, setPrices] = useState<Record<string, LivePrice>>(buildInitial);
   const [loading, setLoading] = useState(() =>
-    stableHandles.some((h) => !memCache.has(h)),
+    handlesNeedingFetch.some((h) => !memCache.has(h)),
   );
 
   useEffect(() => {
-    if (stableHandles.length === 0) {
+    // Shopify-Preise sofort einspielen (z. B. wenn Produkte später nachgeladen werden)
+    setPrices((prev) => {
+      const next = { ...prev };
+      for (const h of stableHandles) {
+        const sp = shopifyPrices?.[h];
+        if (typeof sp === "number" && sp > 0) next[h] = shopifyAsLivePrice(h, sp);
+      }
+      return next;
+    });
+
+    if (handlesNeedingFetch.length === 0) {
       setLoading(false);
       return;
     }
     let cancelled = false;
-    setLoading(stableHandles.some((h) => !memCache.has(h)));
-    fetchPrices(stableHandles)
+    setLoading(handlesNeedingFetch.some((h) => !memCache.has(h)));
+    fetchPrices(handlesNeedingFetch)
       .then((arr) => {
         if (cancelled) return;
         const map: Record<string, LivePrice> = {};
@@ -173,15 +226,17 @@ export function useLivePrices(handles: string[]) {
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [key, shopifyKey]);
 
   return { prices, loading };
 }
 
 /** Hook: Live-Preis für genau ein Produkt. */
-export function useLivePrice(handle: string | undefined) {
+export function useLivePrice(handle: string | undefined, shopifyPrice?: number) {
   const handles = handle ? [handle] : [];
-  const { prices, loading } = useLivePrices(handles);
+  const shopifyPrices =
+    handle && typeof shopifyPrice === "number" ? { [handle]: shopifyPrice } : undefined;
+  const { prices, loading } = useLivePrices(handles, shopifyPrices);
   return { price: handle ? prices[handle] : undefined, loading };
 }
 
