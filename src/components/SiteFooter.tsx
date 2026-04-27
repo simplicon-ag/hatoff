@@ -47,13 +47,15 @@ export const SiteFooter = () => {
           </ul>
         </div>
 
-        <div className="md:col-span-4">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/40 pt-4 text-[10px] tracking-wider text-muted-foreground/40">
-            <Link to="/admin/import" className="hover:text-muted-foreground">Admin · Import</Link>
-            <span aria-hidden="true">·</span>
-            <Link to="/admin/looks" className="hover:text-muted-foreground">Looks</Link>
+        {typeof window !== "undefined" && window.location.hostname.endsWith("lovable.app") && (
+          <div className="md:col-span-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/40 pt-4 text-[10px] tracking-wider text-muted-foreground/40">
+              <Link to="/admin/import" className="hover:text-muted-foreground">Admin · Import</Link>
+              <span aria-hidden="true">·</span>
+              <Link to="/admin/looks" className="hover:text-muted-foreground">Looks</Link>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <div className="border-t border-border">
         <div className="container-editorial flex flex-col items-start justify-between gap-3 py-6 text-xs text-muted-foreground md:flex-row md:items-center">
