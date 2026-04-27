@@ -65,10 +65,13 @@ const FilterChip = ({ label, onRemove }: { label: string; onRemove: () => void }
   </button>
 );
 
+// Modul-Level Cache-Spiegel, damit beim Re-Mount sofort gerendert werden kann
+let cachedProducts: ShopifyProduct[] | null = null;
+
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [products, setProducts] = useState<ShopifyProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<ShopifyProduct[]>(() => cachedProducts ?? []);
+  const [loading, setLoading] = useState(() => cachedProducts === null);
   const [sort, setSort] = useState<SortKey>("featured");
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [selectedVendors, setSelectedVendors] = useState<Set<string>>(new Set());
@@ -83,10 +86,36 @@ const Shop = () => {
   const [density, setDensity] = useState<3 | 4>(4);
 
   useEffect(() => {
+    if (cachedProducts) return;
     fetchAllProducts()
-      .then(setProducts)
+      .then((p) => {
+        cachedProducts = p;
+        setProducts(p);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  // Scroll-Position pro Shop-URL persistieren, damit man beim Zurück-Navigieren
+  // nicht wieder oben landet.
+  const scrollKey = `shop-scroll:${searchParams.toString()}`;
+  useEffect(() => {
+    if (loading) return;
+    const saved = sessionStorage.getItem(scrollKey);
+    if (saved) {
+      const y = parseInt(saved, 10);
+      if (!Number.isNaN(y)) {
+        // Nach Render-Frame, damit das Grid bereits Höhe hat
+        requestAnimationFrame(() => window.scrollTo(0, y));
+      }
+    }
+    const onScroll = () => {
+      sessionStorage.setItem(scrollKey, String(window.scrollY));
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, scrollKey]);
+
 
   // URL → State (z. B. nach Klick aus globaler Suche)
   useEffect(() => {
