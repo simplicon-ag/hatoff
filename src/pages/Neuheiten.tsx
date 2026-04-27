@@ -47,18 +47,21 @@ const Neuheiten = () => {
     return [...onlyNew].sort((a, b) => b.node.id.localeCompare(a.node.id));
   }, [products]);
 
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<CategoryId, number>();
+  // Liste aller in den Neuheiten vorkommenden Product Types, alphabetisch sortiert.
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
     newest.forEach((p) => {
-      const cat = detectCategory(p);
-      if (cat) counts.set(cat, (counts.get(cat) ?? 0) + 1);
+      const t = getProductType(p);
+      if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
     });
-    return counts;
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], "de"))
+      .map(([id, count]) => ({ id, label: id, count }));
   }, [newest]);
 
   const filtered = useMemo(() => {
-    if (activeCategory === "alle") return newest;
-    return newest.filter((p) => detectCategory(p) === activeCategory);
+    if (activeCategory === ALL_CATEGORY) return newest;
+    return newest.filter((p) => getProductType(p) === activeCategory);
   }, [newest, activeCategory]);
 
 
