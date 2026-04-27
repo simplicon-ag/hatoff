@@ -32,6 +32,25 @@ const tagValue = (tag: string, prefix: string) =>
     ? tag.slice(prefix.length + 1).trim()
     : null;
 
+const isNewProduct = (p: ShopifyProduct) => {
+  const tags = p.node.tags ?? [];
+  const isNew = tags.some((t) => /^(neu|new|neuheit)$/i.test(t.replace(/^[a-z]+:/i, "")));
+  const isSale = tags.some((t) => t.toLowerCase() === "sale");
+  return isNew && !isSale;
+};
+
+const isSaleProduct = (p: ShopifyProduct) => {
+  const hasSaleTag = (p.node.tags ?? []).some((t) => t.toLowerCase() === "sale");
+  if (!hasSaleTag) return false;
+  return p.node.variants.edges.some((v) => {
+    const cmp = v.node.compareAtPrice?.amount ? parseFloat(v.node.compareAtPrice.amount) : 0;
+    const price = parseFloat(v.node.price.amount);
+    return cmp > price;
+  });
+};
+
+const STATUS_LABELS: Record<string, string> = { neu: "Neu", sale: "Sale" };
+
 const FilterChip = ({ label, onRemove }: { label: string; onRemove: () => void }) => (
   <button
     type="button"
@@ -52,7 +71,7 @@ const Shop = () => {
   const [selectedVendors, setSelectedVendors] = useState<Set<string>>(new Set());
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [selectedWelten, setSelectedWelten] = useState<Set<string>>(new Set());
-  
+  const [selectedStatus, setSelectedStatus] = useState<Set<string>>(new Set());
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
   const [selectedSizes, setSelectedSizes] = useState<Set<string>>(new Set());
   const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
@@ -70,9 +89,11 @@ const Shop = () => {
     const q = searchParams.get("q") ?? "";
     const marke = searchParams.get("marke");
     const welt = searchParams.get("welt");
+    const status = searchParams.get("status");
     setSearch((prev) => (prev === q ? prev : q));
     if (marke) setSelectedVendors(new Set([marke]));
     if (welt) setSelectedWelten(new Set([welt]));
+    if (status) setSelectedStatus(new Set(status.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -99,6 +120,7 @@ const Shop = () => {
     
     const colors = new Map<string, number>();
     const sizes = new Map<string, number>();
+    const status = new Map<string, number>();
     let priceMin = Infinity;
     let priceMax = 0;
 
@@ -132,6 +154,9 @@ const Shop = () => {
         priceMin = Math.min(priceMin, price);
         priceMax = Math.max(priceMax, price);
       }
+
+      if (isNewProduct(p)) status.set("neu", (status.get("neu") ?? 0) + 1);
+      if (isSaleProduct(p)) status.set("sale", (status.get("sale") ?? 0) + 1);
     });
 
     if (priceMin === Infinity) priceMin = 0;
@@ -147,7 +172,9 @@ const Shop = () => {
       vendors: Array.from(vendors.entries()).sort(([a], [b]) => a.localeCompare(b)),
       categories: Array.from(categories.entries()).sort(([a], [b]) => a.localeCompare(b)),
       welten: Array.from(welten.entries()).sort(([a], [b]) => a.localeCompare(b)),
-      
+      status: (["neu", "sale"] as const)
+        .filter((k) => (status.get(k) ?? 0) > 0)
+        .map((k) => [k, status.get(k) ?? 0] as [string, number]),
       colors: Array.from(colors.entries()).sort(([a], [b]) => a.localeCompare(b)),
       sizes: Array.from(sizes.entries()).sort(([a], [b]) => sortNum(a, b)),
       priceMin: Math.floor(priceMin),
@@ -184,6 +211,13 @@ const Shop = () => {
           return v ? selectedWelten.has(v) : false;
         }),
       );
+    }
+    if (selectedStatus.size > 0) {
+      list = list.filter((p) => {
+        if (selectedStatus.has("neu") && isNewProduct(p)) return true;
+        if (selectedStatus.has("sale") && isSaleProduct(p)) return true;
+        return false;
+      });
     }
     if (selectedColors.size > 0) {
       list = list.filter((p) =>
@@ -238,7 +272,7 @@ const Shop = () => {
     selectedVendors,
     selectedCategories,
     selectedWelten,
-    
+    selectedStatus,
     selectedColors,
     selectedSizes,
     priceRange,
@@ -256,7 +290,7 @@ const Shop = () => {
     setSelectedVendors(new Set());
     setSelectedCategories(new Set());
     setSelectedWelten(new Set());
-    
+    setSelectedStatus(new Set());
     setSelectedColors(new Set());
     setSelectedSizes(new Set());
     setPriceRange([facets.priceMin, facets.priceMax]);
@@ -268,7 +302,7 @@ const Shop = () => {
     selectedVendors.size +
     selectedCategories.size +
     selectedWelten.size +
-    
+    selectedStatus.size +
     selectedColors.size +
     selectedSizes.size +
     (onlyAvailable ? 1 : 0) +
@@ -358,9 +392,16 @@ const Shop = () => {
 
       <Accordion
         type="multiple"
-        defaultValue={["Marke", "Kategorie", "Welt"]}
+        defaultValue={["Status", "Marke", "Kategorie", "Welt"]}
         className="w-full"
       >
+        <FacetGroup
+          title="Status"
+          items={facets.status}
+          selected={selectedStatus}
+          onToggle={toggle(selectedStatus, setSelectedStatus)}
+          capitalize
+        />
         <FacetGroup
           title="Marke"
           items={facets.vendors}
@@ -497,6 +538,11 @@ const Shop = () => {
               <FilterChip key={`w-${w}`} label={titleCase(w)} onRemove={() => {
                 const n = new Set(selectedWelten); n.delete(w); setSelectedWelten(n);
               }} />
+            ))}
+            {Array.from(selectedStatus).map((s) => (
+              <FilterChip key={`st-${s}`} label={STATUS_LABELS[s] ?? titleCase(s)} onRemove={() => {
+                const n = new Set(selectedStatus); n.delete(s); setSelectedStatus(n);
+              }} /> 
             ))}
             {Array.from(selectedColors).map((c) => (
               <FilterChip key={`col-${c}`} label={titleCase(c)} onRemove={() => {
