@@ -31,44 +31,57 @@ function normalizeLivePrice(price: LivePrice): LivePrice {
 
 /**
  * Lädt Live-Preise für eine Liste von Handles vom product-price Edge-Endpoint.
- * - Liest erst den DB-Cache (über die Edge-Function selbst — die fragt zuerst die Tabelle)
- * - Hält bereits geholte Preise in einem Modul-internen Cache
+ * - Chunkt grosse Listen in kleine Batches (max. 4 pro Request) — verhindert
+ *   Edge-Function-Timeouts bei vielen unbekannten Handles.
+ * - Hält bereits geholte Preise in einem Modul-internen Cache.
+ * - Fehler werden geschluckt, damit ein einzelner Edge-Fehler die UI nicht crasht.
  */
+const BATCH_SIZE = 4;
+
 async function fetchPrices(handles: string[]): Promise<LivePrice[]> {
   const missing = handles.filter((h) => !memCache.has(h));
   if (missing.length === 0) {
     return handles.map((h) => memCache.get(h)).filter(Boolean).map(normalizeLivePrice);
   }
 
-  // Bereits laufende Requests für einzelne Handles wiederverwenden
   const newOnes = missing.filter((h) => !inflight.has(h));
 
   if (newOnes.length > 0) {
-    const promise = (async () => {
-      const { data, error } = await supabase.functions.invoke("product-price", {
-        body: { handles: newOnes },
-      });
-      if (error) throw error;
-      const rawPrices: LivePrice[] = data?.prices ?? [];
-      const prices = rawPrices.map(normalizeLivePrice);
-      for (const p of prices) memCache.set(p.handle, p);
-      return prices;
-    })();
+    // In Chunks aufteilen — pro Chunk eine eigene Promise
+    const chunks: string[][] = [];
+    for (let i = 0; i < newOnes.length; i += BATCH_SIZE) {
+      chunks.push(newOnes.slice(i, i + BATCH_SIZE));
+    }
 
-    // Inflight-Marker für jeden Handle setzen
+    const allChunkPromises = chunks.map(async (chunk) => {
+      try {
+        const { data, error } = await supabase.functions.invoke("product-price", {
+          body: { handles: chunk },
+        });
+        if (error) throw error;
+        const rawPrices: LivePrice[] = data?.prices ?? [];
+        const prices = rawPrices.map(normalizeLivePrice);
+        for (const p of prices) memCache.set(p.handle, p);
+        return prices;
+      } catch (err) {
+        console.warn("product-price chunk failed", err);
+        return [] as LivePrice[];
+      }
+    });
+
+    // Kombinierte Promise für jeden Handle hinterlegen
+    const combined = Promise.all(allChunkPromises).then((arr) => arr.flat());
     for (const h of newOnes) {
       inflight.set(
         h,
-        promise.then((arr) => arr.find((p) => p.handle === h) ?? null),
+        combined.then((arr) => arr.find((p) => p.handle === h) ?? null),
       );
     }
-    // Nach Abschluss alle inflight-Einträge entfernen
-    promise.finally(() => {
+    combined.finally(() => {
       for (const h of newOnes) inflight.delete(h);
     });
   }
 
-  // Auf alle relevanten Inflights warten
   await Promise.all(missing.map((h) => inflight.get(h)).filter(Boolean));
 
   return handles.map((h) => memCache.get(h)).filter(Boolean).map(normalizeLivePrice);
