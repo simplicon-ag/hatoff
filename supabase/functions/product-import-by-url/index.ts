@@ -1078,6 +1078,8 @@ Deno.serve(async (req) => {
         description_length: base.description.length,
         missing_fields: missing,
         look_generation_triggered: lookGenerationTriggered,
+        product_status: productStatus,
+        category_tag: categoryTag || null,
         shopify_admin_url: `https://${SHOPIFY_DOMAIN.replace(".myshopify.com","")}.myshopify.com/admin/products/${productId}`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
