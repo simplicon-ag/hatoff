@@ -737,6 +737,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const rawUrl = String(body.url ?? "").trim();
     const force = Boolean(body.force);
+    // NEU: Draft-Modus, zusätzlicher Kategorie-Tag, Sale-Filter
+    const productStatus: "active" | "draft" =
+      String(body.status ?? "").toLowerCase() === "draft" ? "draft" : "active";
+    const categoryTag = String(body.category_tag ?? "").trim().toLowerCase();
+    const excludeSale = Boolean(body.exclude_sale);
     if (!rawUrl) {
       return new Response(
         JSON.stringify({ success: false, error: "url required" }),
@@ -749,6 +754,14 @@ Deno.serve(async (req) => {
     if (!brand) {
       return new Response(
         JSON.stringify({ success: false, error: "Nur casamoda.com oder venti.com URLs werden unterstützt" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Sale/Outlet-URLs ablehnen wenn excludeSale gesetzt ist
+    if (excludeSale && /\/(?:sale|outlet|reduziert)(?:\/|$|\?)/i.test(sourceUrl)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Sale/Outlet-URL übersprungen (exclude_sale=true)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
