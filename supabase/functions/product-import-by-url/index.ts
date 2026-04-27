@@ -257,14 +257,22 @@ function titleFromSlug(sourceUrl: string): string {
     .join(" ");
 }
 
-/** Detect fit from the URL slug or title (Modern Fit / Body Fit / Comfort Fit). */
-function extractFit(sourceUrl: string, title: string): string {
-  const haystack = (sourceUrl + " " + title).toLowerCase();
+/** Detect fit from URL slug, title, OR <title> tag (Modern/Body/Comfort/Regular/Slim). */
+function extractFit(sourceUrl: string, title: string, html?: string): string {
+  let haystack = (sourceUrl + " " + title).toLowerCase();
+  // Venti often hides the fit in the <title> tag (H1 has only the type).
+  // Add the raw <title> too so "Body Fit" is found even if the chosen
+  // displayed title is just "Businesshemd Langarm".
+  if (html) {
+    const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (t) haystack += " " + t[1].toLowerCase();
+  }
   if (/body[- ]?fit/.test(haystack)) return "Body Fit";
   if (/modern[- ]?fit/.test(haystack)) return "Modern Fit";
   if (/comfort[- ]?fit/.test(haystack)) return "Comfort Fit";
   if (/regular[- ]?fit/.test(haystack)) return "Regular Fit";
   if (/slim[- ]?fit/.test(haystack)) return "Slim Fit";
+  if (/tailored[- ]?fit/.test(haystack)) return "Tailored Fit";
   return "";
 }
 
