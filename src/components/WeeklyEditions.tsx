@@ -15,45 +15,76 @@ interface CuratedLookRow {
   created_at: string;
 }
 
+type Season = "fruehling" | "sommer" | "herbst" | "winter";
+
 interface Edition {
-  number: number;       // 1..52
-  label: string;        // "Ausgabe 01"
-  range: string;        // "KW 17 · 21.–27. April"
-  looks: CuratedLookRow[]; // up to 7
-  isComingSoon: boolean;
+  number: number;        // 1 = neueste Ausgabe
+  weekNumber: number;    // ISO-KW
+  year: number;
+  weekStart: Date;       // Montag dieser Woche
+  range: string;         // "21.–27. April"
+  season: Season;
+  seasonLabel: string;
+  looks: CuratedLookRow[]; // bis zu 7
 }
 
-const TOTAL_EDITIONS = 52;
 const LOOKS_PER_EDITION = 7;
 
-const formatRange = (startMonday: Date) => {
-  const end = new Date(startMonday);
-  end.setDate(startMonday.getDate() + 6);
-  // ISO week number
-  const tmp = new Date(startMonday);
+// ─────────── Date helpers ───────────
+
+const mondayOf = (d: Date) => {
+  const out = new Date(d);
+  out.setHours(0, 0, 0, 0);
+  const day = out.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  out.setDate(out.getDate() + diff);
+  return out;
+};
+
+const isoWeek = (date: Date): { week: number; year: number } => {
+  const tmp = new Date(date);
   tmp.setHours(0, 0, 0, 0);
   tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
   const week1 = new Date(tmp.getFullYear(), 0, 4);
-  const weekNum =
+  const week =
     1 + Math.round(((tmp.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
-  const fmt = new Intl.DateTimeFormat("de-CH", { day: "2-digit", month: "short" });
-  return `KW ${String(weekNum).padStart(2, "0")} · ${fmt.format(startMonday)}–${fmt.format(end)}`;
+  return { week, year: tmp.getFullYear() };
 };
 
-// Get Monday of the current ISO week
-const mondayOfThisWeek = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d;
+const formatRange = (mon: Date) => {
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const fmt = new Intl.DateTimeFormat("de-CH", { day: "2-digit", month: "short" });
+  return `${fmt.format(mon)}–${fmt.format(sun)}`;
+};
+
+const seasonOf = (mon: Date): { key: Season; label: string } => {
+  const m = mon.getMonth(); // 0–11
+  if (m >= 2 && m <= 4) return { key: "fruehling", label: "Frühling" };
+  if (m >= 5 && m <= 7) return { key: "sommer", label: "Sommer" };
+  if (m >= 8 && m <= 10) return { key: "herbst", label: "Herbst" };
+  return { key: "winter", label: "Winter" };
+};
+
+// Welt → bevorzugte Saisons (höhere Punktzahl = bessere Passung)
+const WELT_SEASON_AFFINITY: Record<string, Partial<Record<Season, number>>> = {
+  sommer:    { sommer: 3, fruehling: 1 },
+  hemden:    { sommer: 2, fruehling: 2 },
+  freizeit:  { sommer: 1, fruehling: 1, herbst: 1, winter: 1 }, // ganzjährig
+  business:  { herbst: 2, winter: 2, fruehling: 1 },
+  jacken:    { herbst: 3, winter: 3 },
+  abend:     { winter: 2, herbst: 1 },
+};
+
+const matchScore = (look: CuratedLookRow, season: Season): number => {
+  if (!look.welt) return 0;
+  return WELT_SEASON_AFFINITY[look.welt]?.[season] ?? 0;
 };
 
 export const WeeklyEditions = () => {
   const [looks, setLooks] = useState<CuratedLookRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeEdition, setActiveEdition] = useState(1);
+  const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,8 +94,7 @@ export const WeeklyEditions = () => {
         .select("slug,title,subtitle,welt,hero_image_url,product_handles,published_at,created_at")
         .eq("status", "published")
         .order("published_at", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false })
-        .limit(TOTAL_EDITIONS * LOOKS_PER_EDITION);
+        .order("created_at", { ascending: false });
       if (cancelled) return;
       setLooks((data as CuratedLookRow[]) ?? []);
       setLoading(false);
@@ -74,120 +104,161 @@ export const WeeklyEditions = () => {
     };
   }, []);
 
+  // Build editions: ab dieser Woche zurück, jede Woche eine Ausgabe,
+  // solange wir noch genug Looks haben. Saisonal sortiert.
   const editions = useMemo<Edition[]>(() => {
-    const startMonday = mondayOfThisWeek();
-    return Array.from({ length: TOTAL_EDITIONS }, (_, i) => {
-      const editionLooks = looks.slice(i * LOOKS_PER_EDITION, (i + 1) * LOOKS_PER_EDITION);
-      const weekStart = new Date(startMonday);
-      weekStart.setDate(startMonday.getDate() - i * 7);
-      return {
-        number: i + 1,
-        label: `Ausgabe ${String(i + 1).padStart(2, "0")}`,
-        range: formatRange(weekStart),
-        looks: editionLooks,
-        isComingSoon: editionLooks.length === 0,
-      };
-    });
+    if (looks.length === 0) return [];
+
+    const maxEditions = Math.ceil(looks.length / LOOKS_PER_EDITION);
+    const editions: Edition[] = [];
+    const usedSlugs = new Set<string>();
+
+    const thisMonday = mondayOf(new Date());
+
+    for (let i = 0; i < maxEditions; i++) {
+      const weekStart = new Date(thisMonday);
+      weekStart.setDate(thisMonday.getDate() - i * 7);
+      const { week, year } = isoWeek(weekStart);
+      const season = seasonOf(weekStart);
+
+      // Verfügbare Looks (noch nicht verwendet) nach Saison-Score sortieren
+      const available = looks.filter((l) => !usedSlugs.has(l.slug));
+      if (available.length === 0) break;
+
+      const scored = available
+        .map((l) => ({ look: l, score: matchScore(l, season.key) }))
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          // tiebreaker: stable order (createdAt desc bereits durch Query)
+          return 0;
+        });
+
+      const chosen = scored.slice(0, LOOKS_PER_EDITION).map((s) => s.look);
+      chosen.forEach((l) => usedSlugs.add(l.slug));
+
+      // Nur volle Ausgaben (7 Looks) in den Archiv aufnehmen, sonst überspringen für Vergangenheit?
+      // Wunsch: "die anderen KW Wochen noch nicht hinzufügen" → nur Wochen mit Inhalt zeigen.
+      // Aktuelle Woche zeigen wir auch wenn nicht voll, ältere nur wenn voll.
+      if (chosen.length === LOOKS_PER_EDITION || i === 0) {
+        editions.push({
+          number: i + 1,
+          weekNumber: week,
+          year,
+          weekStart,
+          range: formatRange(weekStart),
+          season: season.key,
+          seasonLabel: season.label,
+          looks: chosen,
+        });
+      }
+    }
+
+    return editions;
   }, [looks]);
 
-  const current = editions.find((e) => e.number === activeEdition) ?? editions[0];
+  const current = editions[activeIdx] ?? editions[0];
 
   return (
     <section className="border-y border-border/60 bg-background py-16 md:py-24">
       <div className="container-editorial">
-        <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:gap-16">
-          {/* Main content */}
-          <div className="min-w-0">
-            {/* Header */}
-            <div className="mb-10 flex flex-col gap-3 md:mb-14">
-              <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
-                {current?.label} · {current?.range}
-              </p>
-              <h2 className="font-display text-4xl leading-[1.05] md:text-6xl">
-                7 Tage, 7 Looks.
-              </h2>
-              <p className="mt-2 max-w-xl text-muted-foreground">
-                Jede Woche eine neue Ausgabe — sieben kuratierte Looks für sieben Tage. Blättere rechts
-                durch das Archiv und entdecke, wie sich die Saison entwickelt hat.
-              </p>
-            </div>
-
-            {/* Mosaic */}
-            {loading ? (
-              <div className="flex h-[500px] items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : current?.isComingSoon ? (
-              <ComingSoonGrid />
-            ) : (
-              <MosaicGrid looks={current!.looks} />
-            )}
-          </div>
-
-          {/* Vertical Edition Bar */}
-          <aside className="lg:sticky lg:top-24 lg:self-start">
-            <p className="mb-3 text-[10px] uppercase tracking-[0.3em] text-muted-foreground lg:hidden">
-              Ausgaben
+        <div className="grid gap-10 lg:grid-cols-[auto_1fr] lg:gap-16">
+          {/* ───────── Kalender LINKS ───────── */}
+          <aside className="lg:sticky lg:top-24 lg:self-start lg:order-first">
+            <p className="mb-4 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              Archiv
             </p>
             <div
-              className="flex max-h-[600px] flex-row gap-1 overflow-x-auto overflow-y-hidden lg:flex-col lg:gap-0 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1 lg:[scrollbar-width:thin]"
+              className="flex max-h-[600px] flex-row gap-1 overflow-x-auto overflow-y-hidden lg:flex-col lg:gap-0 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-2 lg:[scrollbar-width:thin]"
               role="tablist"
-              aria-label="Ausgaben-Archiv"
+              aria-label="Wochenausgaben-Archiv"
             >
-              {editions.map((ed) => {
-                const active = ed.number === activeEdition;
-                const empty = ed.isComingSoon;
+              {editions.map((ed, idx) => {
+                const active = idx === activeIdx;
                 return (
                   <button
-                    key={ed.number}
+                    key={`${ed.year}-${ed.weekNumber}`}
                     role="tab"
                     aria-selected={active}
-                    onClick={() => setActiveEdition(ed.number)}
+                    onClick={() => setActiveIdx(idx)}
                     className={cn(
-                      "group flex shrink-0 items-center gap-3 border-l-2 px-3 py-2 text-left text-xs transition-colors lg:w-[170px]",
+                      "group flex shrink-0 items-baseline gap-3 border-l-2 px-3 py-2.5 text-left transition-colors lg:w-[180px]",
                       active
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:border-border hover:text-foreground/80",
-                      empty && !active && "opacity-40",
+                        ? "border-foreground"
+                        : "border-transparent hover:border-border",
                     )}
                   >
                     <span
                       className={cn(
-                        "font-display tabular-nums",
-                        active ? "text-base" : "text-sm",
+                        "font-display tabular-nums leading-none",
+                        active ? "text-2xl text-foreground" : "text-base text-muted-foreground group-hover:text-foreground/80",
                       )}
                     >
-                      {String(ed.number).padStart(2, "0")}
+                      {String(ed.weekNumber).padStart(2, "0")}
                     </span>
                     <span className="hidden flex-col leading-tight lg:flex">
-                      <span className={cn("text-[10px] uppercase tracking-[0.18em]", active && "font-medium")}>
-                        {empty ? "Kommt bald" : ed.range.split(" · ")[0]}
+                      <span
+                        className={cn(
+                          "text-[10px] uppercase tracking-[0.18em]",
+                          active ? "text-foreground" : "text-muted-foreground",
+                        )}
+                      >
+                        KW · {ed.seasonLabel}
                       </span>
-                      {!empty && (
-                        <span className="text-[10px] text-muted-foreground/80">
-                          {ed.range.split(" · ")[1]}
-                        </span>
-                      )}
+                      <span
+                        className={cn(
+                          "text-[10px]",
+                          active ? "text-foreground/70" : "text-muted-foreground/70",
+                        )}
+                      >
+                        {ed.range}
+                      </span>
                     </span>
                   </button>
                 );
               })}
             </div>
           </aside>
+
+          {/* ───────── Hauptinhalt ───────── */}
+          <div className="min-w-0">
+            <div className="mb-10 flex flex-col gap-3 md:mb-14">
+              <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+                {current && (
+                  <>
+                    Ausgabe KW {String(current.weekNumber).padStart(2, "0")} · {current.seasonLabel} {current.year} · {current.range}
+                  </>
+                )}
+              </p>
+              <h2 className="font-display text-4xl leading-[1.05] md:text-6xl">
+                7 Tage, 7 Looks.
+              </h2>
+              <p className="mt-2 max-w-xl text-muted-foreground">
+                Jeden Montag eine neue Ausgabe — sieben kuratierte Looks für sieben Tage,
+                abgestimmt auf die Jahreszeit. Stöbere links durchs Archiv.
+              </p>
+            </div>
+
+            {loading ? (
+              <div className="flex h-[500px] items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !current ? (
+              <p className="py-20 text-center text-sm text-muted-foreground">
+                Noch keine Ausgaben verfügbar.
+              </p>
+            ) : (
+              <MosaicGrid looks={current.looks} />
+            )}
+          </div>
         </div>
       </div>
     </section>
   );
 };
 
-// ─────────────────────────── Sub-Components ───────────────────────────
+// ─────────────────────────── Mosaic ───────────────────────────
 
 const MosaicGrid = ({ looks }: { looks: CuratedLookRow[] }) => {
-  // 7-Look-Mosaik in editorial Manier:
-  // [ big | small  small ]
-  // [ big | small  small ]
-  // [ wide-medium | medium ]
-  // Layout adapts: mobile = stack, md = 6 cols
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-6 md:gap-4">
       {looks[0] && <LookTile look={looks[0]} day={1} className="col-span-2 row-span-2 md:col-span-3 md:row-span-2 aspect-[3/4]" />}
@@ -211,61 +282,32 @@ const LookTile = ({
   look: CuratedLookRow;
   day: number;
   className?: string;
-}) => {
-  return (
-    <Link to={`/looks/${look.slug}`} className={cn("group relative block overflow-hidden bg-secondary", className)}>
-      {look.hero_image_url ? (
-        <img
-          src={look.hero_image_url}
-          alt={look.title}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-[1200ms] group-hover:scale-[1.04]"
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-          Kein Bild
-        </div>
+}) => (
+  <Link to={`/looks/${look.slug}`} className={cn("group relative block overflow-hidden bg-secondary", className)}>
+    {look.hero_image_url ? (
+      <img
+        src={look.hero_image_url}
+        alt={look.title}
+        loading="lazy"
+        className="h-full w-full object-cover transition-transform duration-[1200ms] group-hover:scale-[1.04]"
+      />
+    ) : (
+      <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+        Kein Bild
+      </div>
+    )}
+    <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+    <div className="absolute left-3 top-3 flex items-center gap-2 bg-background/90 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-foreground backdrop-blur md:left-4 md:top-4">
+      <span className="font-display text-xs tabular-nums">{String(day).padStart(2, "0")}</span>
+      <span className="text-muted-foreground">{dayNames[day]}</span>
+    </div>
+    <div className="absolute inset-x-0 bottom-0 p-3 md:p-5">
+      <h3 className="font-display text-base leading-tight text-white drop-shadow-sm md:text-2xl">
+        {look.title}
+      </h3>
+      {look.subtitle && (
+        <p className="mt-1 hidden text-xs text-white/80 line-clamp-1 md:block">{look.subtitle}</p>
       )}
-
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
-
-      {/* Day badge */}
-      <div className="absolute left-3 top-3 flex items-center gap-2 bg-background/90 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-foreground backdrop-blur md:left-4 md:top-4">
-        <span className="font-display text-xs tabular-nums">{String(day).padStart(2, "0")}</span>
-        <span className="text-muted-foreground">{dayNames[day]}</span>
-      </div>
-
-      {/* Caption */}
-      <div className="absolute inset-x-0 bottom-0 p-3 md:p-5">
-        <h3 className="font-display text-base leading-tight text-white drop-shadow-sm md:text-2xl">
-          {look.title}
-        </h3>
-        {look.subtitle && (
-          <p className="mt-1 hidden text-xs text-white/80 line-clamp-1 md:block">{look.subtitle}</p>
-        )}
-      </div>
-    </Link>
-  );
-};
-
-const ComingSoonGrid = () => (
-  <div className="grid grid-cols-2 gap-3 md:grid-cols-6 md:gap-4">
-    {Array.from({ length: 7 }).map((_, i) => (
-      <div
-        key={i}
-        className={cn(
-          "flex items-center justify-center border border-dashed border-border/70 bg-secondary/30",
-          i === 0 && "col-span-2 row-span-2 md:col-span-3 md:row-span-2 aspect-[3/4]",
-          (i === 1 || i === 2) && "col-span-1 md:col-span-3 aspect-square md:aspect-[3/2]",
-          (i === 3 || i === 4 || i === 5) && "col-span-1 md:col-span-2 aspect-[3/4]",
-          i === 6 && "col-span-2 md:col-span-6 aspect-[2/1] md:aspect-[3/1]",
-        )}
-      >
-        <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-          Kommt bald
-        </span>
-      </div>
-    ))}
-  </div>
+    </div>
+  </Link>
 );
