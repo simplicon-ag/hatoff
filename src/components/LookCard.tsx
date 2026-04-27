@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { CuratedLook } from "@/data/looks";
 import { fetchProductByHandle } from "@/lib/shopify";
 import { parseLookHandle } from "@/lib/lookHandles";
+import { LookLikeButton } from "@/components/LookLikeButton";
 
 export const LookCard = ({ look }: { look: CuratedLook }) => {
   const [fallbackImage, setFallbackImage] = useState<string | null>(null);
@@ -53,6 +54,9 @@ export const LookCard = ({ look }: { look: CuratedLook }) => {
           <div className="h-full w-full animate-pulse bg-secondary" />
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-foreground/70 to-transparent" />
+        <div className="absolute right-3 top-3 z-10">
+          <LookLikeButton slug={look.slug} variant="card" stopNavigation />
+        </div>
         <div className="absolute inset-x-0 bottom-0 p-6 text-primary-foreground">
           <p className="text-[11px] uppercase tracking-[0.2em] opacity-80">Look</p>
           <h3 className="mt-1 font-display text-2xl leading-tight">{look.title}</h3>

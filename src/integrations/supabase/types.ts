@@ -125,6 +125,30 @@ export type Database = {
         }
         Relationships: []
       }
+      look_likes: {
+        Row: {
+          created_at: string
+          id: string
+          ip_hash: string
+          look_slug: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_hash: string
+          look_slug: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_hash?: string
+          look_slug?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       product_import_job: {
         Row: {
           created_count: number
@@ -383,6 +407,7 @@ export type Database = {
         Args: { _meta?: Json; _points: number; _reason: string }
         Returns: number
       }
+      get_look_like_count: { Args: { _slug: string }; Returns: number }
       get_my_points: { Args: never; Returns: number }
     }
     Enums: {

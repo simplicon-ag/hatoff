@@ -7,6 +7,7 @@ import { LookSetBuilder } from "@/components/LookSetBuilder";
 import { useCuratedLooks } from "@/hooks/useCuratedLooks";
 import { fetchProductsByHandles, type ShopifyProduct } from "@/lib/shopify";
 import { splitHandlesAndColors } from "@/lib/lookHandles";
+import { LookLikeButton } from "@/components/LookLikeButton";
 
 const LookDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -79,6 +80,9 @@ const LookDetail = () => {
           <p className="text-[11px] uppercase tracking-[0.3em] opacity-90">Look</p>
           <h1 className="mt-3 max-w-3xl font-display text-5xl md:text-6xl">{look.title}</h1>
           <p className="mt-2 text-lg opacity-90">{look.subtitle}</p>
+          <div className="mt-5">
+            <LookLikeButton slug={look.slug} variant="hero" />
+          </div>
         </div>
       </section>
 
