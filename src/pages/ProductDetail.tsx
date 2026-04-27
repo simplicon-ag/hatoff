@@ -96,7 +96,14 @@ const ProductDetail = () => {
   const [siblings, setSiblings] = useState<ShopifyProduct[]>([]);
   const addItem = useCartStore((s) => s.addItem);
   const isLoading = useCartStore((s) => s.isLoading);
-  const { price: livePrice } = useLivePrice(handle);
+  const shopifyMinPrice = useMemo(() => {
+    if (!product) return undefined;
+    const amounts = product.variants.edges
+      .map((e) => parseFloat(e.node.price.amount))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    return amounts.length > 0 ? Math.min(...amounts) : undefined;
+  }, [product]);
+  const { price: livePrice } = useLivePrice(handle, shopifyMinPrice);
   const { stats: reviewStats } = useProductReviews(handle);
 
   useEffect(() => {

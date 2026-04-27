@@ -136,7 +136,15 @@ export const LookSetBuilder = ({ products, lookTitle, allowRemove = false, recom
   );
 
   const handles = useMemo(() => visibleProducts.map((p) => p.node.handle), [visibleProducts]);
-  const { prices: livePrices } = useLivePrices(handles);
+  const shopifyPrices = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const p of visibleProducts) {
+      const amount = parseFloat(p.node.priceRange.minVariantPrice.amount);
+      if (Number.isFinite(amount) && amount > 0) out[p.node.handle] = amount;
+    }
+    return out;
+  }, [visibleProducts]);
+  const { prices: livePrices } = useLivePrices(handles, shopifyPrices);
 
   const total = resolved.reduce((sum, r) => {
     const live = livePrices[r.product.node.handle];
