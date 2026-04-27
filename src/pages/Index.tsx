@@ -65,55 +65,8 @@ const Index = () => {
 
   return (
     <SiteLayout>
-      {/* ───────── Hero ───────── */}
-      <section className="relative h-[88vh] min-h-[640px] w-full overflow-hidden">
-        <img
-          src={heroImg}
-          alt="Mann in cognacfarbenem Hemd"
-          className="absolute inset-0 h-full w-full object-cover"
-          fetchPriority="high"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-foreground/10 via-foreground/30 to-foreground/75" />
-        <div className="container-editorial relative flex h-full flex-col justify-end pb-16 text-primary-foreground animate-fade-up md:pb-20">
-          <p className="text-[11px] uppercase tracking-[0.3em] opacity-90">Kuratiertes Outfit-Universum</p>
-          <h1 className="mt-4 max-w-3xl text-balance font-display text-5xl leading-[1.05] md:text-7xl">
-            Finde deinen Look. Einfach kombiniert. Stilvoll getragen.
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-relaxed opacity-90 md:text-lg">
-            HATOFF kuratiert komplette Looks für jeden Anlass — du findest, kombinierst und trägst.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild size="lg" className="bg-background text-foreground hover:bg-background/90">
-              <Link to="/looks">
-                Looks entdecken <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="border-background/40 bg-transparent text-primary-foreground hover:bg-background/10"
-            >
-              <Link to="/shop">Zum Shop</Link>
-            </Button>
-          </div>
-
-          {/* Trust-Bar */}
-          <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] tracking-wide opacity-80">
-            <span className="flex items-center gap-1.5">
-              <Star className="h-3.5 w-3.5" /> 4.9 / 5 Kundenzufriedenheit
-            </span>
-            <span className="hidden h-3 w-px bg-background/30 md:inline-block" />
-            <span className="flex items-center gap-1.5">
-              <Truck className="h-3.5 w-3.5" /> Gratis Versand & Retoure
-            </span>
-            <span className="hidden h-3 w-px bg-background/30 md:inline-block" />
-            <span className="flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" /> Versand aus der Schweiz
-            </span>
-          </div>
-        </div>
-      </section>
+      {/* ───────── Hero (Carousel + Live-Counter) ───────── */}
+      <HeroCarousel />
 
       {/* ───────── So funktioniert HATOFF ───────── */}
       <section id="so-funktionierts" className="container-editorial py-16 md:py-20">
