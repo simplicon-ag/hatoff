@@ -380,6 +380,26 @@ function extractFromHtml(html: string, brand: string, sourceUrl: string): Scrape
     if (features.length > 0) break;
   }
 
+  // New Casa Moda layout (2024+): the bullet column sits in a sibling
+  // <div class="col-12 col-lg-4 ..."><ul ...><li>…</li>…</ul></div>
+  // immediately after the Produktinformationen block. Anchor on Produktinformationen
+  // to avoid pulling unrelated <ul>s (nav, recommendations, footer).
+  if (features.length === 0) {
+    const anchor = html.search(/<h[23][^>]*>\s*Produktinformationen?\s*<\/h[23]>/i);
+    if (anchor >= 0) {
+      // Search a 6 KB window after the heading for the next <ul>…</ul>
+      const window = html.slice(anchor, anchor + 6000);
+      const ulMatch = window.match(/<ul[^>]*>([\s\S]{0,2000}?)<\/ul>/i);
+      if (ulMatch) {
+        const liMatches = ulMatch[1].match(/<li[^>]*>([\s\S]*?)<\/li>/gi) ?? [];
+        for (const li of liMatches) {
+          const txt = decode(li.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+          if (txt && txt.length < 200 && txt.length > 2) features.push(txt);
+        }
+      }
+    }
+  }
+
   // 3) Badges (NEU / Sale)
   let isNew = false;
   if (/class="[^"]*\b(?:badge|label|tag)[^"]*"[^>]*>\s*NEU\s*</i.test(html)) isNew = true;
