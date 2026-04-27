@@ -9,9 +9,7 @@ import { useWishlist } from "@/hooks/useWishlist";
 
 const navItems = [
   { to: "/looks", label: "Looks" },
-  { to: "/neuheiten", label: "Neuheiten" },
   { to: "/shop", label: "Shop" },
-  { to: "/sale", label: "Sale", highlight: true },
   { to: "/club", label: "CLUB" },
 ];
 
