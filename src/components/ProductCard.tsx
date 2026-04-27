@@ -95,6 +95,25 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
   const primary = colorImage ?? images[0]?.node ?? null;
   const secondary = colorImage ? null : images[1]?.node ?? null;
 
+  // Farb-Swatches: pro Farbe ein Variantenbild (für die Bubbles unten links)
+  const colorSwatches = useMemo(() => {
+    if (!colorOption) return [] as Array<{ value: string; image: string | null }>;
+    const seen = new Map<string, string | null>();
+    for (const { node: v } of p.variants.edges) {
+      const value = v.selectedOptions.find((o) => /farbe|color|colour/i.test(o.name))?.value;
+      if (!value || seen.has(value)) continue;
+      seen.set(value, v.image?.url ?? null);
+    }
+    return Array.from(seen.entries()).map(([value, image]) => ({ value, image }));
+  }, [colorOption, p.variants.edges]);
+
+  // Wenn die Karte auf eine Farbe fokussiert ist → keine Bubbles (Sub-Card)
+  // Sonst: andere Farben als Bubbles darstellen
+  const otherSwatches = useMemo(
+    () => (initialColor ? [] : colorSwatches),
+    [initialColor, colorSwatches],
+  );
+
   const firstAvailable =
     variantsForColor.find((v) => v.availableForSale) ??
     p.variants.edges.find((e) => e.node.availableForSale)?.node;
