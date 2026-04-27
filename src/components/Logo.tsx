@@ -12,7 +12,7 @@ export const Logo = ({ className = "" }: LogoProps) => (
     <img
       src={logoUrl}
       alt="HATOFF"
-      className="h-12 w-auto md:h-16 transition-opacity hover:opacity-80 dark:invert"
+      className="h-20 w-auto md:h-28 transition-opacity hover:opacity-80 dark:invert"
       draggable={false}
     />
   </span>
