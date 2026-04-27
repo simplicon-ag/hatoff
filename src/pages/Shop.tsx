@@ -272,7 +272,7 @@ const Shop = () => {
     selectedVendors,
     selectedCategories,
     selectedWelten,
-    
+    selectedStatus,
     selectedColors,
     selectedSizes,
     priceRange,
