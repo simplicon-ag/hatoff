@@ -152,7 +152,7 @@ export const ProductCard = ({ product, priority, initialColor }: Props) => {
   return (
     <>
       <Link to={detailHref} className="group block">
-        <div className="relative aspect-[4/5] overflow-hidden bg-secondary">
+        <div className="relative aspect-[4/5] overflow-hidden">
           {primary ? (
             <>
               <img
