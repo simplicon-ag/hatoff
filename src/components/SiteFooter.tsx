@@ -47,7 +47,7 @@ export const SiteFooter = () => {
           </ul>
         </div>
 
-        {typeof window !== "undefined" && window.location.hostname.endsWith("lovable.app") && (
+        {typeof window !== "undefined" && window.location.hostname.includes("id-preview--") && (
           <div className="md:col-span-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/40 pt-4 text-[10px] tracking-wider text-muted-foreground/40">
               <Link to="/admin/import" className="hover:text-muted-foreground">Admin · Import</Link>
