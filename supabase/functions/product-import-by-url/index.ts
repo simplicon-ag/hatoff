@@ -992,9 +992,11 @@ Deno.serve(async (req) => {
       colors.splice(maxColors);
     }
 
-    // 3) Build colour-neutral base
+    // 3) Build base. In single_color mode keep colour in title; otherwise strip it.
     const first = colors[0].scraped;
-    const baseTitle = stripColorFromTitle(first.title) || first.title;
+    const baseTitle = singleColor
+      ? (first.title || stripColorFromTitle(first.title))
+      : (stripColorFromTitle(first.title) || first.title);
     const base: ScrapedProduct = { ...first, title: baseTitle, image_urls: [] };
 
     // 4) Upsert: re-use the existence result from the early check.
