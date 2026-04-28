@@ -37,12 +37,12 @@ const CartSyncBoundary = ({ children }: { children: React.ReactNode }) => {
 
 // Listing-Seiten verwalten ihren Scroll selbst (zurück vom Produkt → an
 // gleicher Stelle weiterscrollen). Alle anderen Seiten springen nach oben.
-const SELF_SCROLL_PATHS = new Set(["/shop", "/neuheiten", "/sale", "/marken", "/saison"]);
+const SELF_SCROLL_PREFIXES = ["/shop", "/neuheiten", "/sale", "/marken", "/saison"];
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => {
-    if (SELF_SCROLL_PATHS.has(pathname)) return;
+    if (SELF_SCROLL_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) return;
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [pathname]);
   return null;
