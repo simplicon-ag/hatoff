@@ -73,7 +73,8 @@ async function firecrawlScrape(url: string, apiKey: string): Promise<string | nu
 interface SourceColorData {
   colorName: string;
   colorId: string;
-  sizes: Map<string, boolean>; // size → in stock
+  sizes: Map<string, boolean>; // size (lowercase) → in stock
+  sizesDisplay: Map<string, string>; // size (lowercase) → original case ("3XL")
   priceEur: number | null;
   compareAtEur: number | null;
 }
@@ -93,20 +94,27 @@ function extractColorFromHtml(html: string, fallbackUrl: string): string {
   return "Unbekannt";
 }
 
-function extractSizesFromHtml(html: string): Map<string, boolean> {
+function extractSizesFromHtml(
+  html: string,
+): { sizes: Map<string, boolean>; sizesDisplay: Map<string, string> } {
   // Parse <option data-article-variant-size="S" data-article-variant-stock="1">
+  // Map keys are normalized to lowercase so all lookups (Schritt 4 & 5) are
+  // case-insensitive — Shopify variants and source pages occasionally differ
+  // in casing ("S" vs "s", "3xl" vs "3XL").
   const sizes = new Map<string, boolean>();
+  const sizesDisplay = new Map<string, string>();
   const re = /data-article-variant-size="([^"]+)"\s+data-article-variant-stock="(\d+)"/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
-    const size = m[1].trim();
+    const original = m[1].trim();
+    const key = original.toLowerCase();
     const stock = parseInt(m[2], 10);
-    if (!size) continue;
-    // If size already seen with stock>0 keep that (some pages may duplicate)
-    const prev = sizes.get(size);
-    sizes.set(size, (prev ?? false) || stock > 0);
+    if (!key) continue;
+    const prev = sizes.get(key);
+    sizes.set(key, (prev ?? false) || stock > 0);
+    if (!sizesDisplay.has(key)) sizesDisplay.set(key, original);
   }
-  return sizes;
+  return { sizes, sizesDisplay };
 }
 
 function extractPriceFromHtml(html: string): { priceEur: number | null; compareAtEur: number | null } {
@@ -137,14 +145,14 @@ function extractPriceFromHtml(html: string): { priceEur: number | null; compareA
 async function scrapeColor(url: string, colorId: string, fcKey: string): Promise<SourceColorData | null> {
   const html = await firecrawlScrape(url, fcKey);
   if (!html) return null;
-  const sizes = extractSizesFromHtml(html);
+  const { sizes, sizesDisplay } = extractSizesFromHtml(html);
   if (sizes.size === 0) {
     console.warn(`[sync] no sizes found for ${url}`);
     return null;
   }
   const colorName = extractColorFromHtml(html, url);
   const { priceEur, compareAtEur } = extractPriceFromHtml(html);
-  return { colorName, colorId, sizes, priceEur, compareAtEur };
+  return { colorName, colorId, sizes, sizesDisplay, priceEur, compareAtEur };
 }
 
 // ===========================================================================
@@ -415,13 +423,16 @@ async function syncProduct(
     return { ok: false, error: "no colours scraped" };
   }
 
-  // 2) Build target matrix: colorName → Map<size, available>
+  // 2) Build target matrix: colorName(lower) → Map<size(lower), available>
   const target = new Map<string, Map<string, boolean>>();
+  // Display-case for sizes per color so newly-created variants get "3XL" not "3xl".
+  const targetDisplay = new Map<string, Map<string, string>>();
   // Aggregate price per colour
   const colorPrices = new Map<string, { price: number | null; compareAt: number | null }>();
   for (const c of sourceColors) {
     const key = c.colorName.toLowerCase();
     target.set(key, c.sizes);
+    targetDisplay.set(key, c.sizesDisplay);
     colorPrices.set(key, { price: c.priceEur, compareAt: c.compareAtEur });
   }
 
@@ -474,8 +485,10 @@ async function syncProduct(
     const compareChf =
       priceInfo?.compareAt != null ? (priceInfo.compareAt * EUR_TO_CHF).toFixed(2) : null;
 
+    const sizesDisp = targetDisplay.get(colorKeyLower);
     for (const [size, inStock] of sizes.entries()) {
       const k = variantKey(size, canonicalColor);
+      const sizeDisplay = sizesDisp?.get(size) ?? size.toUpperCase();
       let variant = existingByKey.get(k);
 
       if (!variant) {
@@ -483,13 +496,13 @@ async function syncProduct(
         // point creating phantom variants that never existed).
         if (!inStock || !priceChf) continue;
         const sku = articleNo
-          ? `${articleNo}-${size}-${canonicalColor}`.replace(/[^A-Za-z0-9-]/g, "").toUpperCase()
-          : `${row.handle ?? "p"}-${size}-${canonicalColor}`
+          ? `${articleNo}-${sizeDisplay}-${canonicalColor}`.replace(/[^A-Za-z0-9-]/g, "").toUpperCase()
+          : `${row.handle ?? "p"}-${sizeDisplay}-${canonicalColor}`
               .replace(/[^A-Za-z0-9-]/g, "")
               .toUpperCase();
         const created = await createVariant(
           product.id,
-          size,
+          sizeDisplay,
           canonicalColor,
           priceChf,
           compareChf,
