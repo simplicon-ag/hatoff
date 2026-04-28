@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, ShoppingBag } from "lucide-react";
 import type { ShopifyProduct } from "@/lib/shopify";
-import { formatPrice } from "@/lib/shopify";
+import { formatPrice, shopifyImage } from "@/lib/shopify";
 import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { WishlistButton } from "./WishlistButton";
@@ -210,9 +210,13 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
           {primary ? (
             <>
               <img
-                src={primary.url}
+                src={shopifyImage(primary.url, 600)}
+                srcSet={`${shopifyImage(primary.url, 400)} 400w, ${shopifyImage(primary.url, 600)} 600w, ${shopifyImage(primary.url, 900)} 900w`}
+                sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
                 alt={primary.altText ?? p.title}
                 loading={priority ? "eager" : "lazy"}
+                decoding="async"
+                fetchPriority={priority ? "high" : "auto"}
                 className={cn(
                   "absolute inset-0 h-full w-full object-contain mix-blend-multiply transition-opacity duration-500",
                   secondary ? "group-hover:opacity-0" : "",
@@ -220,9 +224,12 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
               />
               {secondary && (
                 <img
-                  src={secondary.url}
+                  src={shopifyImage(secondary.url, 600)}
+                  srcSet={`${shopifyImage(secondary.url, 400)} 400w, ${shopifyImage(secondary.url, 600)} 600w, ${shopifyImage(secondary.url, 900)} 900w`}
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
                   alt={secondary.altText ?? p.title}
                   loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 h-full w-full object-contain mix-blend-multiply opacity-0 transition-opacity duration-500 group-hover:opacity-100"
                 />
               )}

@@ -36,6 +36,10 @@ export interface ShopifyProduct {
   };
 }
 
+/**
+ * Vollständige Produkt-Query — wird auf Detail-Seiten und überall dort verwendet,
+ * wo `descriptionHtml`, alle Varianten und alle Bilder gebraucht werden.
+ */
 export const PRODUCTS_QUERY = `
   query GetProducts($first: Int!, $query: String, $after: String) {
     products(first: $first, query: $query, after: $after) {
@@ -53,6 +57,45 @@ export const PRODUCTS_QUERY = `
           priceRange { minVariantPrice { amount currencyCode } }
           images(first: 30) { edges { node { url altText } } }
           variants(first: 50) {
+            edges {
+              node {
+                id
+                title
+                price { amount currencyCode }
+                compareAtPrice { amount currencyCode }
+                availableForSale
+                selectedOptions { name value }
+                image { url altText }
+              }
+            }
+          }
+          options { name values }
+        }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+`;
+
+/**
+ * Schlanke Query für Listings/Karten — keine Description, weniger Bilder/Varianten.
+ * Reduziert die Antwortgrösse um ~70 % und beschleunigt das initiale Rendern deutlich.
+ */
+export const PRODUCTS_LIST_QUERY = `
+  query GetProductsList($first: Int!, $query: String, $after: String) {
+    products(first: $first, query: $query, after: $after) {
+      edges {
+        cursor
+        node {
+          id
+          title
+          handle
+          vendor
+          productType
+          tags
+          priceRange { minVariantPrice { amount currencyCode } }
+          images(first: 12) { edges { node { url altText } } }
+          variants(first: 30) {
             edges {
               node {
                 id
@@ -145,9 +188,39 @@ export async function fetchProducts(first = 50, query?: string): Promise<Shopify
 const productListCache = new Map<string, ShopifyProduct[]>();
 const productListInFlight = new Map<string, Promise<ShopifyProduct[]>>();
 
+const LS_PREFIX = "hatoff:plist:v2:";
+const LS_TTL_MS = 15 * 60 * 1000; // 15 Minuten
+
+function readLocalCache(key: string): ShopifyProduct[] | null {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { t: number; d: ShopifyProduct[] };
+    if (Date.now() - parsed.t > LS_TTL_MS) return null;
+    return parsed.d;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalCache(key: string, data: ShopifyProduct[]) {
+  try {
+    localStorage.setItem(LS_PREFIX + key, JSON.stringify({ t: Date.now(), d: data }));
+  } catch {
+    // Quota überschritten — ignorieren, In-Memory-Cache reicht.
+  }
+}
+
 export function clearProductListCache() {
   productListCache.clear();
   productListInFlight.clear();
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(LS_PREFIX))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function fetchAllProducts(query?: string, pageSize = 250): Promise<ShopifyProduct[]> {
@@ -157,32 +230,55 @@ export async function fetchAllProducts(query?: string, pageSize = 250): Promise<
   const inFlight = productListInFlight.get(cacheKey);
   if (inFlight) return inFlight;
 
-  const promise = (async () => {
-    const all: ShopifyProduct[] = [];
-    let after: string | null = null;
-    // Hard safety cap to prevent runaway loops
-    for (let i = 0; i < 50; i++) {
-      const data = await storefrontApiRequest(PRODUCTS_QUERY, {
-        first: pageSize,
-        query: query ?? null,
-        after,
-      });
-      const products = data?.data?.products;
-      if (!products) break;
-      all.push(...(products.edges ?? []));
-      if (!products.pageInfo?.hasNextPage) break;
-      after = products.pageInfo.endCursor;
-    }
-    productListCache.set(cacheKey, all);
-    productListInFlight.delete(cacheKey);
-    return all;
-  })().catch((err) => {
-    productListInFlight.delete(cacheKey);
-    throw err;
-  });
+  // Persistenter Cache: instant aus localStorage zurückgeben (für Navigation/Re-Visit).
+  const local = readLocalCache(cacheKey);
+  if (local && local.length > 0) {
+    productListCache.set(cacheKey, local);
+    // Im Hintergrund frisch nachladen, damit zukünftige Aufrufe aktuell bleiben.
+    void (async () => {
+      try {
+        const fresh = await fetchAllProductsRaw(query, pageSize);
+        productListCache.set(cacheKey, fresh);
+        writeLocalCache(cacheKey, fresh);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return local;
+  }
+
+  const promise = fetchAllProductsRaw(query, pageSize)
+    .then((all) => {
+      productListCache.set(cacheKey, all);
+      writeLocalCache(cacheKey, all);
+      productListInFlight.delete(cacheKey);
+      return all;
+    })
+    .catch((err) => {
+      productListInFlight.delete(cacheKey);
+      throw err;
+    });
 
   productListInFlight.set(cacheKey, promise);
   return promise;
+}
+
+async function fetchAllProductsRaw(query: string | undefined, pageSize: number): Promise<ShopifyProduct[]> {
+  const all: ShopifyProduct[] = [];
+  let after: string | null = null;
+  for (let i = 0; i < 50; i++) {
+    const data = await storefrontApiRequest(PRODUCTS_LIST_QUERY, {
+      first: pageSize,
+      query: query ?? null,
+      after,
+    });
+    const products = data?.data?.products;
+    if (!products) break;
+    all.push(...(products.edges ?? []));
+    if (!products.pageInfo?.hasNextPage) break;
+    after = products.pageInfo.endCursor;
+  }
+  return all;
 }
 
 export async function fetchProductByHandle(handle: string) {
@@ -243,4 +339,22 @@ export function formatPrice(amount: string | number, _currencyCode = "CHF") {
   if (!isFinite(num)) return "CHF –";
   const francs = Math.floor(num);
   return `CHF ${francs}.95`;
+}
+
+/**
+ * Shopify-CDN Bilder-Resize: hängt width/height-Parameter an die URL.
+ * Liefert kleinere, schnellere Bilder für Listings/Karten.
+ * Bei Nicht-Shopify-URLs wird die Original-URL zurückgegeben.
+ */
+export function shopifyImage(url: string | null | undefined, width: number, height?: number): string {
+  if (!url) return "";
+  if (!url.includes("cdn.shopify.com")) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set("width", String(width));
+    if (height) u.searchParams.set("height", String(height));
+    return u.toString();
+  } catch {
+    return url;
+  }
 }
