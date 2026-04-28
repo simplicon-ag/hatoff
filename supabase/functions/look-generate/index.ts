@@ -129,6 +129,8 @@ const WELT_SETTINGS: Record<string, string> = {
   sommer: "Mediterranean terrace, bright afternoon sunlight, light shadows",
   freizeit: "minimalist urban park, natural daylight, weekend mood",
   abend: "moody evening bar interior, warm low light, refined ambience",
+  "fruehling-sommer": "sun-drenched coastal promenade, warm spring breeze, light linen feel",
+  "herbst-winter": "European old town in cold morning light, autumn leaves or first snow, layered warmth",
 };
 
 async function generateHeroImage(
