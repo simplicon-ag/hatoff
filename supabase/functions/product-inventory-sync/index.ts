@@ -73,7 +73,8 @@ async function firecrawlScrape(url: string, apiKey: string): Promise<string | nu
 interface SourceColorData {
   colorName: string;
   colorId: string;
-  sizes: Map<string, boolean>; // size → in stock
+  sizes: Map<string, boolean>; // size (lowercase) → in stock
+  sizesDisplay: Map<string, string>; // size (lowercase) → original case ("3XL")
   priceEur: number | null;
   compareAtEur: number | null;
 }
