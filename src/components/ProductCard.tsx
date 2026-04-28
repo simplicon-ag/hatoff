@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, ShoppingBag } from "lucide-react";
 import type { ShopifyProduct } from "@/lib/shopify";
-import { formatPrice } from "@/lib/shopify";
+import { formatPrice, shopifyImage } from "@/lib/shopify";
 import { useLivePrice, formatLivePrice } from "@/hooks/useLivePrice";
 import { useCartStore } from "@/stores/cartStore";
 import { WishlistButton } from "./WishlistButton";
