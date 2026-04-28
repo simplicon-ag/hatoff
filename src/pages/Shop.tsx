@@ -68,6 +68,28 @@ const FilterChip = ({ label, onRemove }: { label: string; onRemove: () => void }
 // Modul-Level Cache-Spiegel, damit beim Re-Mount sofort gerendert werden kann
 let cachedProducts: ShopifyProduct[] | null = null;
 
+// Session-stabiler Seed, damit das Shuffle nicht bei jedem Re-Render wechselt.
+const SHUFFLE_SEED = (() => {
+  if (typeof sessionStorage === "undefined") return Math.random();
+  const k = "hatoff:shop-shuffle-seed";
+  let s = sessionStorage.getItem(k);
+  if (!s) {
+    s = String(Math.random());
+    sessionStorage.setItem(k, s);
+  }
+  return parseFloat(s);
+})();
+
+// Deterministisches Pseudo-Random aus String + Seed
+const seededHash = (id: string) => {
+  let h = 2166136261 ^ Math.floor(SHUFFLE_SEED * 1e9);
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 100000) / 100000;
+};
+
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<ShopifyProduct[]>(() => cachedProducts ?? []);
