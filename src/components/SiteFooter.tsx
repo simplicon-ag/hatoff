@@ -35,8 +35,6 @@ export const SiteFooter = () => {
             <li><Link to="/sale" className="hover:text-primary">Sale</Link></li>
             <li><Link to="/saison/fs-2026" className="hover:text-primary">F/S 2026</Link></li>
             <li><Link to="/saison/hw-2026" className="hover:text-primary">H/W 2026</Link></li>
-            <li><Link to="/marken" className="hover:text-primary">Marken</Link></li>
-            <li><Link to="/magazin" className="hover:text-primary">Magazin</Link></li>
           </ul>
         </div>
 
