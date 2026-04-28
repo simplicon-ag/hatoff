@@ -103,9 +103,18 @@ const Shop = () => {
     const saved = sessionStorage.getItem(scrollKey);
     if (saved) {
       const y = parseInt(saved, 10);
-      if (!Number.isNaN(y)) {
-        // Nach Render-Frame, damit das Grid bereits Höhe hat
-        requestAnimationFrame(() => window.scrollTo(0, y));
+      if (!Number.isNaN(y) && y > 0) {
+        // Mehrere Versuche, da Bilder/Grid asynchron Höhe aufbauen.
+        let tries = 0;
+        const tryScroll = () => {
+          const maxY = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, Math.min(y, maxY));
+          tries++;
+          if (window.scrollY < y - 4 && tries < 30) {
+            setTimeout(tryScroll, 60);
+          }
+        };
+        requestAnimationFrame(tryScroll);
       }
     }
     const onScroll = () => {

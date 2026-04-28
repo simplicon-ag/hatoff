@@ -1,3 +1,4 @@
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useEffect, useMemo, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";
@@ -41,6 +42,8 @@ const Sale = () => {
       .then(setProducts)
       .finally(() => setLoading(false));
   }, []);
+
+  useScrollRestore(`sale-scroll:${sort}`, !loading);
 
   const onSaleProducts = useMemo(() => {
     // Sale-Produkte: müssen Tag `sale` tragen UND mind. eine reduzierte Variante haben.

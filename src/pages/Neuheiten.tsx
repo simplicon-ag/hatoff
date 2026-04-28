@@ -1,3 +1,4 @@
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
@@ -31,6 +32,8 @@ const Neuheiten = () => {
       .then(setProducts)
       .finally(() => setLoading(false));
   }, []);
+
+  useScrollRestore("neuheiten-scroll", !loading);
 
   // Nur Produkte mit Tag `neu` / `new` / `neuheit` (Präfixe wie `art:` ignorieren)
   // UND ohne `sale`-Tag — Sale-Artikel gehören in den Sale-Bereich, nicht zu Neuheiten.

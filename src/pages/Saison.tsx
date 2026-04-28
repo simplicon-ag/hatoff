@@ -1,3 +1,4 @@
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
@@ -41,6 +42,8 @@ const Saison = () => {
       .then(setProducts)
       .finally(() => setLoading(false));
   }, []);
+
+  useScrollRestore(`saison-scroll:${validSlug}:${sort}`, !loading);
 
   useEffect(() => {
     let active = true;
