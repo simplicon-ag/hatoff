@@ -66,7 +66,12 @@ Treat the reference images as a HARD CONSTRAINT. The model and setting are decor
 Subject: ONE confident, well-groomed European man, age 35-45, natural realistic skin and hair, candid editorial expression — NOT an AI-perfect render.
 Setting: ${setting}.
 Composition: full-body or 3/4 view, cinematic depth of field, natural directional light, GQ / Monocle quality.
-Strictly no text, no logos overlay, no watermark, no collage, no duplicate persons, no extra garments not present in references.`;
+STRICT EXCLUSIONS — the model MUST wear ONLY the garments shown in the reference images. Absolutely:
+- NO extra shirt, jacket, sweater, scarf, or any clothing item held in hand, draped over the shoulder, tied around the waist, or hanging from a pocket.
+- NO additional layers beyond what is in the references (if references show 2 pieces, exactly 2 pieces are worn).
+- NO bags, backpacks, hats, sunglasses, watches, jewellery, belts (unless visible in references).
+- NO duplicate or "spare" garments anywhere in the frame.
+Strictly no text, no logos overlay, no watermark, no collage, no duplicate persons, no extra garments not present in references. Hands are empty and relaxed.`;
   const content: Array<Record<string, unknown>> = [{ type: "text", text: promptText }];
   for (const u of urls.slice(0, 4)) content.push({ type: "image_url", image_url: { url: u } });
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
