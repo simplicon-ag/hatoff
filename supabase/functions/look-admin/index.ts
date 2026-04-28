@@ -32,6 +32,8 @@ const WELT_SETTINGS: Record<string, string> = {
   sommer: "Mediterranean terrace, bright afternoon sunlight",
   freizeit: "minimalist urban park, natural daylight, weekend mood",
   abend: "moody evening bar interior, warm low light, refined ambience",
+  "fruehling-sommer": "sun-drenched coastal promenade, warm spring breeze",
+  "herbst-winter": "European old town in cold morning light, layered warmth",
 };
 
 async function shopifyProduct(handle: string): Promise<{ url: string | null }> {
