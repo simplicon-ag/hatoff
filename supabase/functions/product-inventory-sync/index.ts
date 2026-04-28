@@ -423,13 +423,16 @@ async function syncProduct(
     return { ok: false, error: "no colours scraped" };
   }
 
-  // 2) Build target matrix: colorName → Map<size, available>
+  // 2) Build target matrix: colorName(lower) → Map<size(lower), available>
   const target = new Map<string, Map<string, boolean>>();
+  // Display-case for sizes per color so newly-created variants get "3XL" not "3xl".
+  const targetDisplay = new Map<string, Map<string, string>>();
   // Aggregate price per colour
   const colorPrices = new Map<string, { price: number | null; compareAt: number | null }>();
   for (const c of sourceColors) {
     const key = c.colorName.toLowerCase();
     target.set(key, c.sizes);
+    targetDisplay.set(key, c.sizesDisplay);
     colorPrices.set(key, { price: c.priceEur, compareAt: c.compareAtEur });
   }
 
