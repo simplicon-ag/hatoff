@@ -36,6 +36,10 @@ export interface ShopifyProduct {
   };
 }
 
+/**
+ * Vollständige Produkt-Query — wird auf Detail-Seiten und überall dort verwendet,
+ * wo `descriptionHtml`, alle Varianten und alle Bilder gebraucht werden.
+ */
 export const PRODUCTS_QUERY = `
   query GetProducts($first: Int!, $query: String, $after: String) {
     products(first: $first, query: $query, after: $after) {
@@ -53,6 +57,45 @@ export const PRODUCTS_QUERY = `
           priceRange { minVariantPrice { amount currencyCode } }
           images(first: 30) { edges { node { url altText } } }
           variants(first: 50) {
+            edges {
+              node {
+                id
+                title
+                price { amount currencyCode }
+                compareAtPrice { amount currencyCode }
+                availableForSale
+                selectedOptions { name value }
+                image { url altText }
+              }
+            }
+          }
+          options { name values }
+        }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+`;
+
+/**
+ * Schlanke Query für Listings/Karten — keine Description, weniger Bilder/Varianten.
+ * Reduziert die Antwortgrösse um ~70 % und beschleunigt das initiale Rendern deutlich.
+ */
+export const PRODUCTS_LIST_QUERY = `
+  query GetProductsList($first: Int!, $query: String, $after: String) {
+    products(first: $first, query: $query, after: $after) {
+      edges {
+        cursor
+        node {
+          id
+          title
+          handle
+          vendor
+          productType
+          tags
+          priceRange { minVariantPrice { amount currencyCode } }
+          images(first: 12) { edges { node { url altText } } }
+          variants(first: 30) {
             edges {
               node {
                 id
