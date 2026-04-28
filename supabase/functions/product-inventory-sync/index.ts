@@ -219,6 +219,16 @@ async function getShopifyProduct(productId: string, adminToken: string): Promise
   return json?.product ?? null;
 }
 
+async function getShopifyProductByHandle(handle: string, adminToken: string): Promise<ShopifyProduct | null> {
+  const res = await shopifyFetch(
+    `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?handle=${encodeURIComponent(handle)}&fields=id,title,handle,vendor,options,variants`,
+    { method: "GET", adminToken },
+  );
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json?.products?.[0] ?? null;
+}
+
 async function updateVariantPrice(
   variantId: number,
   price: string,
@@ -446,7 +456,10 @@ async function syncProduct(
   }
 
   // 3) Read current Shopify state.
-  const product = await getShopifyProduct(row.shopify_product_id, adminToken);
+  let product = await getShopifyProduct(row.shopify_product_id, adminToken);
+  if (!product && row.handle) {
+    product = await getShopifyProductByHandle(row.handle, adminToken);
+  }
   if (!product) return { ok: false, error: "shopify product not found" };
 
   // Identify which option index is size vs colour.
