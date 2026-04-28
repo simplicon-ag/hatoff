@@ -52,26 +52,34 @@ async function generateHero(
   apiKey: string, urls: string[], welt: string, title: string, subtitle: string,
 ): Promise<string | null> {
   const setting = WELT_SETTINGS[welt] ?? WELT_SETTINGS.freizeit;
+  const pieceCount = urls.length;
+  const isSummer = welt === "sommer" || welt === "fruehling-sommer";
+  const summerRule = isSummer
+    ? `\nSEASON RULE — SUMMER: NO jacket, NO blazer, NO coat, NO long-sleeve layering unless a jacket is in the references. Light, breathable, short sleeves preferred. The man is comfortable in warm weather.`
+    : "";
   const promptText = `High-end editorial menswear lifestyle photograph for "${title}" — ${subtitle}.
 
 ABSOLUTE PRIORITY — GARMENT FIDELITY:
-Reproduce every visible garment from the reference images PIXEL-FAITHFULLY.
-- Same colour (hue, saturation, brightness) — if a piece is light blue linen, it MUST appear light blue linen, never white, never cotton, never navy.
-- Same collar style, cuff style, button placement, pocket style.
+The model wears EXACTLY ${pieceCount} garment${pieceCount === 1 ? "" : "s"} — one for each reference image — and NOTHING else clothing-wise.
+Reproduce every reference garment PIXEL-FAITHFULLY:
+- Same colour (hue, saturation, brightness).
+- Same collar, cuff, button placement, pocket style.
 - Same fabric texture (linen vs poplin vs denim vs wool — visibly distinct).
-- Same pattern (solid, striped, checked) — copy stripes/checks exactly.
-- Same cut and length (slim vs regular, short vs long sleeves, chinos vs jeans vs dress trousers).
-Treat the reference images as a HARD CONSTRAINT. The model and setting are decoration; the wardrobe is the hero.
+- Same pattern (solid, striped, checked) — copy exactly.
+- Same cut and length (slim vs regular, short vs long sleeves, chinos vs jeans vs shorts vs dress trousers).
+Treat the references as a HARD CONSTRAINT. The wardrobe is the hero, not the setting.${summerRule}
 
 Subject: ONE confident, well-groomed European man, age 35-45, natural realistic skin and hair, candid editorial expression — NOT an AI-perfect render.
 Setting: ${setting}.
 Composition: full-body or 3/4 view, cinematic depth of field, natural directional light, GQ / Monocle quality.
-STRICT EXCLUSIONS — the model MUST wear ONLY the garments shown in the reference images. Absolutely:
-- NO extra shirt, jacket, sweater, scarf, or any clothing item held in hand, draped over the shoulder, tied around the waist, or hanging from a pocket.
-- NO additional layers beyond what is in the references (if references show 2 pieces, exactly 2 pieces are worn).
-- NO bags, backpacks, hats, sunglasses, watches, jewellery, belts (unless visible in references).
-- NO duplicate or "spare" garments anywhere in the frame.
-Strictly no text, no logos overlay, no watermark, no collage, no duplicate persons, no extra garments not present in references. Hands are empty and relaxed.`;
+
+STRICT EXCLUSIONS — count the garments. Exactly ${pieceCount}. Not more.
+- NO extra shirt, jacket, sweater, scarf, cardigan, vest or ANY clothing item held in hand, draped over the shoulder, tied around the waist or neck, hanging from a pocket, or thrown over the arm.
+- NO additional layers beyond the references. If references show ${pieceCount} pieces, exactly ${pieceCount} pieces are worn.
+- NO bags, backpacks, hats, sunglasses, watches, jewellery, ties or belts unless visible in references.
+- NO duplicate or "spare" garments anywhere in the frame, no clothing on benches, chairs or railings.
+- Hands are EMPTY and relaxed at the sides or in pockets.
+Strictly no text, no logos overlay, no watermark, no collage, no duplicate persons.`;
   const content: Array<Record<string, unknown>> = [{ type: "text", text: promptText }];
   for (const u of urls.slice(0, 4)) content.push({ type: "image_url", image_url: { url: u } });
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
