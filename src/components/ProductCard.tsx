@@ -188,8 +188,8 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
             </div>
           )}
 
-          {/* Status-Badges links unten — wie bei PKZ */}
-          <div className="absolute bottom-3 left-3 flex flex-col items-start gap-1.5">
+          {/* Status-Badges oben links */}
+          <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
             {soldOut && (
               <span className="bg-foreground/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-background">
                 Ausverkauft
