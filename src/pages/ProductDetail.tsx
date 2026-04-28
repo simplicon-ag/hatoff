@@ -160,22 +160,24 @@ const ProductDetail = () => {
   );
 
   // Eindeutige Farben (erste Variant pro Farbe → repräsentatives Bild)
-  // Für Farbswatches bevorzugen wir das Kragen-Detailbild derselben Farbe
-  // (bei Casa Moda typischerweise `...-image-3-...`) statt des Varianten-Ganzbilds.
+  // Für Farbswatches bevorzugen wir das Front-Ganzbild derselben Farbe
+  // (bei Casa Moda typischerweise `...-image-1-...`), damit man die Farbe
+  // sofort erkennt — Detail-Aufnahmen (image-3 = Kragen, image-6 = Stoff)
+  // sehen oft farblich sehr ähnlich aus.
   const colorOptions = useMemo(() => {
     if (!product) return [] as Array<{ value: string; variantId: string; image: string | null; available: boolean }>;
     const galleryImgs = product.images.edges.map((e) => e.node);
 
-    const detailImageFor = (variantImageUrl: string | null | undefined): string | null => {
+    const frontImageFor = (variantImageUrl: string | null | undefined): string | null => {
       if (!variantImageUrl) return galleryImgs[0]?.url ?? null;
       // Falls das Variantenbild dem Casa-Moda-Naming folgt (`...-image-N-...`),
-      // bevorzugen wir das Kragen-Detailbild derselben Farbe (image-3 / image-4).
+      // bevorzugen wir das Front-Bild derselben Farbe (image-1).
       const prefix = variantImageUrl.match(/\/([^/?]+-image-)\d+-/)?.[1];
       if (prefix) {
-        const sameColorCollar = galleryImgs.find((g) => g.url.includes(`/${prefix}3-`));
-        if (sameColorCollar) return sameColorCollar.url;
-        const sameColorDetail = galleryImgs.find((g) => g.url.includes(`/${prefix}4-`));
-        if (sameColorDetail) return sameColorDetail.url;
+        const sameColorFront = galleryImgs.find((g) => g.url.includes(`/${prefix}1-`));
+        if (sameColorFront) return sameColorFront.url;
+        const sameColorAlt = galleryImgs.find((g) => g.url.includes(`/${prefix}2-`));
+        if (sameColorAlt) return sameColorAlt.url;
       }
       // Andernfalls: Variantenbild direkt verwenden — NICHT auf einen festen
       // Galerie-Index zurückfallen, sonst zeigen alle Farben dasselbe Bild.
@@ -191,7 +193,7 @@ const ProductDetail = () => {
         seen.set(value, {
           value,
           variantId: v.id,
-          image: detailImageFor(v.image?.url),
+          image: frontImageFor(v.image?.url),
           available: v.availableForSale,
         });
       } else if (!existing.available && v.availableForSale) {
@@ -199,7 +201,7 @@ const ProductDetail = () => {
         seen.set(value, {
           ...existing,
           variantId: v.id,
-          image: detailImageFor(v.image?.url) ?? existing.image,
+          image: frontImageFor(v.image?.url) ?? existing.image,
           available: true,
         });
       }
