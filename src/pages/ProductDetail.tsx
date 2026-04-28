@@ -193,7 +193,7 @@ const ProductDetail = () => {
         seen.set(value, {
           value,
           variantId: v.id,
-          image: detailImageFor(v.image?.url),
+          image: frontImageFor(v.image?.url),
           available: v.availableForSale,
         });
       } else if (!existing.available && v.availableForSale) {
@@ -201,7 +201,7 @@ const ProductDetail = () => {
         seen.set(value, {
           ...existing,
           variantId: v.id,
-          image: detailImageFor(v.image?.url) ?? existing.image,
+          image: frontImageFor(v.image?.url) ?? existing.image,
           available: true,
         });
       }
