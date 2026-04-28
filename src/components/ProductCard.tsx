@@ -133,7 +133,9 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
   }, [images]);
 
   const primary = colorImage ?? orderedImages[0] ?? null;
-  const secondary = colorImage ? null : orderedImages[1] ?? null;
+  const secondary = colorImage
+    ? colorSecondaryImage
+    : orderedImages[1] ?? null;
 
   // Farb-Indikator als kleine Punkte unter dem Bild (PKZ-Stil)
   const colorSwatches = useMemo(() => {
