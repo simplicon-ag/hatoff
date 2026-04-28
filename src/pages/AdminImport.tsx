@@ -89,6 +89,24 @@ export default function AdminImport() {
   const [singleUrl, setSingleUrl] = useState("");
   const [singleBusy, setSingleBusy] = useState(false);
   const [singleResult, setSingleResult] = useState<SingleImportResult | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+
+  const runInventorySync = async () => {
+    if (!confirm("Inventar-Sync starten?\n\nGleicht Farben, Grössen (pro Farbe!) und Preise mit casamoda.com + venti.com ab.\nBilder werden NICHT verändert.\n\nDauer: ~60-90 min, läuft im Hintergrund.")) return;
+    setSyncBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("product-inventory-sync", { body: { mode: "start" } });
+      if (error) throw error;
+      toast.success(`Inventar-Sync gestartet: ${data?.total ?? 0} Produkte`);
+      // Kick off the first batch immediately
+      supabase.functions.invoke("product-inventory-sync", { body: { mode: "batch", batch_size: 3 } }).catch(() => {});
+      fetchAll();
+    } catch (err) {
+      toast.error(`Sync-Start fehlgeschlagen: ${(err as Error).message}`);
+    } finally {
+      setSyncBusy(false);
+    }
+  };
 
   const fetchAll = async () => {
     const [{ data: jobData }, { data: logData }] = await Promise.all([
