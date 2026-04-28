@@ -1,0 +1,1 @@
+ALTER TABLE public.curated_looks ADD COLUMN IF NOT EXISTS flatlay_image_url text;
