@@ -133,6 +133,34 @@ const WELT_SETTINGS: Record<string, string> = {
   "herbst-winter": "European old town in cold morning light, autumn leaves or first snow, layered warmth",
 };
 
+async function callImageModel(
+  apiKey: string,
+  promptText: string,
+  productImageUrls: string[],
+): Promise<string | null> {
+  const content: Array<Record<string, unknown>> = [{ type: "text", text: promptText }];
+  for (const url of productImageUrls.slice(0, 4)) {
+    content.push({ type: "image_url", image_url: { url } });
+  }
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-3.1-flash-image-preview",
+      messages: [{ role: "user", content }],
+      modalities: ["image", "text"],
+    }),
+  });
+  if (!res.ok) {
+    console.warn("image generation failed", res.status, await res.text().catch(() => ""));
+    return null;
+  }
+  const data = await res.json();
+  const dataUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) return null;
+  return dataUrl;
+}
+
 async function generateHeroImage(
   apiKey: string,
   productImageUrls: string[],
@@ -141,35 +169,25 @@ async function generateHeroImage(
   lookSubtitle: string,
 ): Promise<string | null> {
   const setting = WELT_SETTINGS[welt] ?? WELT_SETTINGS.freizeit;
-  const promptText = `Editorial men's fashion lifestyle photograph for the look "${lookTitle}" — ${lookSubtitle}.
-A confident, modern Swiss man in his 30s-40s wearing exactly the garments shown in the reference images.
+  const promptText = `High-end editorial menswear lifestyle photograph for "${lookTitle}" — ${lookSubtitle}.
+Subject: ONE confident, well-groomed European man, age 35-45, natural and approachable expression, realistic skin and hair, photorealistic — NOT a model pose, NOT AI-perfect.
+Wardrobe: he wears EXACTLY the garments from the reference images — same colours, same cut, same materials, same patterns. Do not invent or alter pieces.
 Setting: ${setting}.
-Cinematic photography, natural light, shallow depth of field, magazine editorial style, full-body or 3/4 view.
-The garments must match the references precisely in colour, cut and material.
-No text, no logos overlay, no watermark.`;
+Composition: full-body or 3/4 view, cinematic depth of field, natural directional light, GQ / Monocle magazine quality, candid editorial feel.
+Strictly no text, no logos overlay, no watermark, no collage, no duplicate persons.`;
+  return callImageModel(apiKey, promptText, productImageUrls);
+}
 
-  const content: Array<Record<string, unknown>> = [{ type: "text", text: promptText }];
-  for (const url of productImageUrls.slice(0, 4)) {
-    content.push({ type: "image_url", image_url: { url } });
-  }
-
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash-image",
-      messages: [{ role: "user", content }],
-      modalities: ["image", "text"],
-    }),
-  });
-  if (!res.ok) {
-    console.warn("hero image generation failed", res.status, await res.text().catch(() => ""));
-    return null;
-  }
-  const data = await res.json();
-  const dataUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) return null;
-  return dataUrl;
+async function generateFlatlayImage(
+  apiKey: string,
+  productImageUrls: string[],
+  lookTitle: string,
+): Promise<string | null> {
+  const promptText = `Premium menswear flatlay product composition for "${lookTitle}".
+Arrange EXACTLY the garments from the reference images on a soft warm-neutral linen or stone background, top-down view.
+Garments must match references precisely (colour, cut, material). Tasteful overlap, generous negative space, soft natural daylight, subtle shadows.
+Editorial e-commerce styling — no person, no accessories that aren't in the references, no text, no logos overlay, no watermark.`;
+  return callImageModel(apiKey, promptText, productImageUrls);
 }
 
 async function uploadDataUrl(
