@@ -826,6 +826,10 @@ Deno.serve(async (req) => {
       String(body.status ?? "").toLowerCase() === "draft" ? "draft" : "active";
     const categoryTag = String(body.category_tag ?? "").trim().toLowerCase();
     const excludeSale = Boolean(body.exclude_sale);
+    // NEU: single_color → behandle die URL als eigenständiges Produkt (1 Farbe = 1 Produkt).
+    // Deaktiviert discoverColorUrls und hängt colorId an Handle+Titel an, sodass keine Handle-Konflikte
+    // mit bereits importierten Farbvarianten desselben Stils entstehen.
+    const singleColor = Boolean(body.single_color);
     if (!rawUrl) {
       return new Response(
         JSON.stringify({ success: false, error: "url required" }),
