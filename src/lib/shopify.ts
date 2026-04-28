@@ -340,3 +340,21 @@ export function formatPrice(amount: string | number, _currencyCode = "CHF") {
   const francs = Math.floor(num);
   return `CHF ${francs}.95`;
 }
+
+/**
+ * Shopify-CDN Bilder-Resize: hängt width/height-Parameter an die URL.
+ * Liefert kleinere, schnellere Bilder für Listings/Karten.
+ * Bei Nicht-Shopify-URLs wird die Original-URL zurückgegeben.
+ */
+export function shopifyImage(url: string | null | undefined, width: number, height?: number): string {
+  if (!url) return "";
+  if (!url.includes("cdn.shopify.com")) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set("width", String(width));
+    if (height) u.searchParams.set("height", String(height));
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
