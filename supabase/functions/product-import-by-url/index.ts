@@ -826,6 +826,10 @@ Deno.serve(async (req) => {
       String(body.status ?? "").toLowerCase() === "draft" ? "draft" : "active";
     const categoryTag = String(body.category_tag ?? "").trim().toLowerCase();
     const excludeSale = Boolean(body.exclude_sale);
+    // NEU: single_color → behandle die URL als eigenständiges Produkt (1 Farbe = 1 Produkt).
+    // Deaktiviert discoverColorUrls und hängt colorId an Handle+Titel an, sodass keine Handle-Konflikte
+    // mit bereits importierten Farbvarianten desselben Stils entstehen.
+    const singleColor = Boolean(body.single_color);
     if (!rawUrl) {
       return new Response(
         JSON.stringify({ success: false, error: "url required" }),
@@ -862,7 +866,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const handle = buildBaseHandle(brand, parsed.slugBase, parsed.articleId);
+    const baseHandle = buildBaseHandle(brand, parsed.slugBase, parsed.articleId);
+    const handle = singleColor ? `${baseHandle}-${parsed.colorId}` : baseHandle;
     const adminToken = resolveAdminToken();
     if (!adminToken) {
       return new Response(
@@ -913,8 +918,10 @@ Deno.serve(async (req) => {
 
     console.log(`[by-url] start brand=${brand} handle=${handle} force=${force} existing=${existing?.id ?? "no"}`);
 
-    // 1) Find sibling colour URLs
-    const colorUrlsAll = await discoverColorUrls(sourceUrl, parsed.articleId, brand);
+    // 1) Find sibling colour URLs (skipped in single_color mode → only this URL is used).
+    const colorUrlsAll = singleColor
+      ? [{ url: sourceUrl, colorId: parsed.colorId }]
+      : await discoverColorUrls(sourceUrl, parsed.articleId, brand);
     // Pre-cap before scraping: avoid 150s timeout on products with 20+ colors.
     // Final cap based on actual size count happens after scraping.
     const PRE_SCRAPE_CAP = 24;
@@ -924,7 +931,7 @@ Deno.serve(async (req) => {
     if (colorUrlsAll.length > PRE_SCRAPE_CAP) {
       console.warn(`[by-url] pre-cap ${colorUrlsAll.length} -> ${PRE_SCRAPE_CAP} color URLs (avoid timeout)`);
     }
-    console.log(`[by-url] discovered ${colorUrlsAll.length} colour URLs, will scrape ${colorUrls.length}`);
+    console.log(`[by-url] discovered ${colorUrlsAll.length} colour URLs, will scrape ${colorUrls.length} (single_color=${singleColor})`);
 
     // 2) Scrape every colour IN PARALLEL (was sequential — caused 150s timeouts
     //    on products with 5-7 colour variants like Casa Moda Leinenhemden).
@@ -985,9 +992,11 @@ Deno.serve(async (req) => {
       colors.splice(maxColors);
     }
 
-    // 3) Build colour-neutral base
+    // 3) Build base. In single_color mode keep colour in title; otherwise strip it.
     const first = colors[0].scraped;
-    const baseTitle = stripColorFromTitle(first.title) || first.title;
+    const baseTitle = singleColor
+      ? (first.title || stripColorFromTitle(first.title))
+      : (stripColorFromTitle(first.title) || first.title);
     const base: ScrapedProduct = { ...first, title: baseTitle, image_urls: [] };
 
     // 4) Upsert: re-use the existence result from the early check.
