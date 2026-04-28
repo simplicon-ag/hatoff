@@ -1,0 +1,1 @@
+UPDATE public.curated_looks SET status='published', published_at=now() WHERE slug IN ('smoking-alternative-in-anthrazit','dinner-in-burgund','bar-abend-in-schwarz','leinen-tag-am-mittelmeer','streifen-hemd-klassiker','flieder-statement','kurzarm-in-hellblau','button-down-wei','steppjacke-fur-die-stadt','sommerjacke-in-beige');
