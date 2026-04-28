@@ -247,14 +247,36 @@ async function setInventoryTracking(variantId: number, adminToken: string): Prom
 }
 
 async function getPrimaryLocationId(adminToken: string): Promise<number | null> {
+  // Try /locations.json first (requires read_locations scope)
   const res = await shopifyFetch(
     `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/locations.json`,
     { method: "GET", adminToken },
   );
-  if (!res.ok) return null;
-  const json = await res.json();
-  const loc = json?.locations?.[0];
-  return loc?.id ?? null;
+  if (res.ok) {
+    const json = await res.json();
+    const loc = json?.locations?.[0];
+    if (loc?.id) return loc.id;
+  } else {
+    const txt = await res.text().catch(() => "");
+    console.warn(`[sync] locations.json failed (${res.status}): ${txt.substring(0, 150)} — falling back via inventory_levels`);
+  }
+
+  // Fallback: derive location from any existing variant's inventory_levels
+  const prodRes = await shopifyFetch(
+    `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/products.json?limit=1&fields=id,variants`,
+    { method: "GET", adminToken },
+  );
+  if (!prodRes.ok) return null;
+  const prodJson = await prodRes.json();
+  const inventoryItemId = prodJson?.products?.[0]?.variants?.[0]?.inventory_item_id;
+  if (!inventoryItemId) return null;
+  const lvlRes = await shopifyFetch(
+    `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/inventory_levels.json?inventory_item_ids=${inventoryItemId}`,
+    { method: "GET", adminToken },
+  );
+  if (!lvlRes.ok) return null;
+  const lvlJson = await lvlRes.json();
+  return lvlJson?.inventory_levels?.[0]?.location_id ?? null;
 }
 
 async function setInventoryLevel(
@@ -332,8 +354,7 @@ async function createVariant(
 // ===========================================================================
 
 function resolveAdminToken(): string {
-  const direct = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  if (direct && direct.startsWith("shpat_")) return direct;
+  // Prefer the freshly-rotated online token (per-user, ~24h) over the older static admin token
   for (const [k, v] of Object.entries(Deno.env.toObject())) {
     if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v?.trim().startsWith("{")) {
       try {
@@ -343,6 +364,8 @@ function resolveAdminToken(): string {
       } catch { /* ignore */ }
     }
   }
+  const direct = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+  if (direct && direct.startsWith("shpat_")) return direct;
   return direct ?? "";
 }
 
@@ -537,11 +560,18 @@ async function startSync(
     .not("shopify_product_id", "is", null);
   if (error) throw error;
   const ids = (rows ?? []).map((r: { id: string }) => r.id);
-  if (ids.length > 0) {
-    await supabase
+  // Update in chunks of 100 — a single .in() with 900+ ids generates a URL that PostgREST rejects.
+  const CHUNK = 100;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK);
+    const { error: updErr } = await supabase
       .from("product_import_log")
       .update({ status: "sync_pending", error_message: null, updated_at: new Date().toISOString() })
-      .in("id", ids);
+      .in("id", slice);
+    if (updErr) {
+      console.error(`[sync] startSync chunk ${i} failed:`, updErr);
+      throw updErr;
+    }
   }
   await supabase.from("product_import_job").upsert({
     id: "singleton",
