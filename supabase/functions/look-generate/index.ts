@@ -198,15 +198,18 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { productHandle, force, maxExisting } = await req.json();
+    const { productHandle, force, maxExisting, mode } = await req.json();
     if (!productHandle || typeof productHandle !== "string") {
       return new Response(JSON.stringify({ error: "productHandle required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    // Default: skip when 2+ looks exist. Caller may pass higher value to allow more variants.
-    const limit = typeof maxExisting === "number" && maxExisting >= 0 ? maxExisting : 2;
+    // mode: "diverse" → propose exactly 4 looks across explicit axes (anlass A, anlass B, season, color contrast)
+    const isDiverse = mode === "diverse";
+    // Default: skip when 2+ looks exist (4+ for diverse). Caller may override with maxExisting.
+    const defaultLimit = isDiverse ? 4 : 2;
+    const limit = typeof maxExisting === "number" && maxExisting >= 0 ? maxExisting : defaultLimit;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
