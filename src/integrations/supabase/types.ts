@@ -76,6 +76,7 @@ export type Database = {
           anchor_handle: string | null
           anlaesse: string[]
           created_at: string
+          flatlay_image_url: string | null
           hero_image_url: string | null
           highlights: string[]
           id: string
@@ -93,6 +94,7 @@ export type Database = {
           anchor_handle?: string | null
           anlaesse?: string[]
           created_at?: string
+          flatlay_image_url?: string | null
           hero_image_url?: string | null
           highlights?: string[]
           id?: string
@@ -110,6 +112,7 @@ export type Database = {
           anchor_handle?: string | null
           anlaesse?: string[]
           created_at?: string
+          flatlay_image_url?: string | null
           hero_image_url?: string | null
           highlights?: string[]
           id?: string
