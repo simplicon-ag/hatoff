@@ -188,9 +188,39 @@ export async function fetchProducts(first = 50, query?: string): Promise<Shopify
 const productListCache = new Map<string, ShopifyProduct[]>();
 const productListInFlight = new Map<string, Promise<ShopifyProduct[]>>();
 
+const LS_PREFIX = "hatoff:plist:v2:";
+const LS_TTL_MS = 15 * 60 * 1000; // 15 Minuten
+
+function readLocalCache(key: string): ShopifyProduct[] | null {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { t: number; d: ShopifyProduct[] };
+    if (Date.now() - parsed.t > LS_TTL_MS) return null;
+    return parsed.d;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalCache(key: string, data: ShopifyProduct[]) {
+  try {
+    localStorage.setItem(LS_PREFIX + key, JSON.stringify({ t: Date.now(), d: data }));
+  } catch {
+    // Quota überschritten — ignorieren, In-Memory-Cache reicht.
+  }
+}
+
 export function clearProductListCache() {
   productListCache.clear();
   productListInFlight.clear();
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(LS_PREFIX))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function fetchAllProducts(query?: string, pageSize = 250): Promise<ShopifyProduct[]> {
@@ -200,32 +230,55 @@ export async function fetchAllProducts(query?: string, pageSize = 250): Promise<
   const inFlight = productListInFlight.get(cacheKey);
   if (inFlight) return inFlight;
 
-  const promise = (async () => {
-    const all: ShopifyProduct[] = [];
-    let after: string | null = null;
-    // Hard safety cap to prevent runaway loops
-    for (let i = 0; i < 50; i++) {
-      const data = await storefrontApiRequest(PRODUCTS_QUERY, {
-        first: pageSize,
-        query: query ?? null,
-        after,
-      });
-      const products = data?.data?.products;
-      if (!products) break;
-      all.push(...(products.edges ?? []));
-      if (!products.pageInfo?.hasNextPage) break;
-      after = products.pageInfo.endCursor;
-    }
-    productListCache.set(cacheKey, all);
-    productListInFlight.delete(cacheKey);
-    return all;
-  })().catch((err) => {
-    productListInFlight.delete(cacheKey);
-    throw err;
-  });
+  // Persistenter Cache: instant aus localStorage zurückgeben (für Navigation/Re-Visit).
+  const local = readLocalCache(cacheKey);
+  if (local && local.length > 0) {
+    productListCache.set(cacheKey, local);
+    // Im Hintergrund frisch nachladen, damit zukünftige Aufrufe aktuell bleiben.
+    void (async () => {
+      try {
+        const fresh = await fetchAllProductsRaw(query, pageSize);
+        productListCache.set(cacheKey, fresh);
+        writeLocalCache(cacheKey, fresh);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return local;
+  }
+
+  const promise = fetchAllProductsRaw(query, pageSize)
+    .then((all) => {
+      productListCache.set(cacheKey, all);
+      writeLocalCache(cacheKey, all);
+      productListInFlight.delete(cacheKey);
+      return all;
+    })
+    .catch((err) => {
+      productListInFlight.delete(cacheKey);
+      throw err;
+    });
 
   productListInFlight.set(cacheKey, promise);
   return promise;
+}
+
+async function fetchAllProductsRaw(query: string | undefined, pageSize: number): Promise<ShopifyProduct[]> {
+  const all: ShopifyProduct[] = [];
+  let after: string | null = null;
+  for (let i = 0; i < 50; i++) {
+    const data = await storefrontApiRequest(PRODUCTS_LIST_QUERY, {
+      first: pageSize,
+      query: query ?? null,
+      after,
+    });
+    const products = data?.data?.products;
+    if (!products) break;
+    all.push(...(products.edges ?? []));
+    if (!products.pageInfo?.hasNextPage) break;
+    after = products.pageInfo.endCursor;
+  }
+  return all;
 }
 
 export async function fetchProductByHandle(handle: string) {
