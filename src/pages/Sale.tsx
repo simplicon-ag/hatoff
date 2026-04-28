@@ -1,3 +1,4 @@
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useEffect, useMemo, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ProductCard } from "@/components/ProductCard";

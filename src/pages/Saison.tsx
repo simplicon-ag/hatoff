@@ -1,3 +1,4 @@
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";

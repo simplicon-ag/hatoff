@@ -1,3 +1,4 @@
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
