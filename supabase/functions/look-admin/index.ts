@@ -50,17 +50,28 @@ async function generateHero(
   apiKey: string, urls: string[], welt: string, title: string, subtitle: string,
 ): Promise<string | null> {
   const setting = WELT_SETTINGS[welt] ?? WELT_SETTINGS.freizeit;
-  const promptText = `Editorial men's fashion lifestyle photograph for "${title}" — ${subtitle}.
-A confident modern Swiss man in his 30s-40s wearing exactly the garments shown in the references.
-Setting: ${setting}. Cinematic, natural light, magazine editorial, full-body or 3/4 view.
-Garments must match references precisely. No text, no logos overlay, no watermark.`;
+  const promptText = `High-end editorial menswear lifestyle photograph for "${title}" — ${subtitle}.
+
+ABSOLUTE PRIORITY — GARMENT FIDELITY:
+Reproduce every visible garment from the reference images PIXEL-FAITHFULLY.
+- Same colour (hue, saturation, brightness) — if a piece is light blue linen, it MUST appear light blue linen, never white, never cotton, never navy.
+- Same collar style, cuff style, button placement, pocket style.
+- Same fabric texture (linen vs poplin vs denim vs wool — visibly distinct).
+- Same pattern (solid, striped, checked) — copy stripes/checks exactly.
+- Same cut and length (slim vs regular, short vs long sleeves, chinos vs jeans vs dress trousers).
+Treat the reference images as a HARD CONSTRAINT. The model and setting are decoration; the wardrobe is the hero.
+
+Subject: ONE confident, well-groomed European man, age 35-45, natural realistic skin and hair, candid editorial expression — NOT an AI-perfect render.
+Setting: ${setting}.
+Composition: full-body or 3/4 view, cinematic depth of field, natural directional light, GQ / Monocle quality.
+Strictly no text, no logos overlay, no watermark, no collage, no duplicate persons, no extra garments not present in references.`;
   const content: Array<Record<string, unknown>> = [{ type: "text", text: promptText }];
   for (const u of urls.slice(0, 4)) content.push({ type: "image_url", image_url: { url: u } });
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash-image",
+      model: "google/gemini-3.1-flash-image-preview",
       messages: [{ role: "user", content }],
       modalities: ["image", "text"],
     }),
