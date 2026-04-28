@@ -188,7 +188,7 @@ export async function fetchProducts(first = 50, query?: string): Promise<Shopify
 const productListCache = new Map<string, ShopifyProduct[]>();
 const productListInFlight = new Map<string, Promise<ShopifyProduct[]>>();
 
-const LS_PREFIX = "hatoff:plist:v8:";
+const LS_PREFIX = "hatoff:plist:v9:";
 const LS_TTL_MS = 15 * 60 * 1000; // 15 Minuten
 
 function readLocalCache(key: string): ShopifyProduct[] | null {
