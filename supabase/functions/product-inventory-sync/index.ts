@@ -560,11 +560,18 @@ async function startSync(
     .not("shopify_product_id", "is", null);
   if (error) throw error;
   const ids = (rows ?? []).map((r: { id: string }) => r.id);
-  if (ids.length > 0) {
-    await supabase
+  // Update in chunks of 100 — a single .in() with 900+ ids generates a URL that PostgREST rejects.
+  const CHUNK = 100;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK);
+    const { error: updErr } = await supabase
       .from("product_import_log")
       .update({ status: "sync_pending", error_message: null, updated_at: new Date().toISOString() })
-      .in("id", ids);
+      .in("id", slice);
+    if (updErr) {
+      console.error(`[sync] startSync chunk ${i} failed:`, updErr);
+      throw updErr;
+    }
   }
   await supabase.from("product_import_job").upsert({
     id: "singleton",
