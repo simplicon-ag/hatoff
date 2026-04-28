@@ -328,6 +328,19 @@ const Shop = () => {
     } else if (sort === "newest") {
       // Shopify gid IDs sind monoton steigend → höchste ID = neuestes Produkt
       sorted.sort((a, b) => b.node.id.localeCompare(a.node.id));
+    } else {
+      // "featured" (Default): neueste zuerst, innerhalb gleicher Recency-Tiers
+      // zufällig durchmischt (session-stabil), damit das Raster lebendig wirkt.
+      // Wir ranken nach Position in der Newest-Liste und addieren Jitter.
+      const newestOrder = new Map<string, number>();
+      [...sorted]
+        .sort((a, b) => b.node.id.localeCompare(a.node.id))
+        .forEach((p, i) => newestOrder.set(p.node.id, i));
+      sorted.sort((a, b) => {
+        const ra = (newestOrder.get(a.node.id) ?? 0) + seededHash(a.node.id) * 8;
+        const rb = (newestOrder.get(b.node.id) ?? 0) + seededHash(b.node.id) * 8;
+        return ra - rb;
+      });
     }
     return sorted;
   }, [
