@@ -251,7 +251,11 @@ async function getPrimaryLocationId(adminToken: string): Promise<number | null> 
     `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_ADMIN_VERSION}/locations.json`,
     { method: "GET", adminToken },
   );
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    console.error(`[sync] locations.json failed: ${res.status} ${txt.substring(0, 200)}`);
+    return null;
+  }
   const json = await res.json();
   const loc = json?.locations?.[0];
   return loc?.id ?? null;
