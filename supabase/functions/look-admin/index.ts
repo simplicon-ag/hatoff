@@ -190,6 +190,19 @@ Deno.serve(async (req) => {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      // Validate: every look needs at least one Oberteil + one Hose
+      const cat = (h: string): "oberteil" | "hose" | "jacke" | "acc" => {
+        if (/(hose|chino|jeans|shorts|short|bermuda|5-pocket)/.test(h)) return "hose";
+        if (/(steppjacke|sommerjacke|softshell|materialmix|uebergangsjacke|hemdjacke|sakko|blazer|mantel|coat|steppweste|weste)/.test(h)) return "jacke";
+        if (/(hemd|shirt|polo|pulli|pullover|strickjacke|strick|sweatjacke|sweat|hoodie|tshirt|t-shirt)/.test(h)) return "oberteil";
+        return "acc";
+      };
+      const cats = look.product_handles.map(cat);
+      if (!cats.includes("oberteil") || !cats.includes("hose")) {
+        return new Response(JSON.stringify({ error: "Look must contain at least one Oberteil and one Hose (Jacke optional)" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       let slug = slugify(look.title);
       const { data: existSlug } = await supabase.from("curated_looks").select("slug").eq("slug", slug).maybeSingle();
       if (existSlug) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
