@@ -87,7 +87,6 @@ export const SizeAdvisorProvider = ({ children }: { children: ReactNode }) => {
     <SizeAdvisorContext.Provider value={{ open, close, isOpen }}>
       {children}
       <SizeAdvisorSheet isOpen={isOpen} onOpenChange={setIsOpen} opts={opts} />
-      <FloatingTrigger onClick={() => open()} hidden={isOpen} />
     </SizeAdvisorContext.Provider>
   );
 };
