@@ -12,9 +12,7 @@ const navItems = [
   { to: "/neuheiten", label: "New In" },
   { to: "/shop", label: "Shop" },
   { to: "/looks", label: "Looks" },
-  { to: "/marken", label: "Marken" },
   { to: "/sale", label: "Sale", accent: true },
-  { to: "/magazin", label: "Stories" },
   { to: "/club", label: "Club" },
 ];
 
