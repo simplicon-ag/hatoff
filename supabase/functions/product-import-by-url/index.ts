@@ -866,7 +866,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const handle = buildBaseHandle(brand, parsed.slugBase, parsed.articleId);
+    const baseHandle = buildBaseHandle(brand, parsed.slugBase, parsed.articleId);
+    const handle = singleColor ? `${baseHandle}-${parsed.colorId}` : baseHandle;
     const adminToken = resolveAdminToken();
     if (!adminToken) {
       return new Response(
