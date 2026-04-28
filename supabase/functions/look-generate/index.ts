@@ -479,13 +479,22 @@ ${existingForAnchor.length > 0 ? JSON.stringify(existingForPrompt, null, 2) : "(
       }
 
       let heroUrl: string | null = null;
+      let flatlayUrl: string | null = null;
       try {
-        const dataUrl = await generateHeroImage(LOVABLE_API_KEY, heroSourceUrls, proposal.welt, proposal.title, proposal.subtitle);
-        if (dataUrl) {
-          heroUrl = await uploadDataUrl(supabase, dataUrl, `looks/${slug}-${Date.now()}`);
+        const heroData = await generateHeroImage(LOVABLE_API_KEY, heroSourceUrls, proposal.welt, proposal.title, proposal.subtitle);
+        if (heroData) {
+          heroUrl = await uploadDataUrl(supabase, heroData, `looks/${slug}-hero-${Date.now()}`);
         }
       } catch (e) {
         console.warn("hero generation error", e);
+      }
+      try {
+        const flatData = await generateFlatlayImage(LOVABLE_API_KEY, heroSourceUrls, proposal.title);
+        if (flatData) {
+          flatlayUrl = await uploadDataUrl(supabase, flatData, `looks/${slug}-flat-${Date.now()}`);
+        }
+      } catch (e) {
+        console.warn("flatlay generation error", e);
       }
 
       const { data: inserted, error: insertError } = await supabase
@@ -501,6 +510,7 @@ ${existingForAnchor.length > 0 ? JSON.stringify(existingForPrompt, null, 2) : "(
           story: proposal.story,
           highlights: proposal.highlights,
           hero_image_url: heroUrl,
+          flatlay_image_url: flatlayUrl,
           status: "draft",
         })
         .select("id, slug")
