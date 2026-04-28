@@ -485,8 +485,10 @@ async function syncProduct(
     const compareChf =
       priceInfo?.compareAt != null ? (priceInfo.compareAt * EUR_TO_CHF).toFixed(2) : null;
 
+    const sizesDisp = targetDisplay.get(colorKeyLower);
     for (const [size, inStock] of sizes.entries()) {
       const k = variantKey(size, canonicalColor);
+      const sizeDisplay = sizesDisp?.get(size) ?? size.toUpperCase();
       let variant = existingByKey.get(k);
 
       if (!variant) {
@@ -494,13 +496,13 @@ async function syncProduct(
         // point creating phantom variants that never existed).
         if (!inStock || !priceChf) continue;
         const sku = articleNo
-          ? `${articleNo}-${size}-${canonicalColor}`.replace(/[^A-Za-z0-9-]/g, "").toUpperCase()
-          : `${row.handle ?? "p"}-${size}-${canonicalColor}`
+          ? `${articleNo}-${sizeDisplay}-${canonicalColor}`.replace(/[^A-Za-z0-9-]/g, "").toUpperCase()
+          : `${row.handle ?? "p"}-${sizeDisplay}-${canonicalColor}`
               .replace(/[^A-Za-z0-9-]/g, "")
               .toUpperCase();
         const created = await createVariant(
           product.id,
-          size,
+          sizeDisplay,
           canonicalColor,
           priceChf,
           compareChf,
