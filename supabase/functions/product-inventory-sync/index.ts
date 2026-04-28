@@ -619,7 +619,12 @@ Deno.serve(async (req) => {
 
     const locationId = await getPrimaryLocationId(adminToken);
     if (!locationId) {
-      return new Response(JSON.stringify({ error: "No Shopify location found" }), {
+      const tokenKeys = Object.keys(Deno.env.toObject()).filter(k => k.startsWith("SHOPIFY"));
+      const tokenPreview = adminToken ? `${adminToken.substring(0, 10)}...(${adminToken.length})` : "EMPTY";
+      return new Response(JSON.stringify({
+        error: "No Shopify location found",
+        debug: { tokenPreview, availableShopifyKeys: tokenKeys },
+      }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
