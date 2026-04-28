@@ -82,9 +82,11 @@ export const GlobalSearch = () => {
       };
     }
 
+    // Cutoff bei 18: erlaubt reine Beschreibungs-Treffer (Material, Pflege,
+    // Detailtexte etc.), nicht nur Titel/Marke/Tag.
     const ph = products
       .map((p) => ({ p, s: scoreProduct(p, q) }))
-      .filter((x) => x.s >= 35)
+      .filter((x) => x.s >= 18)
       .sort((a, b) => b.s - a.s)
       .slice(0, 8)
       .map((x) => x.p);
