@@ -472,9 +472,6 @@ const ProductDetail = () => {
                       <span className="ml-2 font-normal text-muted-foreground">: {currentValue}</span>
                     )}
                   </p>
-                  {!isColor ? (
-                    <SizeAdvisorTrigger brand={product.vendor as never} label="Größenberater" />
-                  ) : null}
                 </div>
 
                 {isColor ? (
