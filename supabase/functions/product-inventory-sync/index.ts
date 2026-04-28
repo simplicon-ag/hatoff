@@ -145,14 +145,14 @@ function extractPriceFromHtml(html: string): { priceEur: number | null; compareA
 async function scrapeColor(url: string, colorId: string, fcKey: string): Promise<SourceColorData | null> {
   const html = await firecrawlScrape(url, fcKey);
   if (!html) return null;
-  const sizes = extractSizesFromHtml(html);
+  const { sizes, sizesDisplay } = extractSizesFromHtml(html);
   if (sizes.size === 0) {
     console.warn(`[sync] no sizes found for ${url}`);
     return null;
   }
   const colorName = extractColorFromHtml(html, url);
   const { priceEur, compareAtEur } = extractPriceFromHtml(html);
-  return { colorName, colorId, sizes, priceEur, compareAtEur };
+  return { colorName, colorId, sizes, sizesDisplay, priceEur, compareAtEur };
 }
 
 // ===========================================================================
