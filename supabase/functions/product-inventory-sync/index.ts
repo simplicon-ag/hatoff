@@ -94,22 +94,27 @@ function extractColorFromHtml(html: string, fallbackUrl: string): string {
   return "Unbekannt";
 }
 
-function extractSizesFromHtml(html: string): Map<string, boolean> {
+function extractSizesFromHtml(
+  html: string,
+): { sizes: Map<string, boolean>; sizesDisplay: Map<string, string> } {
   // Parse <option data-article-variant-size="S" data-article-variant-stock="1">
-  // Sizes are normalized to lowercase so that all map lookups (Schritt 4 & 5)
-  // are case-insensitive — Shopify variants and source sizes occasionally
-  // differ in casing ("S" vs "s", "3xl" vs "3XL").
+  // Map keys are normalized to lowercase so all lookups (Schritt 4 & 5) are
+  // case-insensitive — Shopify variants and source pages occasionally differ
+  // in casing ("S" vs "s", "3xl" vs "3XL").
   const sizes = new Map<string, boolean>();
+  const sizesDisplay = new Map<string, string>();
   const re = /data-article-variant-size="([^"]+)"\s+data-article-variant-stock="(\d+)"/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
-    const size = m[1].trim().toLowerCase();
+    const original = m[1].trim();
+    const key = original.toLowerCase();
     const stock = parseInt(m[2], 10);
-    if (!size) continue;
-    const prev = sizes.get(size);
-    sizes.set(size, (prev ?? false) || stock > 0);
+    if (!key) continue;
+    const prev = sizes.get(key);
+    sizes.set(key, (prev ?? false) || stock > 0);
+    if (!sizesDisplay.has(key)) sizesDisplay.set(key, original);
   }
-  return sizes;
+  return { sizes, sizesDisplay };
 }
 
 function extractPriceFromHtml(html: string): { priceEur: number | null; compareAtEur: number | null } {
