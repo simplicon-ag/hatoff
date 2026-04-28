@@ -332,8 +332,7 @@ async function createVariant(
 // ===========================================================================
 
 function resolveAdminToken(): string {
-  const direct = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  if (direct && direct.startsWith("shpat_")) return direct;
+  // Prefer the freshly-rotated online token (per-user, ~24h) over the older static admin token
   for (const [k, v] of Object.entries(Deno.env.toObject())) {
     if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v?.trim().startsWith("{")) {
       try {
@@ -343,6 +342,8 @@ function resolveAdminToken(): string {
       } catch { /* ignore */ }
     }
   }
+  const direct = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+  if (direct && direct.startsWith("shpat_")) return direct;
   return direct ?? "";
 }
 
