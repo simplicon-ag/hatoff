@@ -294,16 +294,14 @@ Deno.serve(async (req) => {
       handles: l.product_handles,
     }));
 
-    const systemPrompt = `Du bist Senior-Stylist der HATOFF Boutique (Schweiz, gehobenes Herrenmodesegment).
-Du erhältst ein neues Anker-Produkt, einen Katalog möglicher Begleitstücke und eine Liste bereits existierender Looks zu diesem Anker.
-
-Schlage 0 bis 2 NEUE Looks vor — nur dann, wenn die Kombinationen sich SIGNIFIKANT von den bereits existierenden unterscheiden (anderer Anlass, andere Saison, andere Stilrichtung). Lieber 0 als ein redundanter Look.
+    const baseRules = `Du bist Senior-Stylist der HATOFF Boutique (Schweiz, gehobenes Herrenmodesegment).
+Du erhältst ein Anker-Produkt, einen Katalog möglicher Begleitstücke und eine Liste bereits existierender Looks zu diesem Anker.
 
 Pro Look (2-4 Stücke inkl. Anker):
 - slug: kurzer URL-Slug (kleinbuchstaben, bindestriche)
 - title: 2-4 Wörter, redaktionell, nicht werblich (z.B. "Smart Casual am Café")
 - subtitle: ein knapper, atmosphärischer Satz
-- welt: EINE von [business, hemden, jacken, sommer, freizeit, abend]
+- welt: EINE von [business, hemden, jacken, sommer, freizeit, abend, fruehling-sommer, herbst-winter]
 - anlaesse: 1-3 Tags aus [buero, alltag, ausgang, reisen, sommer, abend, besondere-anlaesse, wochenende]
 - product_handles: Anker-Handle ZUERST, dann 1-3 Begleiter (NUR Handles aus dem Katalog)
 - story: 2-3 Sätze, wie ein Magazin-Editorial, persönlich
@@ -311,9 +309,24 @@ Pro Look (2-4 Stücke inkl. Anker):
 
 Regeln:
 - KEINE Accessoires (Gürtel, Schal, Krawatte, Mütze, Cap, Socken)
-- Farbharmonie: klassische Kombinationen bevorzugen
 - Vermeide Stücke aus derselben Hauptkategorie wie der Anker
-- MARKEN-MIX ist ausdrücklich erwünscht: Kombiniere bevorzugt Stücke verschiedener Marken (z.B. Venti-Hemd + Casa-Moda-Hose + Pierre-Cardin-Sakko). Ein Look aus 3 Marken wirkt kuratierter als ein Mono-Brand-Set.
+- MARKEN-MIX ist ausdrücklich erwünscht: Kombiniere bevorzugt Stücke verschiedener Marken (z.B. Venti-Hemd + Casa-Moda-Hose + Pierre-Cardin-Sakko)`;
+
+    const systemPrompt = isDiverse
+      ? `${baseRules}
+
+Du erstellst GENAU 4 Looks, die sich klar voneinander unterscheiden. Jeder Look folgt einer eigenen Achse:
+1. **Look 1 — Formell/Business**: Anlass-Achse "buero" oder "besondere-anlaesse". Welt: business / abend / hemden. Klassische, dezente Farbpalette.
+2. **Look 2 — Casual/Wochenende**: Anlass-Achse "wochenende" oder "alltag". Welt: freizeit / hemden. Entspannte, lässige Kombi.
+3. **Look 3 — Saisonal**: Wähle entweder "fruehling-sommer" (helle, leichte Stoffe, Leinen, Pastell) ODER "herbst-winter" (Layering, Strick, erdige Töne, dunklere Palette) — abhängig davon, was zum Anker stilistisch besser passt. Welt entsprechend.
+4. **Look 4 — Farbkontrast**: Mutigere, unerwartetere Farbkombination als Look 1-3 (z.B. Olive + Rost, Bordeaux + Camel, Senf + Navy). Welt frei wählbar, aber stilistisch raffiniert.
+
+Die 4 Looks MÜSSEN sich in Anlass, Saison UND Farbpalette unterscheiden. Vermeide ähnliche Hero-Stimmungen.
+Wenn der Katalog für eine Achse keine sinnvolle Kombi hergibt, wähle die nächstbeste Achse — aber liefere immer 4 Looks.`
+      : `${baseRules}
+
+Schlage 0 bis 2 NEUE Looks vor — nur dann, wenn die Kombinationen sich SIGNIFIKANT von den bereits existierenden unterscheiden (anderer Anlass, andere Saison, andere Stilrichtung). Lieber 0 als ein redundanter Look.
+- Farbharmonie: klassische Kombinationen bevorzugen
 - Wenn keine signifikant neuen Kombinationen möglich sind: leeres looks-Array zurückgeben`;
 
     const userPrompt = `ANKER-PRODUKT:
@@ -339,21 +352,21 @@ ${existingForAnchor.length > 0 ? JSON.stringify(existingForPrompt, null, 2) : "(
             type: "function",
             function: {
               name: "propose_looks",
-              description: "Liefert 0 bis 2 neue Look-Vorschläge.",
+              description: isDiverse ? "Liefert genau 4 diverse Look-Vorschläge." : "Liefert 0 bis 2 neue Look-Vorschläge.",
               parameters: {
                 type: "object",
                 properties: {
                   looks: {
                     type: "array",
-                    minItems: 0,
-                    maxItems: 2,
+                    minItems: isDiverse ? 4 : 0,
+                    maxItems: isDiverse ? 4 : 2,
                     items: {
                       type: "object",
                       properties: {
                         slug: { type: "string" },
                         title: { type: "string" },
                         subtitle: { type: "string" },
-                        welt: { type: "string", enum: ["business", "hemden", "jacken", "sommer", "freizeit", "abend"] },
+                        welt: { type: "string", enum: ["business", "hemden", "jacken", "sommer", "freizeit", "abend", "fruehling-sommer", "herbst-winter"] },
                         anlaesse: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 3 },
                         product_handles: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
                         story: { type: "string" },
