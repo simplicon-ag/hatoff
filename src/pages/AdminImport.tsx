@@ -420,6 +420,27 @@ export default function AdminImport() {
           )}
         </Card>
 
+        {/* Inventar-Sync */}
+        <Card className="p-6 space-y-3 border-amber-300/40 bg-amber-50/30">
+          <div className="flex items-start gap-4">
+            <div className="rounded-full bg-amber-500/15 p-3 shrink-0">
+              <RefreshCcw className="h-5 w-5 text-amber-700" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <h2 className="font-medium">Inventar-Sync (Farben · Grössen pro Farbe · Preise)</h2>
+              <p className="text-sm text-muted-foreground">
+                Gleicht alle Casa-Moda- und Venti-Produkte mit der Original-Webseite ab: fehlende Farben werden ergänzt,
+                Grössen werden <strong>pro Farbe einzeln</strong> auf den echten Bestand gesetzt (ausverkaufte Grössen werden im Picker ausgegraut),
+                Preise und Sale-Status werden aktualisiert. <strong>Bilder werden nicht verändert.</strong>
+                Läuft automatisch jede Nacht.
+              </p>
+            </div>
+            <Button onClick={runInventorySync} disabled={syncBusy} variant="outline" className="shrink-0">
+              {syncBusy ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Startet…</> : <><RefreshCcw className="h-4 w-4 mr-2" /> Jetzt starten</>}
+            </Button>
+          </div>
+        </Card>
+
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
