@@ -409,8 +409,17 @@ async function syncProduct(
   locationId: number,
 ): Promise<{ ok: boolean; error?: string; stats?: SyncStats; title?: string }> {
   if (!row.shopify_product_id) return { ok: false, error: "no shopify_product_id" };
-  const colorUrls = row.scraped_data?.color_urls ?? [];
-  if (colorUrls.length === 0) return { ok: false, error: "no color_urls in scraped_data" };
+
+  // Build the list of (url, colorId) tuples to scrape.
+  // Preferred: scraped_data.color_urls captured during initial import.
+  // Fallback: many older imports never stored color_urls — in that case use
+  // source_url alone (single-color sync) so we can at least keep size
+  // availability for the one colour that was originally imported.
+  let colorUrls = row.scraped_data?.color_urls ?? [];
+  if (colorUrls.length === 0 && row.source_url) {
+    colorUrls = [{ url: row.source_url, colorId: "fallback" }];
+  }
+  if (colorUrls.length === 0) return { ok: false, error: "no color_urls and no source_url" };
 
   // 1) Scrape every colour page (sequentially to be gentle on Firecrawl).
   const sourceColors: SourceColorData[] = [];
