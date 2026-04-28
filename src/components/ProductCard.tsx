@@ -90,6 +90,24 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
 
   const images = p.images.edges;
 
+  // Zweites Bild derselben Farbe finden (gleicher Casa-Moda-Prefix wie image-1).
+  // Beispiel: 12165-148-image-1-... → suche 12165-148-image-2-...
+  const colorSecondaryImage = useMemo(() => {
+    if (!colorImage?.url) return null;
+    const all = images.map((e) => e.node);
+    const prefix = colorImage.url.match(/\/([^/?]+-image-)\d+-/)?.[1];
+    if (prefix) {
+      const second = all.find((g) => g.url.includes(`/${prefix}2-`));
+      if (second && second.url !== colorImage.url) return second;
+    }
+    // Fallback: erstes anderes Bild der Farb-Varianten
+    const variantUrls = new Set(
+      variantsForColor.map((v) => v.image?.url).filter(Boolean) as string[],
+    );
+    const other = all.find((g) => variantUrls.has(g.url) && g.url !== colorImage.url);
+    return other ?? null;
+  }, [colorImage, images, variantsForColor]);
+
   // Heuristik: Rückseite / Detail-Aufnahmen aus dem Alt-Text erkennen und überspringen.
   // So landen Front-Aufnahmen zuverlässig als Hauptbild.
   const isBackOrDetail = (alt?: string | null) => {
