@@ -94,8 +94,8 @@ export const PRODUCTS_LIST_QUERY = `
           productType
           tags
           priceRange { minVariantPrice { amount currencyCode } }
-          images(first: 12) { edges { node { url altText } } }
-          variants(first: 30) {
+          images(first: 30) { edges { node { url altText } } }
+          variants(first: 100) {
             edges {
               node {
                 id
@@ -188,7 +188,7 @@ export async function fetchProducts(first = 50, query?: string): Promise<Shopify
 const productListCache = new Map<string, ShopifyProduct[]>();
 const productListInFlight = new Map<string, Promise<ShopifyProduct[]>>();
 
-const LS_PREFIX = "hatoff:plist:v5:";
+const LS_PREFIX = "hatoff:plist:v6:";
 const LS_TTL_MS = 15 * 60 * 1000; // 15 Minuten
 
 function readLocalCache(key: string): ShopifyProduct[] | null {
