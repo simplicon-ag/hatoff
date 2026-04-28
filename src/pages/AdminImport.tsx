@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2, Link2, CheckCircle2, Rocket } from "lucide-react";
+import { AlertTriangle, Loader2, Play, RefreshCw, Square, Search, Trash2, Link2, CheckCircle2, Rocket, RefreshCcw } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 
 type SingleImportResult = {
@@ -89,6 +89,24 @@ export default function AdminImport() {
   const [singleUrl, setSingleUrl] = useState("");
   const [singleBusy, setSingleBusy] = useState(false);
   const [singleResult, setSingleResult] = useState<SingleImportResult | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+
+  const runInventorySync = async () => {
+    if (!confirm("Inventar-Sync starten?\n\nGleicht Farben, Grössen (pro Farbe!) und Preise mit casamoda.com + venti.com ab.\nBilder werden NICHT verändert.\n\nDauer: ~60-90 min, läuft im Hintergrund.")) return;
+    setSyncBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("product-inventory-sync", { body: { mode: "start" } });
+      if (error) throw error;
+      toast.success(`Inventar-Sync gestartet: ${data?.total ?? 0} Produkte`);
+      // Kick off the first batch immediately
+      supabase.functions.invoke("product-inventory-sync", { body: { mode: "batch", batch_size: 3 } }).catch(() => {});
+      fetchAll();
+    } catch (err) {
+      toast.error(`Sync-Start fehlgeschlagen: ${(err as Error).message}`);
+    } finally {
+      setSyncBusy(false);
+    }
+  };
 
   const fetchAll = async () => {
     const [{ data: jobData }, { data: logData }] = await Promise.all([
@@ -400,6 +418,27 @@ export default function AdminImport() {
               )}
             </div>
           )}
+        </Card>
+
+        {/* Inventar-Sync */}
+        <Card className="p-6 space-y-3 border-amber-300/40 bg-amber-50/30">
+          <div className="flex items-start gap-4">
+            <div className="rounded-full bg-amber-500/15 p-3 shrink-0">
+              <RefreshCcw className="h-5 w-5 text-amber-700" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <h2 className="font-medium">Inventar-Sync (Farben · Grössen pro Farbe · Preise)</h2>
+              <p className="text-sm text-muted-foreground">
+                Gleicht alle Casa-Moda- und Venti-Produkte mit der Original-Webseite ab: fehlende Farben werden ergänzt,
+                Grössen werden <strong>pro Farbe einzeln</strong> auf den echten Bestand gesetzt (ausverkaufte Grössen werden im Picker ausgegraut),
+                Preise und Sale-Status werden aktualisiert. <strong>Bilder werden nicht verändert.</strong>
+                Läuft automatisch jede Nacht.
+              </p>
+            </div>
+            <Button onClick={runInventorySync} disabled={syncBusy} variant="outline" className="shrink-0">
+              {syncBusy ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Startet…</> : <><RefreshCcw className="h-4 w-4 mr-2" /> Jetzt starten</>}
+            </Button>
+          </div>
         </Card>
 
         <Alert>
