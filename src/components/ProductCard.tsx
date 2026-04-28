@@ -89,8 +89,33 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
   }, [initialColor, variantsForColor]);
 
   const images = p.images.edges;
-  const primary = colorImage ?? images[0]?.node ?? null;
-  const secondary = colorImage ? null : images[1]?.node ?? null;
+
+  // Heuristik: Rückseite / Detail-Aufnahmen aus dem Alt-Text erkennen und überspringen.
+  // So landen Front-Aufnahmen zuverlässig als Hauptbild.
+  const isBackOrDetail = (alt?: string | null) => {
+    if (!alt) return false;
+    return /(back|rück|hinten|reverse|detail|close[-\s]?up|sleeve|ärmel|aermel|button|kragen|collar|inside|innen)/i.test(
+      alt,
+    );
+  };
+  const isFront = (alt?: string | null) => {
+    if (!alt) return false;
+    return /(front|vorne|vorder)/i.test(alt);
+  };
+
+  const orderedImages = useMemo(() => {
+    const list = images.map((e) => e.node);
+    if (list.length <= 1) return list;
+    // Erst explizite Front-Bilder, dann neutrale, dann Rück/Detail.
+    return [...list].sort((a, b) => {
+      const score = (img: typeof a) =>
+        isFront(img.altText) ? 0 : isBackOrDetail(img.altText) ? 2 : 1;
+      return score(a) - score(b);
+    });
+  }, [images]);
+
+  const primary = colorImage ?? orderedImages[0] ?? null;
+  const secondary = colorImage ? null : orderedImages[1] ?? null;
 
   // Farb-Indikator als kleine Punkte unter dem Bild (PKZ-Stil)
   const colorSwatches = useMemo(() => {
