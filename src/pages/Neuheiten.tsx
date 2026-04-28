@@ -32,6 +32,8 @@ const Neuheiten = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  useScrollRestore("neuheiten-scroll", !loading);
+
   // Nur Produkte mit Tag `neu` / `new` / `neuheit` (Präfixe wie `art:` ignorieren)
   // UND ohne `sale`-Tag — Sale-Artikel gehören in den Sale-Bereich, nicht zu Neuheiten.
   const newest = useMemo(() => {

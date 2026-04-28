@@ -42,6 +42,8 @@ const Sale = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  useScrollRestore(`sale-scroll:${sort}`, !loading);
+
   const onSaleProducts = useMemo(() => {
     // Sale-Produkte: müssen Tag `sale` tragen UND mind. eine reduzierte Variante haben.
     const list = products.filter((p) => {

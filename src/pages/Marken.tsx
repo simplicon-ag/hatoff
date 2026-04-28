@@ -33,6 +33,8 @@ const MarkenDetail = () => {
     fetchProducts(50, `vendor:${marke.name}`).then(setProducts);
   }, [marke]);
 
+  useScrollRestore(`marken-scroll:${slug ?? ""}`, products.length > 0);
+
   if (!marke) {
     return (
       <SiteLayout>

@@ -42,6 +42,8 @@ const Saison = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  useScrollRestore(`saison-scroll:${validSlug}:${sort}`, !loading);
+
   useEffect(() => {
     let active = true;
     supabase
