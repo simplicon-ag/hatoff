@@ -1,0 +1,1 @@
+UPDATE public.curated_looks SET status='published', published_at=now() WHERE status='draft' AND updated_at > now() - interval '95 minutes';
