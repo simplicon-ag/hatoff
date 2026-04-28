@@ -82,11 +82,36 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
       );
   }, [p.variants.edges, initialColor]);
 
+  // Normalisiert Farbnamen für Fuzzy-Matching gegen Alt-Text / Dateinamen.
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/ä/g, "a")
+      .replace(/ö/g, "o")
+      .replace(/ü/g, "u")
+      .replace(/ß/g, "ss")
+      .replace(/[^a-z0-9]/g, "");
+
   const colorImage = useMemo(() => {
     if (!initialColor) return null;
+    // 1) Variant mit eigenem Bild
     const withImg = variantsForColor.find((v) => v.image?.url);
-    return withImg?.image ?? null;
-  }, [initialColor, variantsForColor]);
+    if (withImg?.image) return withImg.image;
+    // 2) Fallback: Galeriebild, dessen Alt-Text / URL den Farbnamen enthält
+    const needle = normalize(initialColor);
+    if (needle.length >= 3) {
+      const all = p.images.edges.map((e) => e.node);
+      const match = all.find(
+        (g) =>
+          normalize(g.altText ?? "").includes(needle) ||
+          normalize(decodeURIComponent(g.url.split("/").pop() ?? "")).includes(needle),
+      );
+      if (match) return match;
+    }
+    return null;
+  }, [initialColor, variantsForColor, p.images.edges]);
 
   const images = p.images.edges;
 
@@ -100,13 +125,26 @@ export const ProductCard = ({ product, priority, initialColor, compactCart = fal
       const second = all.find((g) => g.url.includes(`/${prefix}2-`));
       if (second && second.url !== colorImage.url) return second;
     }
+    // Fallback: zweites Bild, dessen Alt/URL ebenfalls den Farbnamen enthält
+    if (initialColor) {
+      const needle = normalize(initialColor);
+      if (needle.length >= 3) {
+        const sameColor = all.filter(
+          (g) =>
+            g.url !== colorImage.url &&
+            (normalize(g.altText ?? "").includes(needle) ||
+              normalize(decodeURIComponent(g.url.split("/").pop() ?? "")).includes(needle)),
+        );
+        if (sameColor[0]) return sameColor[0];
+      }
+    }
     // Fallback: erstes anderes Bild der Farb-Varianten
     const variantUrls = new Set(
       variantsForColor.map((v) => v.image?.url).filter(Boolean) as string[],
     );
     const other = all.find((g) => variantUrls.has(g.url) && g.url !== colorImage.url);
     return other ?? null;
-  }, [colorImage, images, variantsForColor]);
+  }, [colorImage, images, variantsForColor, initialColor]);
 
   // Heuristik: Rückseite / Detail-Aufnahmen aus dem Alt-Text erkennen und überspringen.
   // So landen Front-Aufnahmen zuverlässig als Hauptbild.
