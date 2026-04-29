@@ -152,6 +152,48 @@ export type Database = {
         }
         Relationships: []
       }
+      product_color_group: {
+        Row: {
+          brand: string
+          color: string
+          created_at: string
+          display_order: number
+          id: string
+          parent_article_id: string
+          shopify_handle: string
+          shopify_product_id: string | null
+          source_url: string | null
+          swatch_image_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand: string
+          color: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          parent_article_id: string
+          shopify_handle: string
+          shopify_product_id?: string | null
+          source_url?: string | null
+          swatch_image_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand?: string
+          color?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          parent_article_id?: string
+          shopify_handle?: string
+          shopify_product_id?: string | null
+          source_url?: string | null
+          swatch_image_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       product_import_job: {
         Row: {
           created_count: number
