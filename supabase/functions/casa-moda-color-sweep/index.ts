@@ -65,12 +65,32 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const dryRun = body.dry_run === undefined ? true : Boolean(body.dry_run);
-    const limitStyles = Number(body.limit_styles ?? 10) || 10; // default small batch
+    const dryRun = body.dry_run === undefined ? false : Boolean(body.dry_run);
+    const limitStyles = Number(body.limit_styles ?? 25) || 25;
     const onlyStyle = String(body.only_style ?? "").trim();
-    const offset = Math.max(0, Number(body.offset ?? 0) || 0);
+    const useState = body.use_state === undefined ? true : Boolean(body.use_state);
+    const stateId = String(body.state_id ?? "casa-moda-default");
     const maxRuntimeMs = Math.max(5000, Math.min(50000, Number(body.max_runtime_ms ?? 40000) || 40000));
     const startTime = Date.now();
+
+    // Read offset from state table (unless explicit offset given)
+    let offset = Math.max(0, Number(body.offset ?? 0) || 0);
+    if (useState && body.offset === undefined && !onlyStyle && !dryRun) {
+      const { data: st } = await supabase
+        .from("sweep_state")
+        .select("offset_value, finished_at")
+        .eq("id", stateId)
+        .maybeSingle();
+      if (st) {
+        if (st.finished_at) {
+          return new Response(
+            JSON.stringify({ success: true, message: "sweep already finished", state_id: stateId, finished_at: st.finished_at }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        offset = st.offset_value ?? 0;
+      }
+    }
 
     // 1. Alle bekannten Casa-Moda Source-URLs holen (synced + pending + syncing + sync_pending + sync_error)
     //    -> daraus Style-IDs ableiten und ein Set bekannter colorIds pro Style bauen
