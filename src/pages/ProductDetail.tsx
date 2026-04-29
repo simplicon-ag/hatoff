@@ -17,6 +17,7 @@ import { useProductReviews } from "@/hooks/useProductReviews";
 import { YouMightAlsoLike } from "@/components/YouMightAlsoLike";
 import { ClubMemberCta } from "@/components/ClubMemberCta";
 import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
+import SizeRequestDialog from "@/components/SizeRequestDialog";
 import {
   fetchProductByHandle,
   fetchProducts,
@@ -533,48 +534,90 @@ const ProductDetail = () => {
                   </div>
                 ) : (
                   // Text-Buttons für Grösse / sonstige Optionen
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(() => {
-                      // Eindeutige Werte basierend auf Varianten, die zur aktuell gewählten Farbe passen
-                      const colourValue = currentValue && isColor ? currentValue : selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
-                      const seen = new Map<string, { variantId: string; available: boolean }>();
-                      for (const { node: v } of product.variants.edges) {
-                        const value = v.selectedOptions.find((o) => o.name === opt.name)?.value;
-                        if (!value) continue;
-                        // Wenn es eine Farbe gibt, nur Varianten dieser Farbe für die Grössen-Buttons
-                        if (colourValue) {
-                          const vColor = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
-                          if (vColor && vColor !== colourValue) continue;
+                  <>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(() => {
+                        // Eindeutige Werte basierend auf Varianten, die zur aktuell gewählten Farbe passen
+                        const colourValue = currentValue && isColor ? currentValue : selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                        const seen = new Map<string, { variantId: string; available: boolean }>();
+                        for (const { node: v } of product.variants.edges) {
+                          const value = v.selectedOptions.find((o) => o.name === opt.name)?.value;
+                          if (!value) continue;
+                          // Wenn es eine Farbe gibt, nur Varianten dieser Farbe für die Grössen-Buttons
+                          if (colourValue) {
+                            const vColor = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                            if (vColor && vColor !== colourValue) continue;
+                          }
+                          const existing = seen.get(value);
+                          if (!existing || (!existing.available && v.availableForSale)) {
+                            seen.set(value, { variantId: v.id, available: v.availableForSale });
+                          }
                         }
-                        const existing = seen.get(value);
-                        if (!existing || (!existing.available && v.availableForSale)) {
-                          seen.set(value, { variantId: v.id, available: v.availableForSale });
-                        }
-                      }
-                      return Array.from(seen.entries()).map(([value, info]) => {
-                        const active = value === currentValue;
-                        return (
-                          <button
-                            key={value}
-                            onClick={() => {
-                              setUserPickedVariant(true);
-                              setSelectedVariantId(info.variantId);
-                            }}
-                            disabled={!info.available}
-                            className={cn(
-                              "min-w-12 border px-4 py-2 text-sm transition",
-                              active
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border bg-background hover:border-primary",
-                              !info.available && "line-through opacity-40",
-                            )}
-                          >
-                            {value}
-                          </button>
-                        );
-                      });
-                    })()}
-                  </div>
+                        return Array.from(seen.entries()).map(([value, info]) => {
+                          const active = value === currentValue;
+                          return (
+                            <button
+                              key={value}
+                              onClick={() => {
+                                setUserPickedVariant(true);
+                                setSelectedVariantId(info.variantId);
+                              }}
+                              disabled={!info.available}
+                              className={cn(
+                                "min-w-12 border px-4 py-2 text-sm transition",
+                                active
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-background hover:border-primary",
+                                !info.available && "line-through opacity-40",
+                              )}
+                            >
+                              {value}
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                    {(opt.name === "Grösse" || opt.name === "Size") && (
+                      <div className="mt-3">
+                        <SizeRequestDialog
+                          productHandle={product.handle}
+                          productTitle={product.title}
+                          brand={product.vendor}
+                          color={selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value}
+                          availableSizes={(() => {
+                            const colourValue = selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                            const list: string[] = [];
+                            const seen = new Set<string>();
+                            for (const { node: v } of product.variants.edges) {
+                              if (!v.availableForSale) continue;
+                              if (colourValue) {
+                                const vColor = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                                if (vColor && vColor !== colourValue) continue;
+                              }
+                              const sz = v.selectedOptions.find((o) => o.name === opt.name)?.value;
+                              if (sz && !seen.has(sz)) { seen.add(sz); list.push(sz); }
+                            }
+                            return list;
+                          })()}
+                          soldOutSizes={(() => {
+                            const colourValue = selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                            const list: string[] = [];
+                            const seen = new Set<string>();
+                            for (const { node: v } of product.variants.edges) {
+                              if (v.availableForSale) continue;
+                              if (colourValue) {
+                                const vColor = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                                if (vColor && vColor !== colourValue) continue;
+                              }
+                              const sz = v.selectedOptions.find((o) => o.name === opt.name)?.value;
+                              if (sz && !seen.has(sz)) { seen.add(sz); list.push(sz); }
+                            }
+                            return list;
+                          })()}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -633,14 +676,44 @@ const ProductDetail = () => {
             </div>
           </div>
 
-          <Button
-            onClick={handleAdd}
-            disabled={isLoading || !available}
-            size="lg"
-            className="mt-8 w-full"
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : available ? "In den Warenkorb" : "Ausverkauft"}
-          </Button>
+          {available ? (
+            <Button
+              onClick={handleAdd}
+              disabled={isLoading}
+              size="lg"
+              className="mt-8 w-full"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "In den Warenkorb"}
+            </Button>
+          ) : (
+            <SizeRequestDialog
+              productHandle={product.handle}
+              productTitle={product.title}
+              brand={product.vendor}
+              color={selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value}
+              defaultSize={selectedVariant?.selectedOptions.find((o) => o.name === "Grösse" || o.name === "Size")?.value}
+              availableSizes={[]}
+              soldOutSizes={(() => {
+                const colourValue = selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                const list: string[] = [];
+                const seen = new Set<string>();
+                for (const { node: v } of product.variants.edges) {
+                  if (colourValue) {
+                    const vColor = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                    if (vColor && vColor !== colourValue) continue;
+                  }
+                  const sz = v.selectedOptions.find((o) => o.name === "Grösse" || o.name === "Size")?.value;
+                  if (sz && !seen.has(sz)) { seen.add(sz); list.push(sz); }
+                }
+                return list;
+              })()}
+              trigger={
+                <Button size="lg" variant="secondary" className="mt-8 w-full">
+                  Ausverkauft — Grösse anfragen
+                </Button>
+              }
+            />
+          )}
 
           <div className="mt-8">
             <TrustBadges />

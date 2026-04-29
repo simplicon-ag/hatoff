@@ -431,6 +431,60 @@ export type Database = {
         }
         Relationships: []
       }
+      size_requests: {
+        Row: {
+          admin_note: string | null
+          brand: string | null
+          color: string | null
+          created_at: string
+          customer_email: string
+          customer_name: string
+          id: string
+          message: string | null
+          parent_article_id: string | null
+          product_handle: string
+          product_title: string | null
+          requested_size: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_note?: string | null
+          brand?: string | null
+          color?: string | null
+          created_at?: string
+          customer_email: string
+          customer_name: string
+          id?: string
+          message?: string | null
+          parent_article_id?: string | null
+          product_handle: string
+          product_title?: string | null
+          requested_size: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_note?: string | null
+          brand?: string | null
+          color?: string | null
+          created_at?: string
+          customer_email?: string
+          customer_name?: string
+          id?: string
+          message?: string | null
+          parent_article_id?: string | null
+          product_handle?: string
+          product_title?: string | null
+          requested_size?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       style_inspiration_cache: {
         Row: {
           created_at: string
