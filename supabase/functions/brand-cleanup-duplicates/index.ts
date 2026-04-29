@@ -61,9 +61,7 @@ Deno.serve(async (req) => {
     const maxPages = Math.max(1, Math.min(40, Number(body.max_pages ?? 20)));
 
     const domain = Deno.env.get("SHOPIFY_STORE_DOMAIN") ?? "style-compass-6nrqi.myshopify.com";
-    const token =
-      Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ??
-      Deno.env.get("SHOPIFY_ACCESS_TOKEN") ?? "";
+    const token = resolveAdminToken();
     if (!token) {
       return new Response(
         JSON.stringify({ success: false, error: "SHOPIFY_ADMIN_API_TOKEN missing" }),
