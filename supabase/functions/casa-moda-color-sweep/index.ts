@@ -66,8 +66,11 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === undefined ? true : Boolean(body.dry_run);
-    const limitStyles = Number(body.limit_styles ?? 0) || 0; // 0 = no limit
+    const limitStyles = Number(body.limit_styles ?? 10) || 10; // default small batch
     const onlyStyle = String(body.only_style ?? "").trim();
+    const offset = Math.max(0, Number(body.offset ?? 0) || 0);
+    const maxRuntimeMs = Math.max(5000, Math.min(50000, Number(body.max_runtime_ms ?? 40000) || 40000));
+    const startTime = Date.now();
 
     // 1. Alle bekannten Casa-Moda Source-URLs holen (synced + pending + syncing + sync_pending + sync_error)
     //    -> daraus Style-IDs ableiten und ein Set bekannter colorIds pro Style bauen
