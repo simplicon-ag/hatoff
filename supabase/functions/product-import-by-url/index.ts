@@ -787,20 +787,33 @@ function buildProductPayload(
 // Token resolution
 // ============================================================
 
+function isValidShopifyToken(t: string | null | undefined): t is string {
+  if (!t) return false;
+  // Admin API tokens: shpat_, OAuth online/offline: shpua_/shpca_, custom apps: shpss_
+  return /^shp(at|ua|ca|ss|pa)_/.test(t.trim());
+}
+
 function resolveAdminToken(): string {
-  const direct =
-    Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  if (direct && direct.startsWith("shpat_")) return direct;
+  // 1) Prefer the Lovable-managed OAuth token (auto-rotated). Stored as JSON
+  //    under a key starting with "SHOPIFY_ONLINE_ACCESS_TOKEN".
   for (const [k, v] of Object.entries(Deno.env.toObject())) {
-    if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v?.trim().startsWith("{")) {
+    if (!k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN")) continue;
+    const raw = v?.trim() ?? "";
+    if (raw.startsWith("{")) {
       try {
-        const parsed = JSON.parse(v);
+        const parsed = JSON.parse(raw);
         const t = parsed.access_token ?? parsed.accessToken ?? parsed.token;
-        if (typeof t === "string" && t.startsWith("shpat_")) return t;
+        if (isValidShopifyToken(t)) return t;
       } catch { /* ignore */ }
+    } else if (isValidShopifyToken(raw)) {
+      return raw;
     }
   }
-  return direct ?? "";
+  // 2) Fallback: legacy admin secret (may be expired).
+  const legacy =
+    Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+  if (isValidShopifyToken(legacy)) return legacy!;
+  return legacy ?? "";
 }
 
 // ============================================================
