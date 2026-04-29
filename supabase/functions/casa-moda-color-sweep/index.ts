@@ -97,26 +97,38 @@ Deno.serve(async (req) => {
       info.knownColors.add(ids.colorId);
     }
 
-    const styleIds = Array.from(styleMap.keys());
-    const styleSlice = limitStyles > 0 ? styleIds.slice(0, limitStyles) : styleIds;
+    const styleIds = Array.from(styleMap.keys()).sort();
+    const styleSlice = styleIds.slice(offset, offset + limitStyles);
 
     let scanned = 0;
     let stylesWithMissing = 0;
     let inserted = 0;
+    let lastProcessedIndex = offset;
+    let timedOut = false;
     const newRows: Array<{ source_url: string; brand: string; status: string }> = [];
     const details: Array<Record<string, unknown>> = [];
 
-    for (const styleId of styleSlice) {
+    for (let i = 0; i < styleSlice.length; i++) {
+      if (Date.now() - startTime > maxRuntimeMs) {
+        timedOut = true;
+        break;
+      }
+      const styleId = styleSlice[i];
       const info = styleMap.get(styleId)!;
       scanned++;
+      lastProcessedIndex = offset + i + 1;
       try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
         const res = await fetch(info.sampleUrl, {
           headers: {
             "User-Agent":
               "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
             "Accept-Language": "de-DE,de;q=0.9",
           },
+          signal: ctrl.signal,
         });
+        clearTimeout(t);
         if (!res.ok) {
           details.push({ styleId, error: `HTTP ${res.status}`, sampleUrl: info.sampleUrl });
           continue;
@@ -146,9 +158,6 @@ Deno.serve(async (req) => {
       } catch (e) {
         details.push({ styleId, error: e instanceof Error ? e.message : String(e) });
       }
-
-      // Kurze Pause, um Casa Moda nicht zu hämmern
-      await new Promise((r) => setTimeout(r, 250));
     }
 
     // 4. Insert (chunked), wenn nicht dry_run
