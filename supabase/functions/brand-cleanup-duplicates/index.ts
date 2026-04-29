@@ -13,6 +13,22 @@ const corsHeaders = {
 
 const ADMIN_VERSION = "2025-07";
 
+function resolveAdminToken(): string {
+  const direct =
+    Deno.env.get("SHOPIFY_ADMIN_API_TOKEN") ?? Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+  if (direct && direct.startsWith("shpat_")) return direct;
+  for (const [k, v] of Object.entries(Deno.env.toObject())) {
+    if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v?.trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(v);
+        const t = parsed.access_token ?? parsed.accessToken ?? parsed.token;
+        if (typeof t === "string" && t.startsWith("shpat_")) return t;
+      } catch { /* ignore */ }
+    }
+  }
+  return direct ?? "";
+}
+
 async function listAllProducts(domain: string, token: string, maxPages: number) {
   const all: Array<{ id: number; handle: string; vendor: string; created_at: string }> = [];
   let url: string | null =
