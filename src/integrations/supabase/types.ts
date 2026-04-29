@@ -515,6 +515,33 @@ export type Database = {
         }
         Relationships: []
       }
+      sweep_state: {
+        Row: {
+          finished_at: string | null
+          id: string
+          last_run_at: string
+          notes: Json
+          offset_value: number
+          total_value: number
+        }
+        Insert: {
+          finished_at?: string | null
+          id: string
+          last_run_at?: string
+          notes?: Json
+          offset_value?: number
+          total_value?: number
+        }
+        Update: {
+          finished_at?: string | null
+          id?: string
+          last_run_at?: string
+          notes?: Json
+          offset_value?: number
+          total_value?: number
+        }
+        Relationships: []
+      }
       wishlist_items: {
         Row: {
           created_at: string
