@@ -146,7 +146,8 @@ export default function SizeRequestDialog({
                 {sizes.map(([s, state]) => (
                   <SelectItem key={s} value={s}>
                     {s}
-                    {state === "soldout" ? " (ausverkauft)" : ""}
+                    {state === "soldout" && " — ausverkauft"}
+                    {state === "unlisted" && " — auf Anfrage"}
                   </SelectItem>
                 ))}
               </SelectContent>
