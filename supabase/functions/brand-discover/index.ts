@@ -98,7 +98,7 @@ function extractProductUrlsFromListing(html: string, brand: string): string[] {
   );
   const matches = html.match(re) ?? [];
   // Also match relative paths
-  const reRel = /href=["']/de/de/[a-z0-9-]+-\d{3,8}-\d{1,5}["']/gi;
+  const reRel = new RegExp(`href=["']\\/de\\/de\\/[a-z0-9-]+-\\d{3,8}-\\d{1,5}["']`, "gi");
   const relMatches = html.match(reRel) ?? [];
   const baseHost = brand === "casa-moda" ? "https://www.casamoda.com" : "https://www.venti.com";
   const out = new Set<string>();
