@@ -36,17 +36,14 @@ Deno.serve(async (req) => {
     const productStatus = String(body.status ?? "draft").toLowerCase() === "active" ? "active" : "draft";
     const categoryTag = String(body.category_tag ?? "").trim();
 
-    let q = supabase
-      .from("product_import_log")
-      .select("id, brand, source_url")
-      .eq("status", "sync_pending")
-      .in("brand", ["casa-moda", "venti"])
-      .order("created_at", { ascending: true })
-      .limit(batchSize);
-    if (brandFilter === "casa-moda" || brandFilter === "venti") {
-      q = q.eq("brand", brandFilter);
-    }
-    const { data: rows, error: selErr } = await q;
+    // Atomically claim a batch (prevents race conditions across parallel workers)
+    const { data: rows, error: selErr } = await supabase.rpc(
+      "claim_pending_import_rows",
+      {
+        _batch_size: batchSize,
+        _brand: brandFilter === "casa-moda" || brandFilter === "venti" ? brandFilter : null,
+      },
+    );
     if (selErr) throw selErr;
 
     if (!rows || rows.length === 0) {
@@ -55,13 +52,6 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    // Mark as syncing so concurrent ticks don't double-process
-    const ids = rows.map((r) => r.id);
-    await supabase
-      .from("product_import_log")
-      .update({ status: "syncing", updated_at: new Date().toISOString() })
-      .in("id", ids);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
