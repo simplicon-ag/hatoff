@@ -676,14 +676,44 @@ const ProductDetail = () => {
             </div>
           </div>
 
-          <Button
-            onClick={handleAdd}
-            disabled={isLoading || !available}
-            size="lg"
-            className="mt-8 w-full"
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : available ? "In den Warenkorb" : "Ausverkauft"}
-          </Button>
+          {available ? (
+            <Button
+              onClick={handleAdd}
+              disabled={isLoading}
+              size="lg"
+              className="mt-8 w-full"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "In den Warenkorb"}
+            </Button>
+          ) : (
+            <SizeRequestDialog
+              productHandle={product.handle}
+              productTitle={product.title}
+              brand={product.vendor}
+              color={selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value}
+              defaultSize={selectedVariant?.selectedOptions.find((o) => o.name === "Grösse" || o.name === "Size")?.value}
+              availableSizes={[]}
+              soldOutSizes={(() => {
+                const colourValue = selectedVariant?.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                const list: string[] = [];
+                const seen = new Set<string>();
+                for (const { node: v } of product.variants.edges) {
+                  if (colourValue) {
+                    const vColor = v.selectedOptions.find((o) => o.name === "Farbe" || o.name === "Color")?.value;
+                    if (vColor && vColor !== colourValue) continue;
+                  }
+                  const sz = v.selectedOptions.find((o) => o.name === "Grösse" || o.name === "Size")?.value;
+                  if (sz && !seen.has(sz)) { seen.add(sz); list.push(sz); }
+                }
+                return list;
+              })()}
+              trigger={
+                <Button size="lg" variant="secondary" className="mt-8 w-full">
+                  Ausverkauft — Grösse anfragen
+                </Button>
+              }
+            />
+          )}
 
           <div className="mt-8">
             <TrustBadges />
