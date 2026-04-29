@@ -573,6 +573,14 @@ export type Database = {
         Args: { _meta?: Json; _points: number; _reason: string }
         Returns: number
       }
+      claim_pending_import_rows: {
+        Args: { _batch_size: number; _brand?: string }
+        Returns: {
+          brand: string
+          id: string
+          source_url: string
+        }[]
+      }
       get_look_like_count: { Args: { _slug: string }; Returns: number }
       get_my_points: { Args: never; Returns: number }
     }
