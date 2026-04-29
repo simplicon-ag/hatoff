@@ -187,11 +187,14 @@ Deno.serve(async (req) => {
         success: true,
         dry_run: dryRun,
         styles_total: styleIds.length,
+        offset_in: offset,
+        next_offset: lastProcessedIndex < styleIds.length ? lastProcessedIndex : null,
+        timed_out: timedOut,
         styles_scanned: scanned,
         styles_with_missing: stylesWithMissing,
         missing_color_urls_found: inserted,
         inserted_into_log: insertedRealCount,
-        details: details.slice(0, 100), // limit response size
+        details: details.slice(0, 50),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
