@@ -54,10 +54,18 @@ export default function SizeRequestDialog({
   const [size, setSize] = useState(defaultSize ?? "");
   const [message, setMessage] = useState("");
 
-  // De-duplicate, mark sold-out
-  const sizeSet = new Map<string, "available" | "soldout">();
+  // Vollständige Standard-Größenpalette für Herrenoberteile/Hemden (Casa Moda, Venti)
+  // Numerische Kragenweiten + Buchstabengrössen, damit Kunden auch nicht-gelistete Grössen anfragen können.
+  const STANDARD_SIZES = [
+    "37/38", "39/40", "41/42", "43/44", "45/46", "47/48",
+    "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL",
+  ];
+
+  // De-duplicate: alle Standard-Grössen + tatsächliche Varianten (verfügbar / ausverkauft)
+  const sizeSet = new Map<string, "available" | "soldout" | "unlisted">();
+  for (const s of STANDARD_SIZES) sizeSet.set(s, "unlisted");
+  for (const s of soldOutSizes) sizeSet.set(s, "soldout");
   for (const s of availableSizes) sizeSet.set(s, "available");
-  for (const s of soldOutSizes) if (!sizeSet.has(s)) sizeSet.set(s, "soldout");
   const sizes = Array.from(sizeSet.entries());
 
   async function handleSubmit(e: React.FormEvent) {
@@ -138,7 +146,8 @@ export default function SizeRequestDialog({
                 {sizes.map(([s, state]) => (
                   <SelectItem key={s} value={s}>
                     {s}
-                    {state === "soldout" ? " (ausverkauft)" : ""}
+                    {state === "soldout" && " — ausverkauft"}
+                    {state === "unlisted" && " — auf Anfrage"}
                   </SelectItem>
                 ))}
               </SelectContent>
