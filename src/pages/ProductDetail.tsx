@@ -17,6 +17,7 @@ import { useProductReviews } from "@/hooks/useProductReviews";
 import { YouMightAlsoLike } from "@/components/YouMightAlsoLike";
 import { ClubMemberCta } from "@/components/ClubMemberCta";
 import { SizeAdvisorTrigger } from "@/components/SizeAdvisor";
+import SizeRequestDialog from "@/components/SizeRequestDialog";
 import {
   fetchProductByHandle,
   fetchProducts,
