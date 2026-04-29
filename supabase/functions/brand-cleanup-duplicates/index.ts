@@ -30,9 +30,9 @@ function resolveAdminToken(): string {
 }
 
 async function listAllProducts(domain: string, token: string, maxPages: number) {
-  const all: Array<{ id: number; handle: string; vendor: string; created_at: string }> = [];
+  const all: Array<{ id: number; handle: string; vendor: string; created_at: string; tags: string }> = [];
   let url: string | null =
-    `https://${domain}/admin/api/${ADMIN_VERSION}/products.json?fields=id,handle,vendor,created_at&limit=250`;
+    `https://${domain}/admin/api/${ADMIN_VERSION}/products.json?fields=id,handle,vendor,created_at,tags&limit=250`;
   let page = 0;
   while (url && page < maxPages) {
     page++;
@@ -41,7 +41,6 @@ async function listAllProducts(domain: string, token: string, maxPages: number) 
     const data = await r.json();
     for (const p of data.products ?? []) {
       if (!/casa|venti/i.test(p.vendor ?? "")) continue;
-      if (!/-(\d+)-(\d+)$/.test(p.handle)) continue;
       all.push(p);
     }
     const link = r.headers.get("link") ?? "";
