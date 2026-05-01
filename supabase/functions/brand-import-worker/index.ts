@@ -29,12 +29,19 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const startTime = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
     const batchSize = Math.max(1, Math.min(20, Number(body.batch_size ?? 5)));
     const brandFilter = String(body.brand ?? "").trim();
     const productStatus = String(body.status ?? "draft").toLowerCase() === "active" ? "active" : "draft";
     const categoryTag = String(body.category_tag ?? "").trim();
+    // Wall-clock budget per worker invocation. Edge functions are killed around 150s,
+    // and a single product import takes ~30-70s. We stop claiming new work
+    // before we run out of time so nothing stays stuck on 'syncing'.
+    const maxRuntimeMs = Math.max(20000, Math.min(120000, Number(body.max_runtime_ms ?? 90000)));
+    const perItemBudgetMs = 75000; // safety margin per product
+    const timeLeft = () => maxRuntimeMs - (Date.now() - startTime);
 
     // Atomically claim a batch (prevents race conditions across parallel workers)
     const { data: rows, error: selErr } = await supabase.rpc(
