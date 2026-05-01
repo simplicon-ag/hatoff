@@ -65,9 +65,21 @@ Deno.serve(async (req) => {
 
     let ok = 0;
     let failed = 0;
+    let skipped = 0;
     const results: Array<Record<string, unknown>> = [];
 
     for (const row of rows) {
+      // Stop if we don't have time for another product. Release the claim
+      // back to sync_pending so the next worker invocation can pick it up.
+      if (timeLeft() < perItemBudgetMs) {
+        await supabase
+          .from("product_import_log")
+          .update({ status: "sync_pending", updated_at: new Date().toISOString() })
+          .eq("id", row.id);
+        skipped++;
+        results.push({ id: row.id, ok: false, skipped: true, reason: "time-budget" });
+        continue;
+      }
       const ids = parseProductIds(row.source_url);
       if (!ids) {
         await supabase
