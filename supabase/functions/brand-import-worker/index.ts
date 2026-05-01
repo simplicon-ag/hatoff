@@ -193,6 +193,8 @@ Deno.serve(async (req) => {
         processed: rows.length,
         ok,
         failed,
+        skipped,
+        runtime_ms: Date.now() - startTime,
         results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
