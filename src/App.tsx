@@ -53,7 +53,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner position="top-center" />
-      <BrowserRouter>
+      <BrowserRouter basename="/hatoff">
         <ScrollToTop />
         <CartSyncBoundary>
           <SizeAdvisorProvider>
